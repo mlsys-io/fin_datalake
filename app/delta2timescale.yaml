@@ -39,7 +39,8 @@ spec:
     fs.s3a.connection.ttl: "300000"
     fs.s3a.threads.keepalivetime: "60"
 
-    fs.s3a.committer.name: directory
+    fs.s3a.committer.name: magic
+    fs.s3a.bucket.all.committer.magic.enabled: "true"
 
     fs.s3a.multipart.purge: "false"
     fs.s3a.multipart.purge.age: "86400"
