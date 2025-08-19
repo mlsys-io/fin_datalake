@@ -1,0 +1,42 @@
+image:
+  repository: sslhep/hive-metastore     # public image (or keep chart default)
+  tag: "3.1.3"
+  pullPolicy: IfNotPresent
+
+# Internal Postgres via Bitnami subchart (defaults are fine for dev)
+postgresql:
+  postgresqlUsername: hive
+  postgresqlPassword: hive
+  postgresqlDatabase: metastore
+
+# Optional convenience knobs the chart exposes for object stores.
+# You can set these OR set the fs.s3a.* properties below (or both).
+objectStore:
+  externalURI: "http://minio.default.svc.cluster.local:9000"  # or https://...
+  accessKey: "hive"
+  secretKey: "hivehive"
+
+# ---- hive-site.xml (rendered from this map) ----
+conf:
+  hiveSite:
+    "metastore.warehouse.dir": "s3a://hive/warehouse/tablespace/managed/hive"
+    "hive.metastore.warehouse.external.dir": "s3a://hive/warehouse/tablespace/external/hive"
+    "hive.metastore.warehouse.dir": "s3a://hive/warehouse/tablespace/managed/hive"
+
+    # HMS thrift URI that clients (Spark/Trino/etc.) will use
+    "hive.metastore.uris": "thrift://hive-metastore:9083"
+
+    # --- S3A (MinIO) essentials ---
+    # Use the S3A filesystem
+    "fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
+    # Point at your MinIO endpoint (URL for third-party stores is fine)
+    "fs.s3a.endpoint": "http://minio.default.svc.cluster.local:9000"  # set https://... if TLS
+    # MinIO is path-style; enable it
+    "fs.s3a.path.style.access": "true"
+    # Toggle SSL if your MinIO is HTTPS
+    "fs.s3a.connection.ssl.enabled": "false"                 # true if TLS
+
+    # Credentials (simple provider is fine for dev)
+    "fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+    "fs.s3a.access.key": "hive"
+    "fs.s3a.secret.key": "hivehive"
