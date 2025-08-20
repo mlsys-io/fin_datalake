@@ -5,7 +5,7 @@ replicas: 1 # Not applicable in standalone mode
 # --- Disable persistence (ephemeral) ---
 persistence:
   enabled: true
-  size: 8Gi
+  size: 50Gi
   storageClass: standard
 
 # --- Pre-create buckets ---
