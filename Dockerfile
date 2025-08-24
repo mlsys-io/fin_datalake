@@ -60,12 +60,18 @@ RUN set -eux; \
       '*.period=10' \
     > "${SPARK_HOME}/conf/hadoop-metrics2.properties"
 
-# 4) Add Python bits for optional TimescaleDB DDL helpers
+# 4) Add Python bits for optional TimescaleDB DDL helpers and Spark MLlib
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends python3-pip; \
-    pip3 install --no-cache-dir psycopg2-binary==2.9.9; \
+    pip3 install --no-cache-dir \
+      delta-spark==4.0.0 \
+      psycopg2-binary==2.9.9 \
+      numpy pandas pyarrow scipy scikit-learn; \
     rm -rf /var/lib/apt/lists/*
+
+# 5) Install html preprocessing modules
+RUN pip3 install trafilatura bs4 lxml
 
 # Bitnami runs as uid 1001
 RUN chown -R 1001:1001 "${SPARK_HOME}/jars" /opt/hadoop "${SPARK_HOME}/conf"
