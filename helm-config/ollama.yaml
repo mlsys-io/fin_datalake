@@ -1,0 +1,65 @@
+# Namespace note: we'll install into "ollama" below.
+
+image:
+  # leave defaults; chart pins a compatible tag
+  repository: ollama/ollama
+  pullPolicy: IfNotPresent
+
+ollama:
+  port: 11434
+
+  # --- CPU only ---
+  gpu:
+    enabled: false
+
+  # --- models ---
+  # Pull these at startup so the first request isn't slow,
+  # and "run" loads one into memory immediately.
+  models:
+    pull:
+      - "llama3.2:1b-instruct-q4_K_M"   # good CPU quant; ~800–900MB
+    run:
+      - "llama3.2:1b-instruct-q4_K_M"
+
+  # Optional: keep models warm longer (seconds)
+  # See env list for more knobs like OLLAMA_KEEP_ALIVE
+  # https://github.com/ollama/ollama/blob/main/envconfig/config.go
+  # (set via extraEnv below)
+
+serviceAccount:
+  name: ollama
+
+# Persist model blobs across pod restarts
+persistentVolume:
+  enabled: true
+  size: 20Gi           # enough for a few small models; bump if you add more
+  # storageClass: ""   # leave empty to use minikube's default
+
+# Resource tuning for your box (minikube has overhead; keep headroom)
+resources:
+  requests:
+    cpu: "4"
+    memory: "20Gi"
+  limits:
+    cpu: "4"
+    memory: "64Gi"
+
+# Environment tweaks (optional but handy on CPU)
+extraEnv:
+  - name: OLLAMA_KEEP_ALIVE
+    value: "86400"       # keep a loaded model alive 24h idle
+  - name: OLLAMA_NUM_PARALLEL
+    value: "4"         # small concurrency for 1B on CPU
+  # - name: OLLAMA_KV_CACHE_TYPE
+  #   value: "q8_0"    # experiment if you load larger models
+
+# Ingress (optional). If you want a hostname on minikube, enable addon:
+#   minikube addons enable ingress
+# …then uncomment below and set your host.
+# ingress:
+#   enabled: true
+#   hosts:
+#     - host: ollama.local
+#       paths:
+#         - path: /
+#           pathType: Prefix
