@@ -1,0 +1,6 @@
+apiVersion: v2
+name: hive-metastore
+description: Hive Standalone Metastore 4.1.0 (PostgreSQL/TimescaleDB backend)
+type: application
+version: 0.1.0
+appVersion: "4.1.0"

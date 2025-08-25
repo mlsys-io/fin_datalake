@@ -1,0 +1,13 @@
+Hive Metastore is deploying.
+
+Service:   hive-metastore
+Port:      {{ .Values.service.port }}
+
+To test from your machine:
+  kubectl port-forward svc/hive-metastore {{ .Values.service.port }}:{{ .Values.service.port }}
+
+Then point Spark/Trino to:
+  thrift://localhost:{{ .Values.service.port }}
+
+In-cluster URI for Spark/Trino:
+  thrift://{{ include "hms.fullname" . }}:{{ .Values.service.port }}

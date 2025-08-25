@@ -1,0 +1,72 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "hms.fullname" . }}-init-schema
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+        - name: hive-site
+          configMap: { name: {{ include "hms.fullname" . }}-hive-site }
+        - name: metastore-site
+          configMap: { name: {{ include "hms.fullname" . }}-metastore-site }
+        - name: core-site
+          configMap: { name: {{ include "hms.fullname" . }}-core-site }
+        - name: aux-jars
+          emptyDir: {}
+      containers:
+        - name: init
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          env:
+            - name: HADOOP_CONF_DIR
+              value: /opt/hadoop/etc/hadoop
+            - name: HIVE_CONF_DIR
+              value: /opt/hive/conf
+            - name: METASTORE_AUX_JARS_PATH
+              value: /opt/hive/aux
+            - name: HADOOP_CLASSPATH
+              value: /opt/hive/aux/*
+            - name: HMS_DB_USER
+              value: postgres
+            - name: HMS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hms-db-postgresql
+                  key: postgres-password
+          volumeMounts:
+            - name: hive-site
+              mountPath: /opt/hive/conf/hive-site.xml
+              subPath: hive-site.xml
+            - name: metastore-site
+              mountPath: /opt/hive/conf/metastore-site.xml
+              subPath: metastore-site.xml
+            - name: core-site
+              mountPath: /opt/hadoop/etc/hadoop/core-site.xml
+              subPath: core-site.xml
+            - name: aux-jars
+              mountPath: /opt/hive/aux
+          command: ["/bin/bash","-lc"]
+          args:
+            - |
+              # Fetch Postgres JDBC if missing
+              if ! ls /opt/hive/aux/postgresql-*.jar >/dev/null 2>&1; then
+                curl -fsSL -o /opt/hive/aux/postgresql-42.7.4.jar \
+                  https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar
+              fi
+              if ! ls /opt/hive/aux/hadoop-aws-3.4.1.jar >/dev/null 2>&1; then
+                curl -fsSL -o /opt/hive/aux/hadoop-aws-3.4.1.jar \
+                  https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.1/hadoop-aws-3.4.1.jar
+              fi
+              if ! ls /opt/hive/aux/bundle-2.24.6.jar >/dev/null 2>&1; then
+                curl -fsSL -o /opt/hive/aux/bundle-2.24.6.jar \
+                  https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.24.6/bundle-2.24.6.jar
+              fi
+              set -euo pipefail
+              /opt/hive/bin/schematool -dbType postgres -info \
+                -userName "${HMS_DB_USER}" -passWord "${HMS_DB_PASSWORD}" || \
+              /opt/hive/bin/schematool -dbType postgres -initSchema \
+                -userName "${HMS_DB_USER}" -passWord "${HMS_DB_PASSWORD}"
