@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hms.fullname" . }}
+  labels:
+    {{- include "hms.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "hms.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "hms.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      volumes:
+        - name: hive-site
+          configMap: { name: {{ include "hms.fullname" . }}-hive-site }
+        - name: metastore-site
+          configMap: { name: {{ include "hms.fullname" . }}-metastore-site }
+        - name: core-site
+          configMap: { name: {{ include "hms.fullname" . }}-core-site }
+        - name: aux-jars
+          emptyDir: {}
+      containers:
+        - name: metastore
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - name: thrift
+              containerPort: {{ .Values.service.port }}   # HMS Thrift (9083 default)
+          env:
+            - name: HADOOP_CONF_DIR
+              value: /opt/hadoop/etc/hadoop
+            - name: HIVE_CONF_DIR
+              value: /opt/hive/conf
+            - name: METASTORE_AUX_JARS_PATH
+              value: /opt/hive/aux
+            - name: HADOOP_CLASSPATH
+              value: /opt/hive/aux/*
+            - name: HMS_DB_USER
+              value: postgres
+            - name: HMS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hms-db-postgresql
+                  key: postgres-password
+          envFrom:
+            {{- if and .Values.s3.useEnvSecret .Values.s3.secretName }}
+            - secretRef: { name: {{ .Values.s3.secretName }} }   # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+            {{- end }}
+          volumeMounts:
+            - name: hive-site
+              mountPath: /opt/hive/conf/hive-site.xml
+              subPath: hive-site.xml
+            - name: metastore-site
+              mountPath: /opt/hive/conf/metastore-site.xml
+              subPath: metastore-site.xml
+            - name: core-site
+              mountPath: /opt/hadoop/etc/hadoop/core-site.xml
+              subPath: core-site.xml
+            - name: aux-jars
+              mountPath: /opt/hive/aux
+          readinessProbe:
+            tcpSocket: { port: {{ .Values.service.port }} }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: {{ .Values.service.port }} }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          command: ["/bin/bash","-lc"]
+          args:
+            - |
+              # Fetch Postgres JDBC if missing
+              if ! ls /opt/hive/aux/postgresql-*.jar >/dev/null 2>&1; then
+                curl -fsSL -o /opt/hive/aux/postgresql-42.7.4.jar \
+                  https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar
+              fi
+              # Get S3A dependencies matching Hadoop 3.4.1
+              if ! ls /opt/hive/aux/hadoop-aws-3.4.1.jar >/dev/null 2>&1; then
+                curl -fsSL -o /opt/hive/aux/hadoop-aws-3.4.1.jar \
+                  https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.1/hadoop-aws-3.4.1.jar
+              fi
+              if ! ls /opt/hive/aux/bundle-2.24.6.jar >/dev/null 2>&1; then
+                curl -fsSL -o /opt/hive/aux/bundle-2.24.6.jar \
+                  https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.24.6/bundle-2.24.6.jar
+              fi
+              exec /opt/hive/bin/start-metastore

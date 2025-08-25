@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hms.fullname" . }}-hive-site
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"  # runs before the Job (weight 0)
+data:
+  hive-site.xml: |
+    <configuration>
+      <property>
+        <name>hive.metastore.thrift.bind.host</name>
+        <value>{{ .Values.metastore.thriftBindHost }}</value>
+      </property>
+      <property>
+        <name>hive.metastore.uris</name>
+        <value>thrift://{{ include "hms.fullname" . }}:{{ .Values.service.port }}</value>
+      </property>
+      <property>
+        <name>hive.metastore.warehouse.dir</name>
+        <value>{{ .Values.metastore.warehouseDir }}</value>
+      </property>
+
+      <!-- Metastore JDBC (pull user/pass from env) -->
+      <property>
+        <name>javax.jdo.option.ConnectionDriverName</name>
+        <value>{{ .Values.db.driver }}</value>
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionURL</name>
+        <value>{{ .Values.db.url }}</value>
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionUserName</name>
+        <value>${env.HMS_DB_USER}</value>
+      </property>
+      <property>
+        <name>javax.jdo.option.ConnectionPassword</name>
+        <value>${env.HMS_DB_PASSWORD}</value>
+      </property>
+
+      <!-- Once schema is initialized, keep verification on -->
+      <property>
+        <name>hive.metastore.schema.verification</name>
+        <value>true</value>
+      </property>
+    </configuration>
