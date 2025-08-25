@@ -1,0 +1,86 @@
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: silver
+  namespace: default
+spec:
+  type: Python
+  mode: cluster
+  image: timzsu1104/spark4:0.0.5
+  imagePullPolicy: IfNotPresent
+
+  mainApplicationFile: local:///opt/app/cs4221/silver.py
+
+  sparkVersion: 4.0.0
+
+  sparkConf:
+    # Hive catalog (Delta tables get registered here)
+    spark.sql.catalogImplementation: hive
+    spark.sql.warehouse.dir: "s3a://hive/warehouse/tablespace/managed/hive"
+    spark.sql.hive.metastore.version: 4.0.1
+    spark.sql.hive.metastore.jars: maven
+    # spark.sql.hive.metastore.jars: path
+    # spark.sql.hive.metastore.jars.path: /opt/hive4client/*
+
+    # Delta Lake on Spark 4
+    spark.sql.extensions: io.delta.sql.DeltaSparkSessionExtension
+    spark.sql.catalog.spark_catalog: org.apache.spark.sql.delta.catalog.DeltaCatalog
+    # S3-compatible log store (required for Delta on MinIO/S3A)
+    spark.delta.logStore.class: org.apache.spark.sql.delta.storage.S3SingleDriverLogStore
+
+    # (Nice to have) fewer shuffles at small scale; adjust for your cluster
+    spark.sql.shuffle.partitions: "64"
+    # Keep everything in UTC to match your script defaults
+    spark.sql.session.timeZone: "UTC"
+
+    # Use cloud commit protocol for non-Delta writes if any show up
+    spark.sql.sources.commitProtocolClass: org.apache.spark.internal.io.cloud.PathOutputCommitProtocol
+    spark.sql.parquet.output.committer.class: org.apache.spark.internal.io.cloud.BindingParquetOutputCommitter
+
+  hadoopConf:
+    hive.metastore.uris: thrift://hms-hive-metastore.hive.svc:9083
+
+    # MinIO S3A
+    fs.s3a.endpoint: http://myminio-hl.minio-tenant.svc.cluster.local:9000
+    fs.s3a.access.key: hive
+    fs.s3a.secret.key: hivehive
+    fs.s3a.path.style.access: "true"
+    fs.s3a.aws.credentials.provider: org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider
+    fs.s3a.connection.ssl.enabled: "false"
+
+    # Connection tuning (kept from yours)
+    fs.s3a.connection.timeout: "60000"
+    fs.s3a.connection.acquisition.timeout: "60000"
+    fs.s3a.connection.establish.timeout: "30000"
+    fs.s3a.connection.idle.time: "60000"
+    fs.s3a.connection.request.timeout: "60000"
+    fs.s3a.connection.ttl: "300000"
+    fs.s3a.threads.keepalivetime: "60"
+
+    # Committers: fine to keep for generic writes, but note Delta does its own thing
+    fs.s3a.committer.name: magic
+    fs.s3a.bucket.all.committer.magic.enabled: "true"
+    mapreduce.fileoutputcommitter.algorithm.version: "2"
+    mapreduce.fileoutputcommitter.cleanup-failures.ignored: "true"
+    mapreduce.fileoutputcommitter.marksuccessfuljobs: "false"
+
+    fs.s3a.multipart.purge: "false"
+    fs.s3a.multipart.purge.age: "86400"
+
+  driver:
+    cores: 1
+    memory: 2g
+    serviceAccount: spark-operator-spark
+    volumeMounts:
+      - name: app-code
+        mountPath: /opt/app/cs4221
+
+  executor:
+    cores: 1
+    instances: 10
+    memory: 5g
+
+  volumes:
+    - name: app-code
+      configMap:
+        name: cs4221-cmap
