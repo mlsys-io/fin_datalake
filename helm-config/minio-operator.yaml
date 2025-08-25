@@ -1,0 +1,19 @@
+tenant:
+  name: myminio
+  # Point to the config secret created above (both fields for compatibility)
+  configuration:
+    name: minio-env
+  configSecret:
+    name: minio-env
+    existingSecret: true
+  
+  requestAutoCert: false     # <- disable Operator auto-certs (no TLS)
+
+  pools:
+    - name: pool-0
+      servers: 1            # single MinIO pod (fine for minikube)
+      volumesPerServer: 4   # 4 PVCs per pod (erasure on one node)
+      size: 10Gi            # each PVC size
+      storageClassName: standard  # <- set to your default SC
+
+  # auto TLS is on by default; you can customize later if needed
