@@ -26,7 +26,7 @@ RUN mvn -q -B dependency:copy-dependencies -DincludeScope=runtime -DoutputDirect
 
 # ---------- Stage 2: pull Hadoop native libs (match Hadoop 3.4.x used by Spark 4 cloud jars) ----------
 FROM debian:12-slim AS hadoop_native
-ARG HADOOP_VERSION=3.4.0
+ARG HADOOP_VERSION=3.4.1
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl tar && \
     rm -rf /var/lib/apt/lists/*
 
@@ -75,5 +75,15 @@ RUN pip3 install trafilatura bs4 lxml
 
 # Bitnami runs as uid 1001
 RUN chown -R 1001:1001 "${SPARK_HOME}/jars" /opt/hadoop "${SPARK_HOME}/conf"
+
+ENV ROOT_IVY_DIR=/root/.ivy2.5.2
+ENV SPARK_IVY_DIR=/opt/bitnami/spark/.ivy2.5.2
+RUN ${SPARK_HOME}/bin/spark-sql \
+  --conf spark.sql.hive.metastore.jars=maven \
+  --conf spark.sql.hive.metastore.version=4.0.1 \
+  --conf spark.sql.hive.metastore.uris=thrift://hms-hive-metastore.hive.svc:9083 -e "SHOW DATABASES;" || true
+RUN mkdir -p "${SPARK_IVY_DIR}"
+RUN cp -r "${ROOT_IVY_DIR}"/* "${SPARK_IVY_DIR}/"
+RUN chown -R 1001:1001 "/opt/bitnami/spark"
 
 USER 1001
