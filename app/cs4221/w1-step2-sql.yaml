@@ -78,7 +78,7 @@ spec:
       - name: WINDOW_DAYS
         value: "7"              # 14 for biweekly
       - name: RATIO
-        value: "0.05"           # 0.10 or 0.15
+        value: "0.15"           # 0.10 or 0.15
 
     # Init DDL runner
     initContainers:
