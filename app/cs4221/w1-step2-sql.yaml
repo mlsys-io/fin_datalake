@@ -1,0 +1,132 @@
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: w1-step2-sql
+  namespace: default
+spec:
+  type: Python
+  mode: cluster
+  image: timzsu1104/spark4:0.0.8
+  imagePullPolicy: IfNotPresent
+  mainApplicationFile: local:///opt/app/cs4221/sql_wrapper.py
+  sparkVersion: 4.0.0
+
+  sparkConf:
+    # Hive + Delta, etc. (match your cluster settings)
+    spark.sql.catalogImplementation: hive
+    spark.sql.warehouse.dir: "s3a://hive/warehouse/tablespace/managed/hive"
+    spark.sql.hive.metastore.version: 4.0.1
+    spark.sql.hive.metastore.jars: maven
+    spark.sql.extensions: io.delta.sql.DeltaSparkSessionExtension
+    spark.sql.catalog.spark_catalog: org.apache.spark.sql.delta.catalog.DeltaCatalog
+    spark.delta.logStore.class: org.apache.spark.sql.delta.storage.S3SingleDriverLogStore
+    spark.sql.shuffle.partitions: "64"
+    spark.sql.session.timeZone: "UTC"
+
+  hadoopConf:
+    hive.metastore.uris: thrift://hms-hive-metastore.hive.svc:9083
+    fs.s3a.endpoint: http://myminio-hl.minio-tenant.svc.cluster.local:9000
+    fs.s3a.access.key: hive
+    fs.s3a.secret.key: hivehive
+    fs.s3a.path.style.access: "true"
+    fs.s3a.aws.credentials.provider: org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider
+    fs.s3a.connection.ssl.enabled: "false"
+
+    fs.s3a.connection.timeout: "60000"
+    fs.s3a.connection.acquisition.timeout: "60000"
+    fs.s3a.connection.establish.timeout: "30000"
+    fs.s3a.connection.idle.time: "60000"
+    fs.s3a.connection.request.timeout: "60000"
+    fs.s3a.connection.ttl: "300000"
+    fs.s3a.threads.keepalivetime: "60"
+    fs.s3a.committer.name: magic
+    fs.s3a.bucket.all.committer.magic.enabled: "true"
+    mapreduce.fileoutputcommitter.algorithm.version: "2"
+    mapreduce.fileoutputcommitter.cleanup-failures.ignored: "true"
+    mapreduce.fileoutputcommitter.marksuccessfuljobs: "false"
+    fs.s3a.multipart.purge: "false"
+    fs.s3a.multipart.purge.age: "86400"
+
+  driver:
+    cores: 1
+    memory: 2g
+    serviceAccount: spark-operator-spark
+    env:
+      # ---- SQL file path (inside pod)
+      - name: SQL_PATH
+        value: /opt/app/cs4221/w1_step2.sql
+
+      # ---- TSDB JDBC (read/write targets)
+      - name: JDBC_URL
+        value: "jdbc:postgresql://tsdb-primary.postgres-operator.svc:5432/app"
+      - name: JDBC_USER
+        valueFrom:
+          secretKeyRef:
+            name: tsdb-pguser-app
+            key: user
+      - name: JDBC_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: tsdb-pguser-app
+            key: password
+
+      # ---- SQL parameters
+      - name: SCHEMA
+        value: public
+      - name: START_DATE
+        value: "2014-01-01"     # fixed alignment anchor
+      - name: WINDOW_DAYS
+        value: "7"              # 14 for biweekly
+      - name: RATIO
+        value: "0.05"           # 0.10 or 0.15
+
+    # Init DDL runner
+    initContainers:
+      - name: tsdb-ddl
+        image: bitnami/postgresql:17
+        imagePullPolicy: IfNotPresent
+        command: ["psql"] 
+        args:
+          - "-h"
+          - "$(JDBC_HOST)"
+          - "-p"
+          - "5432"
+          - "-U"
+          - "$(JDBC_USER)"
+          - "-d"
+          - "$(JDBC_DB)"
+          - "-v"
+          - "ON_ERROR_STOP=1"
+          - "-f"
+          - "/opt/app/cs4221/w1_step2_init.sql"
+        env:
+          - name: JDBC_HOST
+            value: "tsdb-primary.postgres-operator.svc.cluster.local"
+          - name: JDBC_DB
+            value: app
+          - name: JDBC_PORT
+            value: "5432"
+          - name: JDBC_USER
+            valueFrom: { secretKeyRef: { name: tsdb-pguser-app, key: user } }
+          - name: JDBC_PASSWORD
+            valueFrom: { secretKeyRef: { name: tsdb-pguser-app, key: password } }
+          - name: PGPASSWORD
+            valueFrom: { secretKeyRef: { name: tsdb-pguser-app, key: password } }
+
+        volumeMounts:
+          - name: app-code
+            mountPath: /opt/app/cs4221
+
+    volumeMounts:
+      - name: app-code
+        mountPath: /opt/app/cs4221
+
+  executor:
+    cores: 1
+    instances: 6
+    memory: 5g
+
+  volumes:
+    - name: app-code
+      configMap:
+        name: cs4221-cmap
