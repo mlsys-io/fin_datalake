@@ -86,4 +86,6 @@ RUN mkdir -p "${SPARK_IVY_DIR}"
 RUN cp -r "${ROOT_IVY_DIR}"/* "${SPARK_IVY_DIR}/"
 RUN chown -R 1001:1001 "/opt/bitnami/spark"
 
+RUN pip install requests
+
 USER 1001
