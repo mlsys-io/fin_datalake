@@ -1,6 +1,6 @@
 import os
 import uuid
-from pyspark.sql import SparkSession, functions as F
+from pyspark.sql import SparkSession, functions as F, types as T
 
 spark = SparkSession.builder \
     .appName("W1-Step1-ETL-TSDB") \
@@ -12,7 +12,42 @@ TSDB_URL       = os.getenv("TSDB_JDBC_URL", "jdbc:postgresql://timescaledb.defau
 TSDB_USER      = os.getenv("TSDB_USER", "postgres")
 TSDB_PASSWORD  = os.getenv("TSDB_PASSWORD", "postgres")
 TSDB_SCHEMA    = os.getenv("TSDB_SCHEMA", "public")
-EMBED_DIM      = int(os.getenv("EMBED_DIM", "768"))
+EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
+EMBED_DIM   = int(os.getenv("EMBED_DIM", "768"))
+EMBED_URL = os.getenv("OLLAMA_EMBED_URL", "http://ollama.ollama.svc.cluster.local:11434/api/embed")
+
+_session = None
+def _get_session():
+    global _session
+    if _session is None:
+        import requests
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+        s = requests.Session()
+        retry = Retry(total=3, backoff_factor=0.5,
+                      status_forcelist=(429, 500, 502, 503, 504),
+                      allowed_methods=["POST"])
+        s.mount("http://", HTTPAdapter(pool_connections=4, pool_maxsize=16, max_retries=retry))
+        s.mount("https://", HTTPAdapter(pool_connections=4, pool_maxsize=16, max_retries=retry))
+        _session = s
+    return _session
+
+def _embed_text(text: str):
+    if not text or not text.strip():
+        return None
+    s = _get_session()  # your cached requests.Session
+    r = s.post(EMBED_URL, json={
+        "model": EMBED_MODEL, 
+        "input": text,
+        "keep_alive": "30m"
+    }, timeout=120)
+    r.raise_for_status()
+    data = r.json()
+    # /api/embed returns "embeddings": [[...]] even for a single input
+    vec = (data.get("embeddings") or [None])[0]
+    return [float(x) for x in vec] if vec else None
+
+embed_text_udf = F.udf(_embed_text, T.ArrayType(T.FloatType()))
 
 jdbc_props = {
     "user": TSDB_USER,
@@ -57,8 +92,8 @@ def write_upsert(df, target_table, cols, key_cols, do_update=False):
 
     tgt_cols = ", ".join([f'"{c}"' for c in cols])
     casts = {
-        "id": "BIGINT",          # <-- add this
-        "ts": "TIMESTAMPTZ",     # <-- and this
+        "id": "BIGINT", 
+        "ts": "TIMESTAMPTZ", 
         "mktcap": "BIGINT"
     }
     cast_exprs = []
@@ -84,7 +119,7 @@ def write_upsert(df, target_table, cols, key_cols, do_update=False):
         ON CONFLICT ({conflict}) DO NOTHING
         """
     jdbcexec(merge_sql)
-    jdbcexec(f'DROP TABLE {TSDB_SCHEMA}."{stage}"')
+    jdbcexec(f'DROP TABLE {TSDB_SCHEMA}.{stage}')
 
 # Setup tables
 jdbcexec(f"CREATE SCHEMA IF NOT EXISTS {TSDB_SCHEMA}")
@@ -125,19 +160,40 @@ jdbcexec(f"CREATE INDEX IF NOT EXISTS profiles_industry_idx ON {TSDB_SCHEMA}.pro
 
 # RAG embeddings
 has_vector = True
-try: jdbcexec("CREATE EXTENSION IF NOT EXISTS vector")
-except: has_vector = False
+try: 
+    jdbcexec("CREATE EXTENSION IF NOT EXISTS vector")
+    print("vector extension available")
+except: 
+    print("vector extension not available, using float8[] instead")
+    has_vector = False
 if has_vector:
     jdbcexec(f"""
     CREATE TABLE IF NOT EXISTS {TSDB_SCHEMA}.news_embeddings (
-      doc_id BIGINT PRIMARY KEY REFERENCES {TSDB_SCHEMA}.news_articles(id) ON DELETE CASCADE,
-      embedding VECTOR({EMBED_DIM})
+    id BIGINT PRIMARY KEY REFERENCES {TSDB_SCHEMA}.news_articles(id) ON DELETE CASCADE,
+    embedding vector({EMBED_DIM})
     );
+
+    CREATE TABLE IF NOT EXISTS {TSDB_SCHEMA}.sec_embeddings (
+    id BIGINT PRIMARY KEY REFERENCES {TSDB_SCHEMA}.sec_filings(id) ON DELETE CASCADE,
+    embedding vector({EMBED_DIM})
+    );
+
+    CREATE INDEX IF NOT EXISTS news_embedding_hnsw
+    ON {TSDB_SCHEMA}.news_embeddings USING hnsw (embedding vector_cosine_ops);
+
+    CREATE INDEX IF NOT EXISTS sec_embedding_hnsw
+    ON {TSDB_SCHEMA}.sec_embeddings USING hnsw (embedding vector_cosine_ops);
     """)
 else:
     jdbcexec(f"""
     CREATE TABLE IF NOT EXISTS {TSDB_SCHEMA}.news_embeddings (
-      doc_id BIGINT PRIMARY KEY REFERENCES {TSDB_SCHEMA}.news_articles(id) ON DELETE CASCADE,
+      id BIGINT PRIMARY KEY REFERENCES {TSDB_SCHEMA}.news_articles(id) ON DELETE CASCADE,
+      embedding float8[]
+    );
+    """)
+    jdbcexec(f"""
+    CREATE TABLE IF NOT EXISTS {TSDB_SCHEMA}.sec_embeddings (
+      id BIGINT PRIMARY KEY REFERENCES {TSDB_SCHEMA}.sec_filings(id) ON DELETE CASCADE,
       embedding float8[]
     );
     """)
@@ -155,11 +211,75 @@ profiles_src = spark.table(f"{HIVE_DB_SILVER}.profiles_silver").select(
     F.col("industry"), F.col("sector"),
     F.col("mktCap").cast("long").alias("mktcap")
 )
+sec_filings_df = spark.table(f"{HIVE_DB_SILVER}.sec_filings_silver").select(
+    F.col("SYMBOL").alias("symbol"),
+    F.col("CIK").alias("id"),
+    F.col("filed_ts"),
+    F.col("form"),
+    F.col("text_content"),
+)
 
 # Prepare DFs
 articles_df = news.dropDuplicates(["id"]).drop("symbol")
 pairs_df = news.select("id", "symbol").dropDuplicates(["id", "symbol"])
 profiles_df = profiles_src.dropDuplicates(["symbol"])
+
+news_embed_df = (
+    articles_df
+    .select(
+        F.col("id").cast("long"),
+        F.concat_ws(" ",
+            F.coalesce("title", F.lit("")),
+            F.coalesce("summary", F.lit("")),
+            F.coalesce("content", F.lit(""))
+        ).alias("text_for_embed")
+    )
+    .withColumn("embedding", embed_text_udf(F.col("text_for_embed")))
+    .where(F.col("embedding").isNotNull())
+    .select("id", F.to_json("embedding").alias("embedding_json"))
+)
+
+# Use your write_upsert to save to a staging table with simple TEXT
+news_stg = f"{TSDB_SCHEMA}.news_embeddings_stg"
+jdbcexec(f"CREATE TABLE IF NOT EXISTS {news_stg} (id BIGINT PRIMARY KEY, embedding_json TEXT)")
+write_upsert(news_embed_df, "news_embeddings_stg", ["id","embedding_json"], ["id"])
+
+# Merge staging → real pgvector table (cast ::vector), then clear staging
+jdbcexec(f"""
+INSERT INTO {TSDB_SCHEMA}.news_embeddings (id, embedding)
+SELECT id, embedding_json::vector
+FROM {news_stg}
+ON CONFLICT (id) DO UPDATE SET embedding = EXCLUDED.embedding;
+
+DROP TABLE {news_stg};
+""")
+
+sec_embed_df = (
+    sec_filings_df
+    .select(
+        F.col("id").cast("long"),
+        F.concat_ws(" ",
+            F.coalesce("form", F.lit("")),
+            F.coalesce(F.substring("text_content", 1, 8000), F.lit(""))
+        ).alias("text_for_embed")
+    )
+    .withColumn("embedding", embed_text_udf(F.col("text_for_embed")))
+    .where(F.col("embedding").isNotNull())
+    .select("id", F.to_json("embedding").alias("embedding_json"))
+)
+
+sec_stg = f"{TSDB_SCHEMA}.sec_embeddings_stg"
+jdbcexec(f"CREATE TABLE IF NOT EXISTS {sec_stg} (id BIGINT PRIMARY KEY, embedding_json TEXT)")
+write_upsert(sec_embed_df, "sec_embeddings_stg", ["id","embedding_json"], ["id"])
+
+jdbcexec(f"""
+INSERT INTO {TSDB_SCHEMA}.sec_embeddings (id, embedding)
+SELECT id, embedding_json::vector
+FROM {sec_stg}
+ON CONFLICT (id) DO UPDATE SET embedding = EXCLUDED.embedding;
+
+DROP TABLE {sec_stg};
+""")
 
 # Write to TSDB
 write_upsert(articles_df, "news_articles", ["id","ts","title","summary","content","url","source"], ["id"])

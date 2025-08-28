@@ -6,7 +6,7 @@ metadata:
 spec:
   type: Python
   mode: cluster
-  image: timzsu1104/spark4:0.0.8
+  image: timzsu1104/spark4:0.0.9
   imagePullPolicy: IfNotPresent
   mainApplicationFile: local:///opt/app/cs4221/w1_step1_etl_tsdb.py
   sparkVersion: 4.0.0
@@ -72,8 +72,6 @@ spec:
             key: password
       - name: TSDB_SCHEMA
         value: public
-      - name: EMBED_DIM
-        value: "768"
     volumeMounts:
       - name: app-code
         mountPath: /opt/app/cs4221

@@ -1,7 +1,4 @@
-# Namespace note: we'll install into "ollama" below.
-
 image:
-  # leave defaults; chart pins a compatible tag
   repository: ollama/ollama
   pullPolicy: IfNotPresent
 
@@ -18,13 +15,9 @@ ollama:
   models:
     pull:
       - "llama3.2:1b-instruct-q4_K_M"   # good CPU quant; ~800–900MB
+      - "nomic-embed-text"
     run:
       - "llama3.2:1b-instruct-q4_K_M"
-
-  # Optional: keep models warm longer (seconds)
-  # See env list for more knobs like OLLAMA_KEEP_ALIVE
-  # https://github.com/ollama/ollama/blob/main/envconfig/config.go
-  # (set via extraEnv below)
 
 serviceAccount:
   name: ollama
@@ -38,10 +31,10 @@ persistentVolume:
 # Resource tuning for your box (minikube has overhead; keep headroom)
 resources:
   requests:
-    cpu: "4"
+    cpu: "6"
     memory: "20Gi"
   limits:
-    cpu: "4"
+    cpu: "6"
     memory: "64Gi"
 
 # Environment tweaks (optional but handy on CPU)
@@ -52,14 +45,3 @@ extraEnv:
     value: "4"         # small concurrency for 1B on CPU
   # - name: OLLAMA_KV_CACHE_TYPE
   #   value: "q8_0"    # experiment if you load larger models
-
-# Ingress (optional). If you want a hostname on minikube, enable addon:
-#   minikube addons enable ingress
-# …then uncomment below and set your host.
-# ingress:
-#   enabled: true
-#   hosts:
-#     - host: ollama.local
-#       paths:
-#         - path: /
-#           pathType: Prefix
