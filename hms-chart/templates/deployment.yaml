@@ -25,6 +25,11 @@ spec:
           configMap: { name: {{ include "hms.fullname" . }}-core-site }
         - name: aux-jars
           emptyDir: {}
+        {{- if and .Values.s3.caCertConfigMap }}
+        - name: minio-ca
+          configMap:
+            name: {{ .Values.s3.caCertConfigMap }}
+        {{- end }}
       containers:
         - name: metastore
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -47,9 +52,19 @@ spec:
                 secretKeyRef:
                   name: hms-db-postgresql
                   key: postgres-password
-          envFrom:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Djavax.net.ssl.trustStore=/tmp/minio-truststore.jks -Djavax.net.ssl.trustStorePassword=changeit"
             {{- if and .Values.s3.useEnvSecret .Values.s3.secretName }}
-            - secretRef: { name: {{ .Values.s3.secretName }} }   # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.s3.secretName }}
+                  key: username
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.s3.secretName }}
+                  key: password
             {{- end }}
           volumeMounts:
             - name: hive-site
@@ -63,6 +78,11 @@ spec:
               subPath: core-site.xml
             - name: aux-jars
               mountPath: /opt/hive/aux
+            {{- if and .Values.s3.caCertConfigMap }}
+            - name: minio-ca
+              mountPath: /opt/certs/public.crt
+              subPath: public.crt
+            {{- end }}
           readinessProbe:
             tcpSocket: { port: {{ .Values.service.port }} }
             initialDelaySeconds: 10
@@ -88,4 +108,9 @@ spec:
                 curl -fsSL -o /opt/hive/aux/bundle-2.24.6.jar \
                   https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.24.6/bundle-2.24.6.jar
               fi
+              keytool -importcert -trustcacerts \
+                -alias minio-root-ca \
+                -file /opt/certs/public.crt \
+                -keystore /tmp/minio-truststore.jks \
+                -storepass changeit -noprompt
               exec /opt/hive/bin/start-metastore

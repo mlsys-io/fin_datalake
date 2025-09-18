@@ -6,17 +6,18 @@ service:
   port: 9083
 
 metastore:
-  thriftBindHost: "0.0.0.0"             # Hive 4+ property
-  warehouseDir: "s3a://hive/warehouse"
+  thriftBindHost: "0.0.0.0"
+  warehouseDir: "file:///warehouse"
 
 db:
   url: "jdbc:postgresql://hms-db-postgresql.hive.svc:5432/hivemetastore"
   driver: "org.postgresql.Driver"
 
 s3:
-  endpoint: "http://myminio-hl.minio-tenant.svc.cluster.local:9000"
+  endpoint: "http://localhost:9000"
   pathStyleAccess: true
   useEnvSecret: true
-  secretName: "hms-s3-secret"
+  secretName: "minio-creds"
+  caCertConfigMap: "minio-ca"
 
 resources: {}
