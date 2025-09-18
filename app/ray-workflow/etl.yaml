@@ -1,0 +1,131 @@
+# Create a ConfigMap with the code (or bake it into an image):
+#   kubectl create configmap cs4221-cmap --from-file=bronze_ray.py
+#
+# Then apply this RayJob. It spawns a transient RayCluster, runs the job, and cleans up.
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: ray-etl
+  namespace: default
+spec:
+  # Inline RayCluster for this job
+  rayClusterSpec:
+    rayVersion: "2.49.1"
+    headGroupSpec:
+      serviceType: ClusterIP
+      rayStartParams:
+        dashboard-host: "0.0.0.0"
+      template:
+        spec:
+          volumes:
+            - name: minio-ca
+              secret:
+                secretName: minio-ca
+            - name: local-dataset
+              hostPath:
+                path: /lakehouse-rawdata/dataset-slim
+                type: Directory
+            - name: code
+              hostPath:
+                path: /code
+                type: Directory
+          containers:
+            - name: ray-head
+              image: rayproject/ray:2.49.1
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+                - name: minio-ca
+                  mountPath: /opt/certs
+                  readOnly: true
+                - name: local-dataset
+                  mountPath: /mnt/data
+                  readOnly: true
+                - name: code
+                  mountPath: /opt/app
+                  readOnly: true
+              env:
+                - name: MINIO_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-creds
+                      key: username
+                - name: MINIO_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-creds
+                      key: password
+                - name: MINIO_SERVER_URL
+                  value: "https://192.168.0.202:4000"
+                - name: CA_PATH
+                  value: "/opt/certs/public.crt"
+                - name: INPUT_PATH
+                  value: "/mnt/data"
+                - name: DELTA_ROOT
+                  value: "s3://delta-lake/ray-etl"
+                - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
+                  value: "0.8"
+    workerGroupSpecs:
+      - groupName: workers
+        replicas: 6
+        minReplicas: 6
+        maxReplicas: 12
+        template:
+          spec:
+            volumes:
+              - name: minio-ca
+                secret:
+                  secretName: minio-ca
+              - name: local-dataset
+                hostPath:
+                  path: /lakehouse-rawdata/dataset-slim
+                  type: Directory
+              - name: code
+                hostPath:
+                  path: /code
+                  type: Directory
+            containers:
+              - name: ray-worker
+                image: rayproject/ray:2.49.1
+                imagePullPolicy: IfNotPresent
+                volumeMounts:
+                  - name: minio-ca
+                    mountPath: /opt/certs
+                    readOnly: true
+                  - name: local-dataset
+                    mountPath: /mnt/data
+                    readOnly: true
+                  - name: code
+                    mountPath: /opt/app
+                    readOnly: true
+                env:
+                  - name: MINIO_USERNAME
+                    valueFrom:
+                      secretKeyRef:
+                        name: minio-creds
+                        key: username
+                  - name: MINIO_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: minio-creds
+                        key: password
+                  - name: MINIO_SERVER_URL
+                    value: "https://192.168.0.202:4000"
+                  - name: CA_PATH
+                    value: "/opt/certs/public.crt"
+                  - name: INPUT_PATH
+                    value: "/mnt/data"
+                  - name: DELTA_ROOT
+                    value: "s3://delta-lake/ray-etl"
+                  - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
+                    value: "0.8"
+
+  entrypoint: >
+    python /opt/app/ray-workflow/etl.py
+
+  # Install deps at runtime (or bake into an image)
+  runtimeEnvYAML: |
+    pip:
+      - deltalake
+
+  shutdownAfterJobFinishes: true
+  ttlSecondsAfterFinished: 60

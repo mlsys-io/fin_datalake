@@ -1,2 +1,8 @@
 *.deb
 *.log
+
+# SSL certificates
+*.crt
+*.key
+*srl
+*csr
