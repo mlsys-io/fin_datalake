@@ -1,7 +1,3 @@
-# Create a ConfigMap with the code (or bake it into an image):
-#   kubectl create configmap cs4221-cmap --from-file=bronze_ray.py
-#
-# Then apply this RayJob. It spawns a transient RayCluster, runs the job, and cleans up.
 apiVersion: ray.io/v1
 kind: RayJob
 metadata:
@@ -64,6 +60,16 @@ spec:
                   value: "s3://delta-lake/ray-etl"
                 - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
                   value: "0.8"
+                - name: HMS_HOST
+                  value: "hms-hive-metastore.hive.svc"
+                - name: HMS_PORT
+                  value: "9083"
+                - name: HMS_DB
+                  value: "ray-etl"
+                - name: PYTHONPATH
+                  value: /opt/app/ray-workflow/ioutils/hms_client
+                - name: MAX_CONCURRENCY
+                  value: "6"
     workerGroupSpecs:
       - groupName: workers
         replicas: 6
@@ -118,6 +124,16 @@ spec:
                     value: "s3://delta-lake/ray-etl"
                   - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
                     value: "0.8"
+                  - name: HMS_HOST
+                    value: "hms-hive-metastore.hive.svc"
+                  - name: HMS_PORT
+                    value: "9083"
+                  - name: HMS_DB
+                    value: "ray-etl"
+                  - name: PYTHONPATH
+                    value: /opt/app/ray-workflow/ioutils/hms_client
+                  - name: MAX_CONCURRENCY
+                    value: "6"
 
   entrypoint: >
     python /opt/app/ray-workflow/etl.py
@@ -126,6 +142,7 @@ spec:
   runtimeEnvYAML: |
     pip:
       - deltalake
+      - thrift==0.22.0
 
   shutdownAfterJobFinishes: true
   ttlSecondsAfterFinished: 60

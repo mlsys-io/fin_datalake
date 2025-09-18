@@ -11,6 +11,7 @@ MINIO_SERVER_URL = os.getenv("MINIO_SERVER_URL")
 CA_PATH = os.getenv("CA_PATH", "/opt/certs/public.crt")
 INPUT_PATH = os.getenv("INPUT_PATH", "/mnt/data")
 DELTA_ROOT = os.getenv("DELTA_ROOT", "s3://delta-lake/cs4221/bronze-ray")
+MAX_CONCURRENCY = int(os.getenv("MAX_CONCURRENCY", "10"))
 os.environ.setdefault("RUST_LOG", "warn")
 os.environ.setdefault("SSL_CERT_FILE", CA_PATH)
 os.environ.setdefault("AWS_EC2_METADATA_DISABLED", "true")
@@ -90,4 +91,4 @@ def write_delta_distributed(ds: rd.Dataset, delta_uri: str, *, storage_options: 
         mode="append",
         storage_options=storage_options,
     )
-    ds.repartition(target_files).write_datasink(sink)
+    ds.repartition(target_files).write_datasink(sink, concurrency=MAX_CONCURRENCY)
