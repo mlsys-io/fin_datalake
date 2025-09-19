@@ -1,0 +1,23 @@
+image:
+  repository: apache/hive
+  tag: standalone-metastore-4.1.0
+
+service:
+  port: 9083
+
+metastore:
+  thriftBindHost: "0.0.0.0"
+  warehouseDir: "file:///warehouse"
+
+db:
+  url: "jdbc:postgresql://hms-db-postgresql.hive.svc:5432/hivemetastore"
+  driver: "org.postgresql.Driver"
+
+s3:
+  endpoint: "http://localhost:9000"
+  pathStyleAccess: true
+  useEnvSecret: true
+  secretName: "minio-creds"
+  caCertConfigMap: "minio-ca"
+
+resources: {}
