@@ -1,2 +1,2 @@
-from .deltalake import storage_opts_for_delta, write_delta_distributed, MINIO_USERNAME, MINIO_PASSWORD, MINIO_SERVER_URL, CA_PATH, INPUT_PATH, DELTA_ROOT, MAX_CONCURRENCY
+from .deltalake import storage_opts_for_delta, write_delta_distributed, arrow_schema_from_dataset, MINIO_USERNAME, MINIO_PASSWORD, MINIO_SERVER_URL, CA_PATH, INPUT_PATH, DELTA_ROOT, MAX_CONCURRENCY
 from .hive_metastore import register_delta_table_in_hive, HiveMetastoreClient, HMS_DB

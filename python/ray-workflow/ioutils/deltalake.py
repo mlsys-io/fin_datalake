@@ -1,9 +1,12 @@
 import os
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 from deltalake import DeltaTable
 
 import ray.data as rd
+
+from loguru import logger
 
 MINIO_USERNAME = os.getenv("MINIO_USERNAME")
 MINIO_PASSWORD = os.getenv("MINIO_PASSWORD")
@@ -35,17 +38,28 @@ def _strip_tz_from_schema(schema: pa.Schema) -> pa.Schema:
         new_fields.append(pa.field(f.name, t, f.nullable, f.metadata))
     return pa.schema(new_fields)
 
-def _arrow_schema_from_dataset(ds: rd.Dataset) -> pa.schema:
-    sch = ds.schema(fetch_if_missing=True)
-    if isinstance(sch, pa.Schema):
-        return sch
-    sample = ds.take(1)
-    if sample:
-        if hasattr(sample[0], "__dataframe__") or isinstance(sample[0], pd.Series):
-            return pa.Table.from_pandas(pd.DataFrame([sample[0]])).schema
-        if isinstance(sample[0], dict):
-            return pa.Table.from_pandas(pd.DataFrame(sample)).schema
-    return pa.schema([])
+OVERWRITE_SCHEMA_TYPES = {
+    "_source_path": pa.string(),
+    "symbol": pa.string(),
+}
+def arrow_schema_from_dataset(ds: rd.Dataset) -> pa.schema:
+    schema = ds.schema()
+    if isinstance(schema.base_schema, rd.dataset.PandasBlockSchema):
+        schema.base_schema = rd.dataset.PandasBlockSchema(
+            names=schema.base_schema.names,
+            types=[
+                np.str_ if isinstance(t, pd.core.arrays.string_.StringDtype) else t
+                for t in schema.base_schema.types
+            ] # Suppress the error `Cannot interpret 'string[python]' as a data type`
+        )
+    if not all(isinstance(t, pa.DataType) for t in schema.types):
+        logger.warning(f"Detecting unexpected pattern in schema with string: {schema}")
+    # HACK: overwrite some metadata columns to string. They are considered objects/None by ray data because ds.Schema infer arrow dtype from numpy (https://github.com/ray-project/ray/blob/f8572754424b5be34593a903e88ac725ba171c7d/python/ray/data/dataset.py#L6420). We should find a way to bypass this problem. 
+    # TODO: Avoid string to be set as object, and use binary for real objects (images, pdfs, etc)
+    types = [OVERWRITE_SCHEMA_TYPES.get(n, t) for n, t in zip(schema.names, schema.types)]
+    if not all(isinstance(t, pa.DataType) for t in types):
+        logger.error(f"Detecting unexpected pattern in schema after overwrite: {types}")
+    return pa.schema(list(zip(schema.names, types)))
 
 def ensure_delta_table(uri: str, schema: pa.Schema, storage_options: dict, partition_by=None):
     """Create the table once on the driver, otherwise no-op."""
@@ -83,7 +97,7 @@ class DeltaLakeSink(rd.Datasink):
             write_deltalake(self.uri, block, mode=self.mode, storage_options=self.storage_options)
 
 def write_delta_distributed(ds: rd.Dataset, delta_uri: str, *, storage_options: dict, target_files: int = 8):
-    arrow_schema = _arrow_schema_from_dataset(ds)
+    arrow_schema = arrow_schema_from_dataset(ds)
     ensure_delta_table(delta_uri, arrow_schema, storage_options, partition_by=[])
 
     sink = DeltaLakeSink(

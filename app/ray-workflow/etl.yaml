@@ -4,7 +4,6 @@ metadata:
   name: ray-etl
   namespace: default
 spec:
-  # Inline RayCluster for this job
   rayClusterSpec:
     rayVersion: "2.49.1"
     headGroupSpec:
@@ -57,7 +56,7 @@ spec:
                 - name: INPUT_PATH
                   value: "/mnt/data"
                 - name: DELTA_ROOT
-                  value: "s3://delta-lake/ray-etl"
+                  value: "s3://delta-lake/ray-etl-basic"
                 - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
                   value: "0.8"
                 - name: HMS_HOST
@@ -65,16 +64,16 @@ spec:
                 - name: HMS_PORT
                   value: "9083"
                 - name: HMS_DB
-                  value: "ray-etl"
+                  value: "ray-etl-basic"
                 - name: PYTHONPATH
                   value: /opt/app/ray-workflow/ioutils/hms_client
                 - name: MAX_CONCURRENCY
-                  value: "6"
+                  value: "4"
     workerGroupSpecs:
       - groupName: workers
-        replicas: 6
-        minReplicas: 6
-        maxReplicas: 12
+        replicas: 2
+        minReplicas: 2
+        maxReplicas: 6
         template:
           spec:
             volumes:
@@ -121,7 +120,7 @@ spec:
                   - name: INPUT_PATH
                     value: "/mnt/data"
                   - name: DELTA_ROOT
-                    value: "s3://delta-lake/ray-etl"
+                    value: "s3://delta-lake/ray-etl-basic"
                   - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
                     value: "0.8"
                   - name: HMS_HOST
@@ -129,11 +128,11 @@ spec:
                   - name: HMS_PORT
                     value: "9083"
                   - name: HMS_DB
-                    value: "ray-etl"
+                    value: "ray-etl-basic"
                   - name: PYTHONPATH
                     value: /opt/app/ray-workflow/ioutils/hms_client
                   - name: MAX_CONCURRENCY
-                    value: "6"
+                    value: "4"
 
   entrypoint: >
     python /opt/app/ray-workflow/etl.py
@@ -143,6 +142,10 @@ spec:
     pip:
       - deltalake
       - thrift==0.22.0
+      - loguru
+      - fsspec==2025.9.0
+      - beautifulsoup4
+      - lxml
 
   shutdownAfterJobFinishes: true
   ttlSecondsAfterFinished: 60
