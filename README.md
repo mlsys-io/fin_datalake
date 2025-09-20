@@ -1,50 +1,59 @@
-# Deployment of Spark + MinIO + Hive + TimescaleDB + DeltaLake in K8S. 
+# The AI Lakehouse Project
 
-All commands below are idempotent to avoid unintentional failure due to repeatedly applying one operation multiple times. 
+### Deployment
 
-### Quick Deployment
+#### Installing K0S
 
-This script requires an existing installation of Kubernetes with Helm. 
-
+The following instructions are from the official K0S documentation.
 ```bash
-sh quick-deploy.sh
+curl --proto '=https' --tlsv1.2 -sSf https://get.k0s.sh | sudo sh
+sudo k0s install controller --single
+sudo k0s start
 ```
 
-### Test of Deployment
-
-#### Preparation
-
-Firstly, upload our files to a configmap with the following command.
-
+Install `kubectl` and set up the connection. 
 ```bash
-kubectl create configmap python-cmap --from-file=python/ --dry-run=client -o yaml | kubectl replace -f -
+curl -LO https://dl.k8s.io/$(k0s version | sed -r "s/\+k0s\.[[:digit:]]+$//")/kubernetes-client-linux-amd64.tar.gz
+tar -zxvf kubernetes-client-linux-amd64.tar.gz kubernetes/client/bin/kubectl
+sudo mv kubernetes/client/bin/kubectl /usr/local/bin/kubectl
+
+mkdir -p $HOME/.kube
+sudo cp /var/lib/k0s/pki/admin.conf $HOME/.kube/config
+sudo chown $USER $HOME/.kube/config
 ```
 
-Then, upload the news file using mc: 
+Install Helm. 
 ```bash
-kubectl port-forward svc/minio 9000:9000
-mc alias set myminio http://localhost:9000 hive hivehive
-mc mirror --exclude "*.html"  $HOME/dataset/News myminio/raw-dataset/News
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 ```
 
-#### News combination
-
-Read the news json and aggregate all summary values together. This step tests the correctness of Spark + MinIO. 
+#### Set up Hive Metastore service
 
 ```bash
-kubectl apply -f app/combine-news.yaml
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+kubectl annotate storageclass local-path storageclass.kubernetes.io/is-default-class="true" --overwrite
+
+bash deps/hive.sh https://localhost:4000 $MINIO_USERNAME $MINIO_PASSWORD
 ```
 
-#### ETL from Json to Delta Lake File (Still in MinIO)
+#### Set up KubeRay
 
-Test Spark + MinIO + Hive + Delta Lake
 ```bash
-kubectl apply -f app/json2delta.yaml
+bash deps/kuberay.sh
 ```
 
-#### ETL from Delta Lake to TimescaleDB
+#### Deploy the job
 
-Test Spark + MinIO + Hive + TimescaleDB + Delta Lake (All together)
+Register the CA.
 ```bash
-kubectl apply -f app/delta2timescale.yaml
+kubectl delete configmap minio-ca 2>/dev/null
+kubectl create configmap minio-ca --from-file=public.crt=$MINIO_CERT
+kubectl delete secret minio-creds 2>/dev/null
+kubectl create secret generic minio-creds \
+  --from-literal=username=$MINIO_USERNAME --from-literal=password=$MINIO_PASSWORD
+```
+
+Run the ETL job. 
+```bash
+bash app/run-etl.sh
 ```
