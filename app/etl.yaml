@@ -14,15 +14,15 @@ spec:
         spec:
           volumes:
             - name: minio-ca
-              secret:
-                secretName: minio-ca
+              configMap:
+                name: minio-ca
             - name: local-dataset
               hostPath:
-                path: /lakehouse-rawdata/dataset-slim
+                path: /home/szy/data/dataset-slim
                 type: Directory
             - name: code
               hostPath:
-                path: /code
+                path: /home/szy/ai-lakehouse/app-code
                 type: Directory
           containers:
             - name: ray-head
@@ -66,7 +66,7 @@ spec:
                 - name: HMS_DB
                   value: "ray-etl-basic"
                 - name: PYTHONPATH
-                  value: /opt/app/ray-workflow/ioutils/hms_client
+                  value: /opt/app/ioutils/hms_client
                 - name: MAX_CONCURRENCY
                   value: "4"
     workerGroupSpecs:
@@ -78,15 +78,15 @@ spec:
           spec:
             volumes:
               - name: minio-ca
-                secret:
-                  secretName: minio-ca
+                configMap:
+                  name: minio-ca
               - name: local-dataset
                 hostPath:
-                  path: /lakehouse-rawdata/dataset-slim
+                  path: /home/szy/data/dataset-slim
                   type: Directory
               - name: code
                 hostPath:
-                  path: /code
+                  path: /home/szy/ai-lakehouse/app-code
                   type: Directory
             containers:
               - name: ray-worker
@@ -130,12 +130,12 @@ spec:
                   - name: HMS_DB
                     value: "ray-etl-basic"
                   - name: PYTHONPATH
-                    value: /opt/app/ray-workflow/ioutils/hms_client
+                    value: /opt/app/ioutils/hms_client
                   - name: MAX_CONCURRENCY
                     value: "4"
 
   entrypoint: >
-    python /opt/app/ray-workflow/etl.py
+    python /opt/app/etl.py
 
   # Install deps at runtime (or bake into an image)
   runtimeEnvYAML: |

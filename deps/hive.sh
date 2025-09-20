@@ -3,17 +3,13 @@ MINIO_USERNAME=$2
 MINIO_PASSWORD=$3
 MINIO_CERT=${4-$HOME/.mc/certs/CAs/public.crt}
 
+SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
+
 helm repo add bitnami https://charts.bitnami.com/bitnami
-kubectl create namespace hive
+kubectl get namespace | grep -q "^hive " || kubectl create namespace hive # Create namespace if not exists
 
-kubectl -n hive apply -f hms-chart/pvc/pv.yaml
-kubectl -n hive apply -f hms-chart/pvc/pvc.yaml
-echo "Allocated Persistent Volume for Hive Metastore DB"
+helm install hms-db bitnami/postgresql -n hive -f $SCRIPT_DIR/hive/hms-db.yaml
 
-helm upgrade -i hms-db bitnami/postgresql -n hive \
-  --set auth.database=hivemetastore \
-  --set persistence.existingClaim=hms-metastore-pvc \
-  --set volumePermissions.enabled=true
 echo "Deployed PostgreSQL for Hive Metastore"
 
 kubectl delete configmap minio-ca -n hive 2>/dev/null
@@ -25,4 +21,4 @@ kubectl create secret generic minio-creds -n hive \
   --from-literal=username=$MINIO_USERNAME --from-literal=password=$MINIO_PASSWORD
 echo "Created Secret for MinIO credentials"
 
-helm upgrade -i hms ./hms-chart -n hive --set s3.endpoint=$MINIO_ENDPOINT
+helm install hms $SCRIPT_DIR/hive/hms-chart -n hive --set s3.endpoint=$MINIO_ENDPOINT
