@@ -7,7 +7,6 @@ CN_SERVER="localhost"
 SAN_DNS_1="localhost"
 SAN_DNS_2="luyao-storage-head.ddns.comp.nus.edu.sg"
 SAN_IP_1="127.0.0.1"
-SAN_IP_2="192.168.0.202"
 
 DAYS_CA=3650        # ~10 years
 DAYS_SERVER=825     # ~27 months
@@ -42,7 +41,7 @@ openssl ecparam -name prime256v1 -genkey -noout -out server-certs/private.key
 echo "==> Creating server CSR with SANs..."
 openssl req -new -key server-certs/private.key \
   -subj "/CN=${CN_SERVER}" \
-  -addext "subjectAltName=DNS:${SAN_DNS_1},DNS:${SAN_DNS_2},IP:${SAN_IP_1},IP:${SAN_IP_2}" \
+  -addext "subjectAltName=DNS:${SAN_DNS_1},DNS:${SAN_DNS_2},IP:${SAN_IP_1}" \
   -out server-certs/server.csr
 
 echo "==> Signing server certificate with CA..."
@@ -55,7 +54,7 @@ openssl x509 -req -in server-certs/server.csr \
 basicConstraints=critical,CA:FALSE
 keyUsage=critical,digitalSignature,keyAgreement
 extendedKeyUsage=serverAuth
-subjectAltName=DNS:${SAN_DNS_1},DNS:${SAN_DNS_2},IP:${SAN_IP_1},IP:${SAN_IP_2}
+subjectAltName=DNS:${SAN_DNS_1},DNS:${SAN_DNS_2},IP:${SAN_IP_1}
 authorityKeyIdentifier=keyid,issuer
 subjectKeyIdentifier=hash
 EOF

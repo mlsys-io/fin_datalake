@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   rayClusterSpec:
-    rayVersion: "2.49.1"
+    rayVersion: "2.49.2"
     headGroupSpec:
       serviceType: ClusterIP
       rayStartParams:
@@ -26,7 +26,7 @@ spec:
                 type: Directory
           containers:
             - name: ray-head
-              image: rayproject/ray:2.49.1
+              image: rayproject/ray:2.49.2
               imagePullPolicy: IfNotPresent
               volumeMounts:
                 - name: minio-ca
@@ -50,13 +50,13 @@ spec:
                       name: minio-creds
                       key: password
                 - name: MINIO_SERVER_URL
-                  value: "https://192.168.0.202:4000"
+                  value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
                 - name: CA_PATH
                   value: "/opt/certs/public.crt"
                 - name: INPUT_PATH
                   value: "/mnt/data"
                 - name: DELTA_ROOT
-                  value: "s3://delta-lake/ray-etl-basic"
+                  value: "s3://delta-lake/ray-etl-sanity"
                 - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
                   value: "0.8"
                 - name: HMS_HOST
@@ -64,7 +64,7 @@ spec:
                 - name: HMS_PORT
                   value: "9083"
                 - name: HMS_DB
-                  value: "ray-etl-basic"
+                  value: "ray-etl-sanity"
                 - name: PYTHONPATH
                   value: /opt/app/ioutils/hms_client
                 - name: MAX_CONCURRENCY
@@ -90,7 +90,7 @@ spec:
                   type: Directory
             containers:
               - name: ray-worker
-                image: rayproject/ray:2.49.1
+                image: rayproject/ray:2.49.2
                 imagePullPolicy: IfNotPresent
                 volumeMounts:
                   - name: minio-ca
@@ -114,13 +114,13 @@ spec:
                         name: minio-creds
                         key: password
                   - name: MINIO_SERVER_URL
-                    value: "https://192.168.0.202:4000"
+                    value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
                   - name: CA_PATH
                     value: "/opt/certs/public.crt"
                   - name: INPUT_PATH
                     value: "/mnt/data"
                   - name: DELTA_ROOT
-                    value: "s3://delta-lake/ray-etl-basic"
+                    value: "s3://delta-lake/ray-etl-sanity"
                   - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
                     value: "0.8"
                   - name: HMS_HOST
@@ -128,7 +128,7 @@ spec:
                   - name: HMS_PORT
                     value: "9083"
                   - name: HMS_DB
-                    value: "ray-etl-basic"
+                    value: "ray-etl-sanity"
                   - name: PYTHONPATH
                     value: /opt/app/ioutils/hms_client
                   - name: MAX_CONCURRENCY
