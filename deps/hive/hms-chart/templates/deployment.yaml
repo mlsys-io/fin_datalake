@@ -33,6 +33,8 @@ spec:
       containers:
         - name: metastore
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          securityContext:
+            runAsUser: 0
           ports:
             - name: thrift
               containerPort: {{ .Values.service.port }}   # HMS Thrift (9083 default)
