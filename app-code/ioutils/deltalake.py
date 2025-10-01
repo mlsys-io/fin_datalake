@@ -29,6 +29,16 @@ def storage_opts_for_delta() -> dict:
     }
     return opts
 
+def get_minio_filesystem():
+    from pyarrow import fs
+    minio_fs = fs.S3FileSystem(
+        access_key=MINIO_USERNAME,
+        secret_key=MINIO_PASSWORD,
+        endpoint_override=MINIO_SERVER_URL,
+        tls_ca_file_path=CA_PATH, 
+    )
+    return minio_fs
+
 def _strip_tz_from_schema(schema: pa.Schema) -> pa.Schema:
     new_fields = []
     for f in schema:
@@ -106,3 +116,11 @@ def write_delta_distributed(ds: rd.Dataset, delta_uri: str, *, storage_options: 
         storage_options=storage_options,
     )
     ds.repartition(target_files).write_datasink(sink, concurrency=MAX_CONCURRENCY)
+
+def read_delta(uri: str, storage_options: dict) -> rd.Dataset:
+    """
+    Accept s3:// or s3a:// URIs.
+    """
+    paths = DeltaTable(uri.replace("s3a://", "s3://"), storage_options=storage_options).file_uris()
+    ds = rd.read_parquet(paths, filesystem=get_minio_filesystem())
+    return ds
