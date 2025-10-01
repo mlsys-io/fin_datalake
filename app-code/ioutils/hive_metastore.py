@@ -66,7 +66,7 @@ class HiveMetastoreClient:
 
     # --- table ops ------------------------------------------------------------
 
-    def get_table(self, db: str, table: str) -> HMS.Table:
+    def get_table(self, db: str, table: str) -> HMS.GetTableResult:
         if hasattr(self.client, "get_table"):
             return self.client.get_table(db, table)
 
@@ -84,7 +84,7 @@ class HiveMetastoreClient:
             return False
 
     def get_table_location(self, db: str, table: str) -> str:
-        tbl = self.get_table(db, table)
+        tbl: HMS.Table = self.get_table(db, table).table
         return tbl.sd.location
 
     def drop_table_if_exists(self, db: str, table: str, delete_data: bool = False) -> None:
@@ -218,3 +218,7 @@ def register_delta_table_in_hive(
             partition_keys=partition_keys, 
             table_properties={"provider": "delta"},
         )
+
+def get_hive_table_location(db: str, table: str) -> str:
+    with open_hms(HMS_HOST, HMS_PORT) as hms:
+        return hms.get_table_location(db, table)
