@@ -1,0 +1,154 @@
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: ray-summarize
+  namespace: default
+  annotations:
+    ray.io/overwrite-container-cmd: "true"
+spec:
+  rayClusterSpec:
+    rayVersion: "2.49.2"
+    headGroupSpec:
+      serviceType: ClusterIP
+      rayStartParams:
+        dashboard-host: "0.0.0.0"
+      template:
+        spec:
+          imagePullSecrets:
+            - name: regcred
+          volumes:
+            - name: minio-ca
+              configMap:
+                name: minio-ca
+            - name: local-dataset
+              hostPath:
+                path: /mnt/data/cs4221/dataset-slim
+                type: Directory
+            - name: code
+              hostPath:
+                path: /home/szy/ai-lakehouse/app-code
+                type: Directory
+          containers:
+            - name: ray-head
+              image: ghcr.io/timzsu/ray-vllm:0.0.2
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/bash", "-lc", "--"]
+              args: ["ulimit -n 65536; env-exec $KUBERAY_GEN_RAY_START_CMD"]
+              volumeMounts:
+                - name: minio-ca
+                  mountPath: /opt/certs
+                  readOnly: true
+                - name: local-dataset
+                  mountPath: /mnt/data
+                  readOnly: true
+                - name: code
+                  mountPath: /opt/app
+                  readOnly: true
+              env:
+                - name: MINIO_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-creds
+                      key: username
+                - name: MINIO_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-creds
+                      key: password
+                - name: MINIO_SERVER_URL
+                  value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
+                - name: CA_PATH
+                  value: "/opt/certs/public.crt"
+                - name: INPUT_PATH
+                  value: "/mnt/data"
+                - name: DELTA_ROOT
+                  value: "s3://delta-lake/ray-etl-sanity"
+                - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
+                  value: "0.8"
+                - name: HMS_HOST
+                  value: "hms-hive-metastore.hive.svc"
+                - name: HMS_PORT
+                  value: "9083"
+                - name: HMS_DB
+                  value: "ray-etl-sanity"
+                - name: PYTHONPATH
+                  value: /opt/app/ioutils/hms_client
+                - name: MAX_CONCURRENCY
+                  value: "1"
+    workerGroupSpecs:
+      - groupName: workers
+        replicas: 1
+        minReplicas: 1
+        maxReplicas: 1
+        template:
+          spec:
+            imagePullSecrets:
+              - name: regcred
+            volumes:
+              - name: minio-ca
+                configMap:
+                  name: minio-ca
+              - name: local-dataset
+                hostPath:
+                  path: /mnt/data/cs4221/dataset-slim
+                  type: Directory
+              - name: code
+                hostPath:
+                  path: /home/szy/ai-lakehouse/app-code
+                  type: Directory
+            containers:
+              - name: ray-worker
+                image: ghcr.io/timzsu/ray-vllm:0.0.2
+                imagePullPolicy: IfNotPresent
+                command: ["/bin/bash", "-lc", "--"]
+                args: ["ulimit -n 65536; env-exec $KUBERAY_GEN_RAY_START_CMD"]
+                resources:
+                  limits: { cpu: "32", memory: 32Gi }
+                  requests: { cpu: "32", memory: 32Gi }
+                volumeMounts:
+                  - name: minio-ca
+                    mountPath: /opt/certs
+                    readOnly: true
+                  - name: local-dataset
+                    mountPath: /mnt/data
+                    readOnly: true
+                  - name: code
+                    mountPath: /opt/app
+                    readOnly: true
+                env:
+                  - name: MINIO_USERNAME
+                    valueFrom:
+                      secretKeyRef:
+                        name: minio-creds
+                        key: username
+                  - name: MINIO_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: minio-creds
+                        key: password
+                  - name: MINIO_SERVER_URL
+                    value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
+                  - name: CA_PATH
+                    value: "/opt/certs/public.crt"
+                  - name: INPUT_PATH
+                    value: "/mnt/data"
+                  - name: DELTA_ROOT
+                    value: "s3://delta-lake/ray-etl-sanity"
+                  - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
+                    value: "0.8"
+                  - name: HMS_HOST
+                    value: "hms-hive-metastore.hive.svc"
+                  - name: HMS_PORT
+                    value: "9083"
+                  - name: HMS_DB
+                    value: "ray-etl-sanity"
+                  - name: PYTHONPATH
+                    value: /opt/app/ioutils/hms_client
+                  - name: MAX_CONCURRENCY
+                    value: "1"
+
+  entrypoint: >
+    env-python /opt/app/summarize.py
+
+  shutdownAfterJobFinishes: true
+  ttlSecondsAfterFinished: 60
