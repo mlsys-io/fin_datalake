@@ -3,6 +3,8 @@ kind: RayJob
 metadata:
   name: ray-etl
   namespace: default
+  annotations:
+    ray.io/overwrite-container-cmd: "true"
 spec:
   rayClusterSpec:
     rayVersion: "2.49.2"
@@ -12,6 +14,8 @@ spec:
         dashboard-host: "0.0.0.0"
       template:
         spec:
+          imagePullSecrets:
+            - name: regcred
           volumes:
             - name: minio-ca
               configMap:
@@ -26,8 +30,10 @@ spec:
                 type: Directory
           containers:
             - name: ray-head
-              image: rayproject/ray:2.49.2
+              image: ghcr.io/timzsu/ray-vllm:0.0.2
               imagePullPolicy: IfNotPresent
+              command: ["/bin/bash", "-lc", "--"]
+              args: ["ulimit -n 65536; env-exec $KUBERAY_GEN_RAY_START_CMD"]
               volumeMounts:
                 - name: minio-ca
                   mountPath: /opt/certs
@@ -76,6 +82,8 @@ spec:
         maxReplicas: 6
         template:
           spec:
+            imagePullSecrets:
+              - name: regcred
             volumes:
               - name: minio-ca
                 configMap:
@@ -90,8 +98,10 @@ spec:
                   type: Directory
             containers:
               - name: ray-worker
-                image: rayproject/ray:2.49.2
+                image: ghcr.io/timzsu/ray-vllm:0.0.2
                 imagePullPolicy: IfNotPresent
+                command: ["/bin/bash", "-lc", "--"]
+                args: ["ulimit -n 65536; env-exec $KUBERAY_GEN_RAY_START_CMD"]
                 volumeMounts:
                   - name: minio-ca
                     mountPath: /opt/certs
@@ -135,17 +145,7 @@ spec:
                     value: "4"
 
   entrypoint: >
-    python /opt/app/etl.py
-
-  # Install deps at runtime (or bake into an image)
-  runtimeEnvYAML: |
-    pip:
-      - deltalake
-      - thrift==0.22.0
-      - loguru
-      - fsspec==2025.9.0
-      - beautifulsoup4
-      - lxml
+    env-python /opt/app/etl.py
 
   shutdownAfterJobFinishes: true
   ttlSecondsAfterFinished: 60

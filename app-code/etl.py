@@ -2,7 +2,7 @@ import sys
 from glob import glob
 from datetime import datetime
 import pyarrow as pa
-from pyarrow import csv
+from pyarrow import csv, json
 
 import ray
 import ray.data as rd
