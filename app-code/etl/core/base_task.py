@@ -21,7 +21,7 @@ class BaseTask(ABC):
         """
         The main logic of the task goes here.
         Must be implemented by subclass.
-        """
+        """         
         pass
 
     def pre_run(self):
