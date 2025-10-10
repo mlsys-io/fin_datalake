@@ -1,54 +1,44 @@
 #!/bin/bash
 set -euo pipefail
 
-# --- CONFIG ---
+# === RisingWave Helm deployment (bundled with MinIO + PostgreSQL) ===
+
 NAMESPACE="risingwave"
 RELEASE_NAME="risingwave"
-CHART_REPO_NAME="risingwave"
-CHART_REPO_URL="https://risingwavelabs.github.io/risingwave"
-VALUES_FILE="values.yaml"  # optional
-KUBECONFIG_PATH="${KUBECONFIG:-$HOME/.kube/config}"
+VALUES_FILE="risingwave-values.yaml"
 
-echo "🔍 Checking prerequisites..."
+echo "🚀 Starting RisingWave bundled deployment..."
 
+# --- Check for Helm ---
 if ! command -v helm &> /dev/null; then
-    echo "Helm not found. Please install Helm"
-    exit 1
+  echo "Helm not found. Installing Helm..."
+  curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 fi
 
-if ! command -v kubectl &> /dev/null; then
-    echo "kubectl not found. Please install kubectl."
-    exit 1
+# --- Create namespace ---
+if ! kubectl get namespace "$NAMESPACE" &> /dev/null; then
+  echo "Creating namespace: $NAMESPACE"
+  kubectl create namespace "$NAMESPACE"
 fi
 
-if [ ! -f "$KUBECONFIG_PATH" ]; then
-    echo "kubeconfig not found at $KUBECONFIG_PATH"
-    exit 1
-fi
-
+# --- Add RisingWave repo ---
 echo "Adding RisingWave Helm repo..."
-helm repo add "$CHART_REPO_NAME" "$CHART_REPO_URL" >/dev/null
-helm repo update >/dev/null
+helm repo add risingwavelabs https://risingwavelabs.github.io/helm-charts
+helm repo update
 
-echo "Creating namespace '$NAMESPACE' (if not exists)..."
-kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$NAMESPACE"
+#--- Deploy RisingWave bundle ---
+echo "Installing RisingWave bundle with PostgreSQL + MinIO..."
+helm install -n risingwave --create-namespace --set tags.bundle=true --set wait=true $RELEASE_NAME risingwavelabs/risingwave
 
-echo "Deploying RisingWave via Helm..."
-if [ -f "$VALUES_FILE" ]; then
-    helm upgrade --install "$RELEASE_NAME" "$CHART_REPO_NAME/risingwave" \
-        --namespace "$NAMESPACE" \
-        -f "$VALUES_FILE"
-else
-    helm upgrade --install "$RELEASE_NAME" "$CHART_REPO_NAME/risingwave" \
-        --namespace "$NAMESPACE"
-fi
+echo "✅ RisingWave bundle deployed successfully!"
 
-echo "Waiting for RisingWave pods to be ready..."
-kubectl wait --for=condition=available --timeout=600s deployment --all -n "$NAMESPACE" || true
+# --- Show status ---
 kubectl get pods -n "$NAMESPACE"
+kubectl get svc -n "$NAMESPACE"
 
-echo "RisingWave deployed successfully!"
-echo "You can check the status with:"
-echo "  kubectl get pods -n $NAMESPACE"
-echo "To access RisingWave locally:"
-echo "  kubectl port-forward svc/${RELEASE_NAME}-frontend 4566:4566 -n $NAMESPACE"
+echo ""
+echo "🌐 Access RisingWave frontend via NodePort 31001"
+echo "🌐 Access RisingWave dashboard via NodePort 31002"
+echo ""
+echo "You can check logs with:"
+echo "  kubectl logs -n $NAMESPACE <pod-name>"
