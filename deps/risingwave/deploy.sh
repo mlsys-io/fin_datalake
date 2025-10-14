@@ -28,7 +28,7 @@ helm repo update
 
 #--- Deploy RisingWave bundle ---
 echo "Installing RisingWave bundle with PostgreSQL + MinIO..."
-helm install -n risingwave --create-namespace --set tags.bundle=true --set wait=true $RELEASE_NAME risingwavelabs/risingwave
+helm install -n risingwave $RELEASE_NAME risingwavelabs/risingwave -f $VALUES_FILE
 
 echo "✅ RisingWave bundle deployed successfully!"
 
@@ -37,8 +37,7 @@ kubectl get pods -n "$NAMESPACE"
 kubectl get svc -n "$NAMESPACE"
 
 echo ""
-echo "🌐 Access RisingWave frontend via NodePort 31001"
-echo "🌐 Access RisingWave dashboard via NodePort 31002"
+echo "🌐 Access RisingWave via NodePort 31001"
 echo ""
 echo "You can check logs with:"
 echo "  kubectl logs -n $NAMESPACE <pod-name>"
