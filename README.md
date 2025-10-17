@@ -42,6 +42,27 @@ bash deps/hive.sh https://localhost:4000 $MINIO_USERNAME $MINIO_PASSWORD
 bash deps/kuberay.sh
 ```
 
+
+#### Set up Prefect & Persistence Ray Cluster 
+```bash
+# Spin up a persistence Ray cluster to handle job sent by Prefect, if not configured, Prefect spin up temporary Ray cluster
+kubectl create namespace ray
+cd deps/ray
+kubectl apply -f ray-cluster.yaml
+
+cd deps/prefect
+bash deploy.sh
+
+# to connect to Prefect UI 
+kubectl port-forward svc/prefect-server -n prefect 4200:4200
+
+# on a new terminal 
+ssh -L 4200:localhost:4200 <username>@<serverIP>
+
+````
+After forwarding port to localhost, can open the UI with http://localhost:4200
+
+
 #### Deploy the job
 
 Register the CA.

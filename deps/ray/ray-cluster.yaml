@@ -1,0 +1,79 @@
+# A standalone manifest to create a persistent, long-running Ray cluster.
+# Apply with: kubectl apply -f persistent-ray-cluster.yaml
+
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  # This name will be used to generate the head service name (e.g., "raycluster-persistent-head-svc").
+  name: raycluster-persistent
+  # Ensure this namespace exists before applying (e.g., `kubectl create ns ray-systems`).
+  namespace: ray
+spec:
+  # Pin to a specific Ray version for a reproducible environment.
+  rayVersion: "2.23.0"
+
+  # --- Ray Head Node ---
+  headGroupSpec:
+    serviceType: ClusterIP
+    rayStartParams:
+      dashboard-host: "0.0.0.0"
+    template:
+      spec:
+        containers:
+          - name: ray-head
+            image: rayproject/ray:2.23.0
+            imagePullPolicy: IfNotPresent
+            ports:
+              - containerPort: 8265
+                name: dashboard
+              - containerPort: 10001
+                name: client
+              - containerPort: 6379
+                name: gcs-server
+            
+            # --- CUSTOMIZATION POINT: Define CPU and memory resources for the head pod.
+            resources:
+              requests:
+                cpu: "2"
+                memory: "4Gi"
+              limits:
+                cpu: "4"
+                memory: "8Gi"
+            
+            # --- CUSTOMIZATION POINT: Add environment variables here.
+            # env:
+            # - name: MY_ENV_VAR
+            #   value: "my_value"
+
+            # --- CUSTOMIZATION POINT: Mount volumes (ConfigMaps, Secrets, HostPaths) here.
+            # volumeMounts:
+            # - name: code-volume
+            #   mountPath: /home/ray/app
+
+  # --- Ray Worker Nodes ---
+  workerGroupSpecs:
+    - groupName: small-group
+      replicas: 2
+      minReplicas: 1
+      maxReplicas: 5
+      template:
+        spec:
+          containers:
+            - name: ray-worker
+              image: rayproject/ray:2.23.0
+              imagePullPolicy: IfNotPresent
+              
+              # --- CUSTOMIZATION POINT: Define CPU and memory resources for each worker pod.
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: "4Gi"
+                limits:
+                  cpu: "4"
+                  memory: "8Gi"
+              
+              # --- CUSTOMIZATION POINT: Add environment variables for workers.
+              # env:
+              # - name: WORKER_ENV_VAR
+              #   value: "worker_value"
+
