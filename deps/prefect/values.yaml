@@ -1,0 +1,16 @@
+# Configuration for the Prefect worker
+worker:
+  enabled: true
+
+  # This is the crucial part:
+  # Set environment variables for the worker pods to connect to your Ray cluster.
+  env:
+    # The address of your existing Ray head node.
+    - name: PREFECT_RAY_ADDRESS
+      value: "ray://raycluster-persistent-head-svc.ray.svc.cluster.local:10001"
+
+  # Define the work pool the worker will pull from.
+  # This name should match the work pool in your Prefect deployment.
+  workPool:
+    name: "kubernetes-ray-pool"
+    type: "kubernetes"
