@@ -24,17 +24,13 @@ helm repo update
 echo "SUCCESS: Helm repository is up to date."
 
 echo "INFO: Deploying Prefect server to namespace '${PREFECT_NAMESPACE}'..."
-kubectl create namespace "${PREFECT_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace "${PREFECT_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f 
 helm install prefect prefect/prefect -n "${PREFECT_NAMESPACE}" -f values.yaml
 echo "SUCCESS: Prefect Helm chart installation initiated."
-echo "INFO: It may take a few minutes for all Prefect pods to be ready."
-echo "INFO: You can monitor the status with: kubectl get pods -n ${PREFECT_NAMESPACE} -w"
 
 
 # --- 3. Final Instructions ---
-echo ""
 echo "🚀 Prefect Server Deployment Initiated! 🚀"
-echo "Your Prefect server and a Ray-connected worker are being deployed."
 echo "Access the Prefect UI by port-forwarding the service:"
 echo "kubectl port-forward svc/prefect-server -n ${PREFECT_NAMESPACE} 4200:4200"
 echo "Then navigate to http://localhost:4200 in your browser."
