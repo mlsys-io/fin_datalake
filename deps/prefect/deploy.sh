@@ -1,37 +1,55 @@
 #!/bin/bash
 
-# Exit immediately if a command exits with a non-zero status.
+# --- CONFIGURATION ---
+# This section defines names used for the Helm releases and namespaces.
+# The actual configuration for the worker is now expected to be in values.yaml.
+PREFECT_NAMESPACE="prefect"
+PREFECT_SERVER_RELEASE_NAME="prefect-server"
+PREFECT_WORKER_RELEASE_NAME="prefect-ray-worker"
+
+# --- SCRIPT LOGIC ---
 set -e
 
-PREFECT_NAMESPACE="prefect"                 
-
-
-# --- 1. Check for required dependencies ---
-echo "INFO: Checking for required dependencies..."
+# 1. Check for required dependencies
 for cmd in helm kubectl; do
     if ! command -v "$cmd" &> /dev/null; then
-        echo "ERROR: $cmd could not be found. Please install it and ensure it's in your PATH." >&2
+        echo "ERROR: $cmd could not be found. Please install it." >&2
         exit 1
     fi
 done
-echo "SUCCESS: All dependencies are installed."
 
+# 2. Set up Helm repository
+helm repo add prefect https://prefecthq.github.io/prefect-helm &>/dev/null || true
+helm repo update
 
-# --- 2. Deploy the Prefect server using Helm ---
-echo "INFO: Setting up Prefect Helm repository..."
-helm repo add prefect https://prefecthq.github.io/prefect-helm 
-helm repo update 
-echo "SUCCESS: Helm repository is up to date."
+# 3. Ensure namespace exists
+kubectl create namespace "${PREFECT_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
-echo "INFO: Deploying Prefect server to namespace '${PREFECT_NAMESPACE}'..."
-kubectl create namespace "${PREFECT_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f 
-helm install prefect prefect/prefect -n "${PREFECT_NAMESPACE}" -f values.yaml
-echo "SUCCESS: Prefect Helm chart installation initiated."
+# 4. Deploy Prefect Server
+# This command installs the server. It will safely ignore the 'worker' settings
+# in your existing values.yaml file.
+echo "INFO: Deploying Prefect Server..."
+helm upgrade --install "${PREFECT_SERVER_RELEASE_NAME}" prefect/prefect-server \
+  --namespace "${PREFECT_NAMESPACE}" \
+  -f values.yaml \
+  --wait
 
+# 5. Deploy Prefect Worker
+# This command uses your existing values.yaml file to configure the worker.
+echo "INFO: Deploying Prefect Worker..."
+helm upgrade --install "${PREFECT_WORKER_RELEASE_NAME}" prefect/prefect-worker \
+  --namespace "${PREFECT_NAMESPACE}" \
+  -f values.yaml
 
-# --- 3. Final Instructions ---
-echo "🚀 Prefect Server Deployment Initiated! 🚀"
-echo "Access the Prefect UI by port-forwarding the service:"
-echo "kubectl port-forward svc/prefect-server -n ${PREFECT_NAMESPACE} 4200:4200"
-echo "Then navigate to http://localhost:4200 in your browser."
+# --- Final Instructions ---
+echo ""
+echo "🚀 Prefect Server & Worker Deployment Complete! 🚀"
+echo ""
+echo "To monitor pod status, run:"
+echo "kubectl get pods -n ${PREFECT_NAMESPACE} -w"
+echo ""
+echo "To access the Prefect UI, run this in a new terminal:"
+echo "kubectl port-forward svc/${PREFECT_SERVER_RELEASE_NAME} -n ${PREFECT_NAMESPACE} 4200:4200"
+echo ""
+echo "Then, open your browser and go to http://localhost:4200"
 
