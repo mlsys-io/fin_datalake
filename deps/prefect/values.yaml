@@ -15,3 +15,8 @@ env:
 worker:
   config: 
     workPool: "kubernetes-ray-pool"
+
+  apiConfig: "selfHostedServer"
+
+  selfHostedServerApiConfig:
+    apiUrl: "http://prefect-server.prefect.svc.cluster.local:4200/api"
