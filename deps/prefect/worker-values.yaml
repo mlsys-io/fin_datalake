@@ -1,0 +1,18 @@
+# This file contains the specific configuration for the prefect-worker chart.
+# Note that the keys are at the top level, not nested under a 'worker:' key.
+
+# Injects environment variables into the worker pod.
+env:
+  # 1. The address of the Prefect Server API. REQUIRED for the worker to connect.
+  - name: PREFECT_API_URL
+    value: "http://prefect-server.prefect.svc.cluster.local:4200/api"
+
+  # 2. The address of your Ray cluster.
+  - name: PREFECT_RAY_ADDRESS
+    value: "ray://raycluster-persistent-head-svc.ray.svc.cluster.local:10001"
+
+# The name of the work pool this worker will poll.
+# This must match a work pool that exists in ya Prefect server.
+workPool:
+  name: "kubernetes-ray-pool"
+

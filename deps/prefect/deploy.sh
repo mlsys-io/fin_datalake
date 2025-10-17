@@ -2,7 +2,6 @@
 
 # --- CONFIGURATION ---
 # This section defines names used for the Helm releases and namespaces.
-# The actual configuration for the worker is now expected to be in values.yaml.
 PREFECT_NAMESPACE="prefect"
 PREFECT_SERVER_RELEASE_NAME="prefect-server"
 PREFECT_WORKER_RELEASE_NAME="prefect-ray-worker"
@@ -26,20 +25,18 @@ helm repo update
 kubectl create namespace "${PREFECT_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
 # 4. Deploy Prefect Server
-# This command installs the server. It will safely ignore the 'worker' settings
-# in your existing values.yaml file.
+# This command installs the server without any custom values.
 echo "INFO: Deploying Prefect Server..."
 helm upgrade --install "${PREFECT_SERVER_RELEASE_NAME}" prefect/prefect-server \
   --namespace "${PREFECT_NAMESPACE}" \
-  -f values.yaml \
   --wait
 
 # 5. Deploy Prefect Worker
-# This command uses your existing values.yaml file to configure the worker.
+# This command uses the separate 'worker-values.yaml' file to configure the worker.
 echo "INFO: Deploying Prefect Worker..."
 helm upgrade --install "${PREFECT_WORKER_RELEASE_NAME}" prefect/prefect-worker \
   --namespace "${PREFECT_NAMESPACE}" \
-  -f values.yaml
+  -f worker-values.yaml
 
 # --- Final Instructions ---
 echo ""
