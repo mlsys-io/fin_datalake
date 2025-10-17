@@ -19,7 +19,7 @@ echo "SUCCESS: All dependencies are installed."
 
 # --- 2. Deploy the Prefect server using Helm ---
 echo "INFO: Setting up Prefect Helm repository..."
-helm repo add prefect https://prefecthq.github.io/prefect-helm &> /dev/null
+helm repo add prefect https://prefecthq.github.io/prefect-helm 
 helm repo update 
 echo "SUCCESS: Helm repository is up to date."
 
