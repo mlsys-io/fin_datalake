@@ -36,7 +36,7 @@ helm upgrade --install "${PREFECT_SERVER_RELEASE_NAME}" prefect/prefect-server \
 echo "INFO: Deploying Prefect Worker..."
 helm upgrade --install "${PREFECT_WORKER_RELEASE_NAME}" prefect/prefect-worker \
   --namespace "${PREFECT_NAMESPACE}" \
-  -f worker-values.yaml
+  -f values.yaml
 
 # --- Final Instructions ---
 echo ""
