@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict
-
+from prefect import Task
 class BaseTask(ABC):
     """
     Base class for all ETL tasks.
@@ -17,27 +17,18 @@ class BaseTask(ABC):
         self.config = config or {}
 
     @abstractmethod
-    def run(self, *args, **kwargs) -> Any:
+    def _run(self, *args, **kwargs) -> Any:
         """
         The main logic of the task goes here.
-        Must be implemented by subclass.
         """         
         pass
+    
 
-    def pre_run(self):
-        """Optional hook before run (logging, validation, metrics)."""
-        print(f"[{self.name}] Pre-run hook.")
-
-    def post_run(self, result: Any):
-        """Optional hook after run (logging, metrics, cleanup)."""
-        print(f"[{self.name}] Post-run hook. Result: {result}")
-        return result
-
-    def execute(self, *args, **kwargs) -> Any:
+    @Task
+    def __execute(self, *args, **kwargs) -> Any:
         """
         Standardized way to run the task:
         Calls pre_run -> run -> post_run
         """
-        self.pre_run()
         result = self.run(*args, **kwargs)
-        return self.post_run(result)
+        return result
