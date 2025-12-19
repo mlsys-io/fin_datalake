@@ -1,34 +1,55 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict
-from prefect import Task
-class BaseTask(ABC):
+from typing import Any, Dict, Optional
+from prefect import task
+from etl.core.utils.dependency_aware_mixin import DependencyAwareMixin
+
+class BaseTask(ABC, DependencyAwareMixin):
     """
-    Base class for all ETL tasks.
-    Users should extend this class and implement the `run` method.
+    Base class for ETL tasks. 
+    Encapsulates business logic and configuration.
+    
+    Usage:
+        class MyTask(BaseTask):
+            def run(self, data):
+                return data * 2
+                
+        t = MyTask()
+        prefect_task = t.as_task(retries=3)
     """
 
-    def __init__(self, name: str, config: Dict[str, Any] = None):
+    def __init__(self, name: Optional[str] = None, config: Dict[str, Any] = None):
         """
         Args:
-            name: Name of the task
+            name: Name of the task (defaults to Class Name)
             config: Optional configuration dictionary
         """
-        self.name = name
+        self.name = name or self.__class__.__name__
         self.config = config or {}
 
     @abstractmethod
-    def _run(self, *args, **kwargs) -> Any:
+    def run(self, *args, **kwargs) -> Any:
         """
-        The main logic of the task goes here.
-        """         
+        The pure Python business logic of the task.
+        """
         pass
     
+    def as_task(self, **task_kwargs):
+        """
+        Wraps this instance's run method in a Prefect Task.
+        
+        Args:
+            **task_kwargs: Arguments passed to the @task decorator 
+                           (e.g. retries, cache_key_fn, etc.)
+        
+        Returns:
+            A Prefect Task object that can be .submit()-ed in a flow.
+        """
+        # Default name if not provided in kwargs
+        if "name" not in task_kwargs:
+            task_kwargs["name"] = self.name
 
-    @Task
-    def __execute(self, *args, **kwargs) -> Any:
-        """
-        Standardized way to run the task:
-        Calls pre_run -> run -> post_run
-        """
-        result = self.run(*args, **kwargs)
-        return result
+        @task(**task_kwargs)
+        def wrapper(*args, **kwargs):
+            return self.run(*args, **kwargs)
+            
+        return wrapper
