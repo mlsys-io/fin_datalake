@@ -44,11 +44,25 @@ class ServiceTask(BaseTask):
                 return inner_self.task_instance.run(*args, **kwargs)
                 
             def stop(inner_self):
-                # Placeholder for graceful shutdown if we implement signaling
-                pass
+                if hasattr(inner_self.task_instance, "stop"):
+                    inner_self.task_instance.stop()
+                    
+            def get_status(inner_self):
+                """
+                Returns the current status dictionary of the service logic.
+                """
+                if hasattr(inner_self.task_instance, "get_status"):
+                    return inner_self.task_instance.get_status()
+                return {"status": "unknown"}
 
         # Link the helper class to the specific Task subclass
         ServiceActor.TaskClass = self.__class__
         ServiceActor.__name__ = f"{self.__class__.__name__}Actor"
         
         return ray.remote(**actor_options)(ServiceActor)
+
+    def get_status(self) -> Dict[str, Any]:
+        """
+        Default status implementation. Can be overridden.
+        """
+        return {"running": getattr(self, "running", False)}
