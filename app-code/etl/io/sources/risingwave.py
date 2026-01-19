@@ -22,7 +22,6 @@ class RisingWaveReader(DataReader):
     """
     Runtime reader for RisingWave using Psycopg2.
     """
-    REQUIRED_DEPENDENCIES = ["psycopg2"]
 
     def __init__(self, source: RisingWaveSource):
         self.source = source

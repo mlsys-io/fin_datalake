@@ -25,7 +25,6 @@ class DeltaLakeReader(DataReader):
     """
     Runtime reader for Delta Lake.
     """
-    REQUIRED_DEPENDENCIES = ["deltalake", "pandas"]
 
     def __init__(self, source: DeltaLakeSource):
         self.source = source
