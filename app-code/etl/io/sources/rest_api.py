@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List, Iterator, Union
 from time import sleep
+from loguru import logger
 
 from etl.io.base import DataSource, DataReader
 
@@ -22,7 +23,7 @@ class PaginationConfig:
 @dataclass
 class RestApiSource(DataSource):
     """
-    Configuration for REST API Data Source.
+   Configuration for REST API Data Source.
     """
     REQUIRED_DEPENDENCIES = ["requests"]
 
@@ -33,6 +34,13 @@ class RestApiSource(DataSource):
     pagination: Optional[PaginationConfig] = None
     retries: int = 3
     rate_limit_delay: float = 0.0
+    
+    def __post_init__(self):
+        """Validate URL format."""
+        from urllib.parse import urlparse
+        parsed = urlparse(self.url)
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError(f"Invalid URL format: {self.url}. Must include scheme (http/https) and domain.")
 
     def open(self) -> 'RestApiReader':
         return RestApiReader(self)
@@ -74,7 +82,7 @@ class RestApiReader(DataReader):
         if self.source.auth:
             self._apply_auth()
             
-        print(f"[RestApiReader] Connected to {self.source.url}")
+        logger.info(f"Connected to {self.source.url}")
 
     def _apply_auth(self):
         auth = self.source.auth
@@ -132,10 +140,24 @@ class RestApiReader(DataReader):
             resp.raise_for_status()
             return self._normalize(resp.json())
         except Exception as e:
-            print(f"[RestApiReader] Error fetching {self.source.url}: {e}")
+            logger.error(f"Error fetching {self.source.url}: {e}")
             raise
 
     def _normalize(self, data: Union[Dict, List]) -> List[Dict]:
+        """
+        Extract list from common API response structures.
+        
+        Handles three response patterns:
+        1. Direct list: [{...}, {...}] -> return as-is
+        2. Nested list: {"results": [...]} or {"data": [...]} or {"items": [...]}
+        3. Single object: {...} -> wrap in list
+        
+        Args:
+            data: Raw JSON response from API
+            
+        Returns:
+            List of dictionaries representing data records
+        """
         if isinstance(data, list):
             return data
         if isinstance(data, dict):

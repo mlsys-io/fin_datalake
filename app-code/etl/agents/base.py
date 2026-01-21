@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional
 from abc import abstractmethod
 import ray
+from loguru import logger
 
 from etl.core.base_service import ServiceTask
 
@@ -21,9 +22,9 @@ class BaseAgent(ServiceTask):
         Called once when the Actor starts.
         Builds the heavy logic (LLM, Tools) to ensure they live on the Cluster Node.
         """
-        print(f"[{self.name}] Setting up Agent Intelligence...")
+        logger.info(f"[{self.name}] Setting up Agent Intelligence...")
         self.executor = self.build_executor()
-        print(f"[{self.name}] Ready.")
+        logger.info(f"[{self.name}] Ready.")
 
     @abstractmethod
     def build_executor(self) -> Any:
@@ -68,7 +69,7 @@ class BaseAgent(ServiceTask):
             else:
                 raise TypeError(f"Executor {type(self.executor)} is not callable and has no 'invoke' method.")
         except Exception as e:
-            print(f"[{self.name}] Error during ask(): {e}")
+            logger.error(f"[{self.name}] Error during ask(): {e}")
             raise
 
     def notify(self, event: Dict[str, Any]):
@@ -82,7 +83,7 @@ class BaseAgent(ServiceTask):
              # We treat notification payload as input to the same executor, 
              # OR we could have a separate handler. 
              # For now, assume the executor handles it or we log it.
-             print(f"[{self.name}] Received Notification: {event}")
+             logger.info(f"[{self.name}] Received Notification: {event}")
              # Optional: self.executor.invoke(event) 
         except Exception as e:
-            print(f"[{self.name}] Error processing notification: {e}")
+            logger.error(f"[{self.name}] Error processing notification: {e}")

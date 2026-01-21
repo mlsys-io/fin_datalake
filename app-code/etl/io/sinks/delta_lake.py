@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any, Union, List
 import pyarrow as pa
 import pandas as pd
 from deltalake import write_deltalake
+from loguru import logger
 
 from etl.io.base import DataSink, DataWriter
 
@@ -80,13 +81,20 @@ class DeltaLakeWriter(DataWriter):
                 self._write_local_batch(data)
         except Exception as e:
             # We explicitly catch and re-raise to add context
-            print(f"[DeltaLakeWriter] Error writing to {self.sink.uri}: {e}")
+            logger.error(f"Error writing to {self.sink.uri}: {e}")
             raise
 
     def _write_ray_dataset(self, ds):
         """
-        Distributed write using Ray Datasink.
-        Ported from legacy ioutils/deltalake.py
+        Distributed write using Ray Datasink pattern.
+        
+        Writes a Ray Dataset to Delta Lake in a distributed fashion by:
+        1. Defining a custom Datasink that wraps deltalake.write_deltalake
+        2. Each block/partition writes independently in parallel
+        3. Automatically registers the table in Hive Metastore if configured
+        
+        Args:
+            ds: Ray Dataset containing data to write
         """
         # 1. Define custom Datasink
         import ray.data as rd
@@ -164,10 +172,24 @@ class DeltaLakeWriter(DataWriter):
                     partition_keys=self.sink.partition_by or []
                 )
         except Exception as e:
-            print(f"[DeltaLakeWriter] Warning: Failed to register in Hive: {e}")
+            logger.warning(f"Failed to register table in Hive: {e}")
 
     def _clean_schema(self, table: pa.Table) -> pa.Table:
-        """Strip timezones from timestamps for compatibility."""
+        """
+        Strip timezone information from timestamp fields for Delta Lake compatibility.
+        
+        Delta Lake requires timestamps without timezone info. This method:
+        1. Iterates through all fields in the Arrow schema
+        2. Identifies timestamp fields with timezone information
+        3. Converts them to timezone-naive timestamps with same unit
+        4. Casts the table to the new schema if any changes were made
+        
+        Args:
+            table: PyArrow Table potentially containing timezone-aware timestamps
+            
+        Returns:
+            PyArrow Table with timezone-naive timestamps
+        """
         new_fields = []
         schema = table.schema
         changed = False
