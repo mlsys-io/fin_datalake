@@ -1,0 +1,383 @@
+# ConfigMaps for Demo Sources Scripts
+# These embed the Python scripts directly into K8s for easy deployment
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: websocket-server-script
+  namespace: demo-sources
+data:
+  server.py: |
+    """
+    Mock WebSocket server streaming real-time price data.
+    Alternative to using external services like Bitstamp.
+
+    Streams:
+      - Simulated trade events (price, amount, timestamp)
+      - Updates every 500ms per symbol
+    """
+    import asyncio
+    import argparse
+    import json
+    import random
+    from datetime import datetime
+    from typing import Dict, Set
+
+    import websockets
+    from websockets.server import serve
+
+    # ============ Configuration ============
+    SYMBOLS = {
+        "BTCUSD": 42000.0,
+        "ETHUSD": 2800.0,
+    }
+
+    # Track connected clients
+    connected_clients: Set = set()
+
+
+    # ============ Price Simulation ============
+    async def simulate_prices():
+        """Continuously update prices with random walk."""
+        while True:
+            for symbol in SYMBOLS:
+                # Random walk with slight upward bias
+                change = random.uniform(-0.001, 0.0012)
+                SYMBOLS[symbol] *= (1 + change)
+            await asyncio.sleep(0.1)
+
+
+    # ============ WebSocket Handler ============
+    async def handle_client(websocket, path):
+        """Handle a single WebSocket client connection."""
+        client_addr = websocket.remote_address
+        print(f"Client connected: {client_addr}")
+        connected_clients.add(websocket)
+        
+        try:
+            # Send welcome message
+            await websocket.send(json.dumps({
+                "event": "connected",
+                "message": "Welcome to ETL Demo WebSocket",
+                "symbols": list(SYMBOLS.keys())
+            }))
+            
+            # Stream price updates
+            while True:
+                for symbol, price in SYMBOLS.items():
+                    # Simulate a trade event (similar to Bitstamp format)
+                    trade = {
+                        "event": "trade",
+                        "channel": "live_trades",
+                        "data": {
+                            "id": random.randint(100000, 999999),
+                            "symbol": symbol,
+                            "price": round(price, 2),
+                            "price_str": f"{price:.2f}",
+                            "amount": round(random.uniform(0.001, 2.0), 6),
+                            "amount_str": f"{random.uniform(0.001, 2.0):.6f}",
+                            "type": random.choice([0, 1]),  # 0=buy, 1=sell
+                            "timestamp": datetime.now().isoformat(),
+                            "microtimestamp": str(int(datetime.now().timestamp() * 1000000))
+                        }
+                    }
+                    
+                    try:
+                        await websocket.send(json.dumps(trade))
+                    except websockets.ConnectionClosed:
+                        break
+                        
+                await asyncio.sleep(0.5)  # 2 updates per second per symbol
+                
+        except websockets.ConnectionClosed:
+            pass
+        finally:
+            connected_clients.discard(websocket)
+            print(f"Client disconnected: {client_addr}")
+
+
+    async def broadcast_stats():
+        """Periodically broadcast connection stats."""
+        while True:
+            if connected_clients:
+                stats = {
+                    "event": "stats",
+                    "connected_clients": len(connected_clients),
+                    "symbols": {sym: round(price, 2) for sym, price in SYMBOLS.items()},
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                # Broadcast to all clients
+                disconnected = set()
+                for client in connected_clients:
+                    try:
+                        await client.send(json.dumps(stats))
+                    except websockets.ConnectionClosed:
+                        disconnected.add(client)
+                
+                connected_clients.difference_update(disconnected)
+                
+            await asyncio.sleep(10)  # Stats every 10 seconds
+
+
+    # ============ Main ============
+    async def main(host: str, port: int):
+        print(f"WebSocket server starting on ws://{host}:{port}")
+        
+        # Start background tasks
+        asyncio.create_task(simulate_prices())
+        asyncio.create_task(broadcast_stats())
+        
+        # Start WebSocket server
+        async with serve(handle_client, host, port):
+            await asyncio.Future()  # Run forever
+
+
+    if __name__ == "__main__":
+        parser = argparse.ArgumentParser(description="Mock WebSocket Price Server")
+        parser.add_argument("--host", default="0.0.0.0", help="Host to bind")
+        parser.add_argument("--port", type=int, default=8765, help="Port to listen on")
+        args = parser.parse_args()
+        
+        try:
+            asyncio.run(main(args.host, args.port))
+        except KeyboardInterrupt:
+            print("Server stopped")
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-producer-script
+  namespace: demo-sources
+data:
+  producer.py: |
+    """
+    Kafka producer that generates simulated OHLC and event data.
+    Run this during demos to show real-time data ingestion.
+
+    Topics produced:
+      - ohlc-events: Simulated price ticks for multiple symbols
+      - news-events: Simulated news headlines
+      - orders: Simulated order events
+    """
+    import argparse
+    import json
+    import time
+    import random
+    import signal
+    import sys
+    from datetime import datetime
+    from typing import Dict, Any
+
+    from kafka import KafkaProducer
+    from kafka.errors import NoBrokersAvailable
+
+
+    # ============ Configuration ============
+    SYMBOLS = {
+        "BTCUSD": {"base": 42000, "volatility": 0.002},
+        "ETHUSD": {"base": 2800, "volatility": 0.003},
+        "AAPL": {"base": 185, "volatility": 0.001},
+        "GOOGL": {"base": 140, "volatility": 0.001},
+        "MSFT": {"base": 380, "volatility": 0.001},
+    }
+
+    # Track current prices for random walk
+    current_prices: Dict[str, float] = {sym: cfg["base"] for sym, cfg in SYMBOLS.items()}
+
+    # Graceful shutdown
+    running = True
+
+
+    def signal_handler(sig, frame):
+        global running
+        print("Shutting down producer...")
+        running = False
+
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+
+    # ============ Data Generators ============
+    def generate_ohlc_tick(symbol: str) -> Dict[str, Any]:
+        """Generate a single OHLC tick with random walk."""
+        config = SYMBOLS[symbol]
+        volatility = config["volatility"]
+        
+        # Random walk
+        change = random.uniform(-volatility, volatility)
+        current_prices[symbol] *= (1 + change)
+        price = current_prices[symbol]
+        
+        return {
+            "symbol": symbol,
+            "timestamp": datetime.now().isoformat(),
+            "epoch_ms": int(datetime.now().timestamp() * 1000),
+            "open": round(price * random.uniform(0.999, 1.0), 2),
+            "high": round(price * random.uniform(1.0, 1.002), 2),
+            "low": round(price * random.uniform(0.998, 1.0), 2),
+            "close": round(price, 2),
+            "volume": random.randint(100, 10000),
+            "trade_count": random.randint(10, 500)
+        }
+
+
+    def generate_news_event() -> Dict[str, Any]:
+        """Generate a simulated news event."""
+        headlines = [
+            "Breaking: Market volatility increases on economic data",
+            "Analysts upgrade rating amid strong earnings",
+            "Sector rotation observed as investors seek value",
+            "Central bank signals policy shift",
+            "Trading volumes surge on institutional activity"
+        ]
+        
+        symbol = random.choice(list(SYMBOLS.keys()))
+        return {
+            "id": random.randint(10000, 99999),
+            "timestamp": datetime.now().isoformat(),
+            "symbol": symbol,
+            "headline": f"{random.choice(headlines)} - {symbol}",
+            "source": random.choice(["Reuters", "Bloomberg", "CNBC"]),
+            "sentiment": random.choice(["positive", "negative", "neutral"]),
+            "impact_score": round(random.uniform(0, 1), 2)
+        }
+
+
+    def generate_order_event() -> Dict[str, Any]:
+        """Generate a simulated order event."""
+        symbol = random.choice(list(SYMBOLS.keys()))
+        price = current_prices[symbol]
+        
+        return {
+            "order_id": f"ORD-{random.randint(100000, 999999)}",
+            "timestamp": datetime.now().isoformat(),
+            "symbol": symbol,
+            "side": random.choice(["buy", "sell"]),
+            "quantity": round(random.uniform(0.1, 100), 4),
+            "price": round(price * random.uniform(0.999, 1.001), 2),
+            "order_type": random.choice(["market", "limit"]),
+            "status": "filled"
+        }
+
+
+    # ============ Producer Logic ============
+    def create_producer(bootstrap_servers: str) -> KafkaProducer:
+        """Create Kafka producer with retry logic."""
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                producer = KafkaProducer(
+                    bootstrap_servers=[bootstrap_servers],
+                    value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+                    acks='all',
+                    retries=3
+                )
+                print(f"Connected to Kafka at {bootstrap_servers}")
+                return producer
+            except NoBrokersAvailable:
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    print(f"Waiting for Kafka... retry in {wait_time}s ({attempt + 1}/{max_retries})")
+                    time.sleep(wait_time)
+                else:
+                    raise
+
+
+    def produce_loop(producer: KafkaProducer, topic: str, interval: float):
+        """Main production loop."""
+        message_count = 0
+        
+        print(f"Starting producer for topic '{topic}' (interval: {interval}s)")
+        
+        while running:
+            try:
+                if topic == "ohlc-events":
+                    for symbol in SYMBOLS:
+                        data = generate_ohlc_tick(symbol)
+                        producer.send(topic, value=data)
+                        message_count += 1
+                        print(f"[{message_count}] {symbol}: ${data['close']:.2f}")
+                        
+                elif topic == "news-events":
+                    data = generate_news_event()
+                    producer.send(topic, value=data)
+                    message_count += 1
+                    print(f"[{message_count}] {data['symbol']}: {data['headline'][:50]}...")
+                    
+                elif topic == "orders":
+                    data = generate_order_event()
+                    producer.send(topic, value=data)
+                    message_count += 1
+                    print(f"[{message_count}] {data['side'].upper()} {data['quantity']} {data['symbol']} @ ${data['price']}")
+                
+                producer.flush()
+                time.sleep(interval)
+                
+            except Exception as e:
+                print(f"Error: {e}")
+                time.sleep(1)
+        
+        producer.close()
+        print(f"Producer stopped. Total messages sent: {message_count}")
+
+
+    # ============ Main ============
+    def main():
+        parser = argparse.ArgumentParser(description="Kafka Demo Data Producer")
+        parser.add_argument("--bootstrap", default="localhost:9092", help="Kafka bootstrap servers")
+        parser.add_argument("--topic", default="ohlc-events", choices=["ohlc-events", "news-events", "orders"])
+        parser.add_argument("--interval", type=float, default=1.0, help="Seconds between messages")
+        args = parser.parse_args()
+        
+        producer = create_producer(args.bootstrap)
+        produce_loop(producer, args.topic, args.interval)
+
+
+    if __name__ == "__main__":
+        main()
+---
+# Static data ConfigMap (for CSV files)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: static-data
+  namespace: demo-sources
+data:
+  customers.csv: |
+    customer_id,name,email,region,tier,created_at
+    C001,Acme Corporation,contact@acme.com,APAC,gold,2024-03-15
+    C002,Globex Industries,sales@globex.com,EMEA,silver,2024-05-22
+    C003,Initech Solutions,info@initech.com,AMER,bronze,2024-07-10
+    C004,Umbrella Corp,business@umbrella.com,APAC,gold,2024-02-28
+    C005,Stark Industries,orders@stark.com,AMER,gold,2024-01-05
+    C006,Wayne Enterprises,procurement@wayne.com,AMER,gold,2024-04-18
+    C007,Oscorp Industries,supply@oscorp.com,EMEA,silver,2024-06-30
+    C008,Cyberdyne Systems,contracts@cyberdyne.com,APAC,bronze,2024-08-12
+    C009,Weyland Corp,purchasing@weyland.com,EMEA,silver,2024-09-25
+    C010,Tyrell Corporation,sales@tyrell.com,APAC,gold,2024-10-08
+    C011,Massive Dynamic,orders@massive.com,AMER,bronze,2024-11-15
+    C012,Soylent Corp,bulk@soylent.com,EMEA,silver,2024-12-01
+  orders.csv: |
+    order_id,customer_id,product,quantity,price,order_date,status
+    ORD-0001,C001,Widget A,10,99.99,2026-01-10,completed
+    ORD-0002,C002,Widget B,5,149.99,2026-01-11,completed
+    ORD-0003,C001,Gadget X,3,299.99,2026-01-12,shipped
+    ORD-0004,C003,Tool Y,8,49.99,2026-01-13,completed
+    ORD-0005,C004,Device Z,2,599.99,2026-01-14,pending
+    ORD-0006,C002,Widget A,15,99.99,2026-01-15,completed
+    ORD-0007,C005,Widget B,7,149.99,2026-01-16,shipped
+    ORD-0008,C001,Gadget X,1,299.99,2026-01-17,completed
+    ORD-0009,C006,Tool Y,12,49.99,2026-01-18,completed
+    ORD-0010,C003,Device Z,4,599.99,2026-01-19,pending
+    ORD-0011,C007,Widget A,20,99.99,2026-01-20,completed
+    ORD-0012,C004,Widget B,3,149.99,2026-01-21,shipped
+    ORD-0013,C008,Gadget X,6,299.99,2026-01-22,completed
+    ORD-0014,C005,Tool Y,9,49.99,2026-01-23,pending
+    ORD-0015,C009,Device Z,1,599.99,2026-01-24,completed
+    ORD-0016,C010,Widget A,25,99.99,2026-01-25,shipped
+    ORD-0017,C006,Widget B,11,149.99,2026-01-26,completed
+    ORD-0018,C011,Gadget X,4,299.99,2026-01-27,completed
+    ORD-0019,C007,Tool Y,16,49.99,2026-01-28,pending
+    ORD-0020,C012,Device Z,2,599.99,2026-01-29,completed

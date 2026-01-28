@@ -1,0 +1,10 @@
+# Demo Sources Kubernetes Namespace
+# All demo data sources (Kafka, API, WebSocket) will be deployed here
+# Using NodePort services so ETL pipelines can connect via external IP:port
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-sources
+  labels:
+    app.kubernetes.io/name: demo-sources
+    purpose: etl-demo

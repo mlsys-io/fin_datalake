@@ -1,0 +1,13 @@
+customer_id,name,email,region,tier,created_at
+C001,Acme Corporation,contact@acme.com,APAC,gold,2024-03-15
+C002,Globex Industries,sales@globex.com,EMEA,silver,2024-05-22
+C003,Initech Solutions,info@initech.com,AMER,bronze,2024-07-10
+C004,Umbrella Corp,business@umbrella.com,APAC,gold,2024-02-28
+C005,Stark Industries,orders@stark.com,AMER,gold,2024-01-05
+C006,Wayne Enterprises,procurement@wayne.com,AMER,gold,2024-04-18
+C007,Oscorp Industries,supply@oscorp.com,EMEA,silver,2024-06-30
+C008,Cyberdyne Systems,contracts@cyberdyne.com,APAC,bronze,2024-08-12
+C009,Weyland Corp,purchasing@weyland.com,EMEA,silver,2024-09-25
+C010,Tyrell Corporation,sales@tyrell.com,APAC,gold,2024-10-08
+C011,Massive Dynamic,orders@massive.com,AMER,bronze,2024-11-15
+C012,Soylent Corp,bulk@soylent.com,EMEA,silver,2024-12-01

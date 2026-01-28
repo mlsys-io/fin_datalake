@@ -1,0 +1,21 @@
+order_id,customer_id,product,quantity,price,order_date,status
+ORD-0001,C001,Widget A,10,99.99,2026-01-10,completed
+ORD-0002,C002,Widget B,5,149.99,2026-01-11,completed
+ORD-0003,C001,Gadget X,3,299.99,2026-01-12,shipped
+ORD-0004,C003,Tool Y,8,49.99,2026-01-13,completed
+ORD-0005,C004,Device Z,2,599.99,2026-01-14,pending
+ORD-0006,C002,Widget A,15,99.99,2026-01-15,completed
+ORD-0007,C005,Widget B,7,149.99,2026-01-16,shipped
+ORD-0008,C001,Gadget X,1,299.99,2026-01-17,completed
+ORD-0009,C006,Tool Y,12,49.99,2026-01-18,completed
+ORD-0010,C003,Device Z,4,599.99,2026-01-19,pending
+ORD-0011,C007,Widget A,20,99.99,2026-01-20,completed
+ORD-0012,C004,Widget B,3,149.99,2026-01-21,shipped
+ORD-0013,C008,Gadget X,6,299.99,2026-01-22,completed
+ORD-0014,C005,Tool Y,9,49.99,2026-01-23,pending
+ORD-0015,C009,Device Z,1,599.99,2026-01-24,completed
+ORD-0016,C010,Widget A,25,99.99,2026-01-25,shipped
+ORD-0017,C006,Widget B,11,149.99,2026-01-26,completed
+ORD-0018,C011,Gadget X,4,299.99,2026-01-27,completed
+ORD-0019,C007,Tool Y,16,49.99,2026-01-28,pending
+ORD-0020,C012,Device Z,2,599.99,2026-01-29,completed
