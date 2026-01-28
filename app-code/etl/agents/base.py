@@ -11,7 +11,12 @@ class BaseAgent(ServiceTask):
     
     This class handles the infrastructure (Ray Actor lifecycle, messaging),
     while the subclass defines the intelligence (LLM, Chain, etc.) via `build_executor`.
+    
+    Class Attributes:
+        CAPABILITIES: List of capabilities this agent provides (for registry discovery)
     """
+    
+    CAPABILITIES: list = []  # Override in subclass with agent's capabilities
     
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__(name=self.__class__.__name__, config=config)
@@ -21,10 +26,30 @@ class BaseAgent(ServiceTask):
         """
         Called once when the Actor starts.
         Builds the heavy logic (LLM, Tools) to ensure they live on the Cluster Node.
+        Also auto-registers with the AgentRegistry if CAPABILITIES are defined.
         """
         logger.info(f"[{self.name}] Setting up Agent Intelligence...")
         self.executor = self.build_executor()
+        
+        # Auto-register with AgentRegistry if capabilities defined
+        if self.CAPABILITIES:
+            self._register_with_registry()
+        
         logger.info(f"[{self.name}] Ready.")
+    
+    def _register_with_registry(self):
+        """Register this agent with the AgentRegistry."""
+        try:
+            from etl.agents.registry import get_registry
+            registry = get_registry()
+            ray.get(registry.register.remote(
+                name=self.name,
+                capabilities=self.CAPABILITIES,
+                metadata={"class": self.__class__.__name__}
+            ))
+            logger.info(f"[{self.name}] Registered with capabilities: {self.CAPABILITIES}")
+        except Exception as e:
+            logger.warning(f"[{self.name}] Failed to register with AgentRegistry: {e}")
 
     @abstractmethod
     def build_executor(self) -> Any:
@@ -74,16 +99,106 @@ class BaseAgent(ServiceTask):
 
     def notify(self, event: Dict[str, Any]):
         """
-        Asynchronous Fire-and-Forget.
-        Used for Alerts, Triggers, or Stream Processing.
+        Handle incoming messages from the MessageBus.
+        
+        Routes messages to topic-specific handlers if they exist:
+        - Topic "market_data" → calls self.handle_market_data(payload)
+        - Topic "alert" → calls self.handle_alert(payload)
+        - Otherwise → calls self.on_message(event)
+        
+        Subclasses should override handle_<topic>() or on_message() to process.
         """
-        # In a real impl, this might push to an internal Queue processed by run()
-        # For simplicity in V1, we process immediately but don't return result.
         try:
-             # We treat notification payload as input to the same executor, 
-             # OR we could have a separate handler. 
-             # For now, assume the executor handles it or we log it.
-             logger.info(f"[{self.name}] Received Notification: {event}")
-             # Optional: self.executor.invoke(event) 
+            topic = event.get("topic", "")
+            payload = event.get("payload", {})
+            
+            # Look for topic-specific handler: handle_<topic>()
+            handler_name = f"handle_{topic.replace('-', '_').replace('.', '_')}"
+            handler = getattr(self, handler_name, None)
+            
+            if handler and callable(handler):
+                logger.debug(f"[{self.name}] Routing to {handler_name}")
+                handler(payload, event)
+            else:
+                # Default handler
+                self.on_message(event)
+                
         except Exception as e:
             logger.error(f"[{self.name}] Error processing notification: {e}")
+    
+    def on_message(self, event: Dict[str, Any]):
+        """
+        Default message handler. Override in subclass to process unhandled topics.
+        
+        Args:
+            event: Full message dict with topic, payload, sender, timestamp
+        """
+        logger.info(f"[{self.name}] Received: {event.get('topic')} from {event.get('sender')}")
+
+    def delegate(
+        self, 
+        capability: str, 
+        payload: Any,
+        retry_on_failure: bool = True,
+        max_retries: int = 3
+    ) -> Any:
+        """
+        Delegate a task to another agent that has the required capability.
+        
+        Uses the AgentRegistry for service discovery. If retry_on_failure is True,
+        will try other agents with the same capability if the first one fails.
+        
+        Args:
+            capability: The capability needed (e.g., "analysis", "data_fetch")
+            payload: The input to pass to the target agent
+            retry_on_failure: If True, try other capable agents on failure (default: True)
+            max_retries: Maximum number of agents to try (default: 3)
+            
+        Returns:
+            Result from the delegated agent
+            
+        Raises:
+            ValueError: If no agent with the capability is found
+            RuntimeError: If all capable agents fail
+        """
+        from etl.agents.registry import get_registry
+        
+        registry = get_registry()
+        agents = ray.get(registry.find_by_capability.remote(capability))
+        
+        if not agents:
+            raise ValueError(f"No agent found with capability: {capability}")
+        
+        # Limit retries to available agents
+        attempts = min(len(agents), max_retries) if retry_on_failure else 1
+        last_error = None
+        
+        for i in range(attempts):
+            target_name = agents[i]
+            
+            try:
+                target = ray.get(registry.get_agent.remote(target_name))
+                
+                if target is None:
+                    logger.warning(f"[{self.name}] Agent '{target_name}' not accessible, trying next...")
+                    continue
+                
+                logger.info(f"[{self.name}] Delegating '{capability}' to {target_name}")
+                return ray.get(target.ask.remote(payload))
+                
+            except Exception as e:
+                last_error = e
+                logger.warning(f"[{self.name}] Agent '{target_name}' failed: {e}")
+                
+                if not retry_on_failure:
+                    raise
+                
+                if i < attempts - 1:
+                    logger.info(f"[{self.name}] Retrying with next agent...")
+        
+        # All agents failed
+        raise RuntimeError(
+            f"All {attempts} agents with capability '{capability}' failed. "
+            f"Last error: {last_error}"
+        )
+
