@@ -3,7 +3,7 @@ apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
   name: tsdb
-  namespace: postgres-operator
+  namespace: etl-data
 spec:
   # Newest major
   postgresVersion: 17
@@ -29,7 +29,7 @@ spec:
   users:
     - name: app
       databases: ["app"]
-      options: "SUPERUSER"   # tighten later if you prefer
+      options: "SUPERUSER" # tighten later if you prefer
 
   # Simple pgBackRest repo on PVC (easy to start)
   backups:

@@ -3,7 +3,7 @@ set -euo pipefail
 
 # === RisingWave Helm deployment (bundled with MinIO + PostgreSQL) ===
 
-NAMESPACE="risingwave"
+NAMESPACE="etl-data"
 RELEASE_NAME="risingwave"
 VALUES_FILE="risingwave-values.yaml"
 

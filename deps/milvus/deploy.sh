@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # --- CONFIG ---
-NAMESPACE="milvus"
+NAMESPACE="etl-data"
 RELEASE_NAME="milvus"
 CHART_REPO_NAME="milvus"
 CHART_REPO_URL="https://zilliztech.github.io/milvus-helm/"

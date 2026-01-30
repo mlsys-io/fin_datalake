@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Automated ETL Configuration Setup
+# =============================================================================
+# This script auto-discovers K8s services and generates configuration files.
+# Usage: ./setup-config.sh [--env | --configmap | --both]
+#
+# Prerequisites:
+#   - kubectl configured and connected to cluster
+#   - jq installed (for JSON parsing)
+# =============================================================================
+
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Output files
+ENV_FILE=".env"
+CONFIGMAP_FILE="k8s-config.yaml"
+
+# Default namespaces (adjust if different)
+NS_DEMO="demo-sources"
+NS_MINIO="etl-storage"
+NS_TSDB="etl-data"
+NS_PREFECT="etl-orchestrate"
+NS_COMPUTE="etl-compute"
+
+echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
+echo -e "${BLUE}    ETL Framework - Automated Configuration Setup${NC}"
+echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
+echo ""
+
+# -----------------------------------------------------------------------------
+# 1. Check prerequisites
+# -----------------------------------------------------------------------------
+echo -e "${YELLOW}[1/6] Checking prerequisites...${NC}"
+
+if ! command -v kubectl &> /dev/null; then
+    echo -e "${RED}❌ kubectl not found. Please install kubectl first.${NC}"
+    exit 1
+fi
+
+if ! kubectl cluster-info &> /dev/null; then
+    echo -e "${RED}❌ Cannot connect to K8s cluster. Check your kubeconfig.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ kubectl connected to cluster${NC}"
+
+# -----------------------------------------------------------------------------
+# 2. Discover Node IP
+# -----------------------------------------------------------------------------
+echo -e "${YELLOW}[2/6] Discovering Node IP...${NC}"
+
+NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+if [ -z "$NODE_IP" ]; then
+    echo -e "${RED}❌ Could not determine Node IP${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ Node IP: ${NODE_IP}${NC}"
+
+# -----------------------------------------------------------------------------
+# 3. Discover Services & NodePorts
+# -----------------------------------------------------------------------------
+echo -e "${YELLOW}[3/6] Discovering services...${NC}"
+
+# Function to get NodePort for a service
+get_nodeport() {
+    local ns=$1
+    local svc=$2
+    kubectl get svc "$svc" -n "$ns" -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo ""
+}
+
+# Demo Sources
+API_PORT=$(get_nodeport "$NS_DEMO" "demo-api")
+WS_PORT=$(get_nodeport "$NS_DEMO" "websocket-server")
+KAFKA_PORT=$(get_nodeport "$NS_DEMO" "kafka")
+STATIC_PORT=$(get_nodeport "$NS_DEMO" "static-server")
+
+echo "  - API Server: ${API_PORT:-not found}"
+echo "  - WebSocket: ${WS_PORT:-not found}"
+echo "  - Kafka: ${KAFKA_PORT:-not found}"
+echo "  - Static Files: ${STATIC_PORT:-not found}"
+
+# -----------------------------------------------------------------------------
+# 4. Extract Secrets
+# -----------------------------------------------------------------------------
+echo -e "${YELLOW}[4/6] Extracting secrets...${NC}"
+
+# MinIO credentials
+MINIO_ACCESS=""
+MINIO_SECRET=""
+MINIO_SECRET_NAME=$(kubectl get secrets -n "$NS_MINIO" -o name 2>/dev/null | grep -E "(minio|credentials)" | head -1 || echo "")
+if [ -n "$MINIO_SECRET_NAME" ]; then
+    MINIO_ACCESS=$(kubectl get "$MINIO_SECRET_NAME" -n "$NS_MINIO" -o jsonpath='{.data.accesskey}' 2>/dev/null | base64 -d || echo "")
+    MINIO_SECRET=$(kubectl get "$MINIO_SECRET_NAME" -n "$NS_MINIO" -o jsonpath='{.data.secretkey}' 2>/dev/null | base64 -d || echo "")
+    
+    # Try alternate field names
+    if [ -z "$MINIO_ACCESS" ]; then
+        MINIO_ACCESS=$(kubectl get "$MINIO_SECRET_NAME" -n "$NS_MINIO" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' 2>/dev/null | base64 -d || echo "")
+        MINIO_SECRET=$(kubectl get "$MINIO_SECRET_NAME" -n "$NS_MINIO" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' 2>/dev/null | base64 -d || echo "")
+    fi
+fi
+echo "  - MinIO: ${MINIO_ACCESS:+found}${MINIO_ACCESS:-not found}"
+
+# TimescaleDB password
+TSDB_PASSWORD=""
+TSDB_SECRET_NAME="tsdb-pguser-app"
+if kubectl get secret "$TSDB_SECRET_NAME" -n "$NS_TSDB" &>/dev/null; then
+    TSDB_PASSWORD=$(kubectl get secret "$TSDB_SECRET_NAME" -n "$NS_TSDB" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
+fi
+echo "  - TimescaleDB: ${TSDB_PASSWORD:+found}${TSDB_PASSWORD:-not found}"
+
+# -----------------------------------------------------------------------------
+# 5. Generate .env file
+# -----------------------------------------------------------------------------
+echo -e "${YELLOW}[5/6] Generating configuration files...${NC}"
+
+cat > "$ENV_FILE" << EOF
+# =============================================================================
+# ETL Framework Configuration
+# Auto-generated by setup-config.sh on $(date)
+# =============================================================================
+
+# K8s Cluster
+NODE_IP=${NODE_IP}
+
+# MinIO / S3 (Delta Lake Storage)
+AWS_ACCESS_KEY_ID=${MINIO_ACCESS}
+AWS_SECRET_ACCESS_KEY=${MINIO_SECRET}
+AWS_ENDPOINT_URL=http://${NODE_IP}:9000
+AWS_REGION=us-east-1
+
+# Delta Lake
+DELTA_ROOT=s3://delta-lake/bronze
+
+# TimescaleDB
+TSDB_HOST=${NODE_IP}
+TSDB_PORT=5432
+TSDB_USER=app
+TSDB_PASSWORD=${TSDB_PASSWORD}
+TSDB_DATABASE=app
+
+# Kafka
+KAFKA_BOOTSTRAP_SERVERS=${NODE_IP}:${KAFKA_PORT:-30909}
+
+# Demo Sources
+API_URL=http://${NODE_IP}:${API_PORT:-30800}
+WEBSOCKET_URL=ws://${NODE_IP}:${WS_PORT:-30876}
+STATIC_URL=http://${NODE_IP}:${STATIC_PORT:-30880}
+
+# Hive Metastore
+HIVE_HOST=hive-metastore.default.svc.cluster.local
+HIVE_PORT=9083
+
+# Prefect
+PREFECT_API_URL=http://${NODE_IP}:4200/api
+
+# Ray
+RAY_ADDRESS=ray://${NODE_IP}:10001
+
+# Data Paths
+INPUT_PATH=/mnt/data
+EOF
+
+echo -e "${GREEN}✅ Generated: ${ENV_FILE}${NC}"
+
+# -----------------------------------------------------------------------------
+# 6. Generate K8s ConfigMap + Secret
+# -----------------------------------------------------------------------------
+cat > "$CONFIGMAP_FILE" << EOF
+# Auto-generated by setup-config.sh on $(date)
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etl-config
+  labels:
+    app: etl-framework
+data:
+  NODE_IP: "${NODE_IP}"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka.${NS_DEMO}.svc:9092"
+  DELTA_ROOT: "s3://delta-lake/bronze"
+  HIVE_HOST: "hive-metastore.default.svc.cluster.local"
+  HIVE_PORT: "9083"
+  API_URL: "http://demo-api.${NS_DEMO}.svc:8000"
+  WEBSOCKET_URL: "ws://websocket-server.${NS_DEMO}.svc:8765"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: etl-secrets
+  labels:
+    app: etl-framework
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: "${MINIO_ACCESS}"
+  AWS_SECRET_ACCESS_KEY: "${MINIO_SECRET}"
+  TSDB_PASSWORD: "${TSDB_PASSWORD}"
+EOF
+
+echo -e "${GREEN}✅ Generated: ${CONFIGMAP_FILE}${NC}"
+
+# -----------------------------------------------------------------------------
+# Summary
+# -----------------------------------------------------------------------------
+echo ""
+echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}✅ Configuration complete!${NC}"
+echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
+echo ""
+echo "Generated files:"
+echo "  📄 ${ENV_FILE} - For local development (source .env)"
+echo "  📄 ${CONFIGMAP_FILE} - For K8s deployment (kubectl apply -f)"
+echo ""
+echo "Usage:"
+echo "  # Local development"
+echo "  source .env && python -m pipelines.demo_pipeline"
+echo ""
+echo "  # K8s deployment"
+echo "  kubectl apply -f ${CONFIGMAP_FILE}"
+echo ""
+
+# Check for missing values
+MISSING=""
+[ -z "$MINIO_ACCESS" ] && MISSING="${MISSING}\n  - MinIO credentials"
+[ -z "$TSDB_PASSWORD" ] && MISSING="${MISSING}\n  - TimescaleDB password"
+[ -z "$API_PORT" ] && MISSING="${MISSING}\n  - Demo API service"
+
+if [ -n "$MISSING" ]; then
+    echo -e "${YELLOW}⚠️  Some values could not be auto-discovered:${MISSING}${NC}"
+    echo -e "${YELLOW}   You may need to fill these in manually.${NC}"
+fi

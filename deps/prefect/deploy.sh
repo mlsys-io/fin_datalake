@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # --- CONFIG ---
-NAMESPACE="prefect"
+NAMESPACE="etl-orchestrate"
 RELEASE_NAME="prefect-server"
 CHART_REPO_NAME="prefect"
 CHART_REPO_URL="https://prefecthq.github.io/prefect-helm"
