@@ -1,0 +1,51 @@
+# Milvus Minimal Configuration (Standalone Mode)
+# Reduces pods from ~25 to ~5 for development/testing
+
+# Use standalone mode instead of cluster
+cluster:
+  enabled: false
+
+# Standalone mode configuration
+standalone:
+  resources:
+    limits:
+      cpu: 2
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 512Mi
+
+# Single etcd instance
+etcd:
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+# Single MinIO instance
+minio:
+  mode: standalone
+  replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+# Disable Pulsar (use embedded rocksmq instead)
+pulsar:
+  enabled: false
+
+# Use embedded message queue
+msgStreamType: "rocksmq"
+
+# NodePort for external access
+service:
+  type: NodePort
+  nodePort: 31530
