@@ -28,7 +28,7 @@ helm repo update
 
 #--- Deploy RisingWave bundle ---
 echo "Installing RisingWave bundle with PostgreSQL + MinIO..."
-helm install -n risingwave $RELEASE_NAME risingwavelabs/risingwave -f $VALUES_FILE
+helm install -n $NAMESPACE $RELEASE_NAME risingwavelabs/risingwave $VALUES_FILES
 
 echo "✅ RisingWave bundle deployed successfully!"
 
