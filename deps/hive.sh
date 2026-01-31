@@ -1,7 +1,7 @@
 MINIO_ENDPOINT=$1
 MINIO_USERNAME=$2
 MINIO_PASSWORD=$3
-MINIO_CERT=${4-$HOME/.mc/certs/CAs/public.crt}
+MINIO_CERT=${4-/mnt/data/minio-certs/minio-storage-head.crt}
 
 SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 

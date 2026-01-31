@@ -111,8 +111,8 @@ deploy_hive() {
     local minio_endpoint="${MINIO_ENDPOINT:-}"
     local minio_user="${MINIO_USER:-}"
     local minio_password="${MINIO_PASSWORD:-}"
-    local minio_cert="${MINIO_CERT:-$HOME/.mc/certs/CAs/public.crt}"
-    
+    local minio_cert="${MINIO_CERT:-/mnt/data/minio-certs/minio-storage-head.crt}"
+        
     if [ -z "$minio_endpoint" ] || [ -z "$minio_user" ] || [ -z "$minio_password" ]; then
         log_error "Hive requires MinIO credentials. Set environment variables:"
         log_error "  export MINIO_ENDPOINT=https://minio.example.com"
