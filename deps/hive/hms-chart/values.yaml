@@ -10,7 +10,7 @@ metastore:
   warehouseDir: "file:///warehouse"
 
 db:
-  url: "jdbc:postgresql://hms-db-postgresql.hive.svc:5432/hivemetastore"
+  url: "jdbc:postgresql://hms-db-postgresql.etl-storage.svc:5432/hivemetastore"
   driver: "org.postgresql.Driver"
 
 s3:
