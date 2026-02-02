@@ -19,7 +19,7 @@ spec:
       spec:
         containers:
           - name: ray-head
-            image: etl-ray:2.9.3-py311
+            image: docker.io/library/etl-ray:2.9.3-py311
             imagePullPolicy: Never # Use local image
             resources:
               limits:
@@ -61,7 +61,7 @@ spec:
         spec:
           containers:
             - name: ray-worker
-              image: etl-ray:2.9.3-py311
+              image: docker.io/library/etl-ray:2.9.3-py311
               imagePullPolicy: Never # Use local image
               resources:
                 limits:
