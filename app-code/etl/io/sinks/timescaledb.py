@@ -1,9 +1,16 @@
+"""
+TimescaleDB Sink for writing data to TimescaleDB.
+Heavy imports are deferred to runtime for Ray worker execution.
+"""
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, Union, List
-import pandas as pd
-import pyarrow as pa
+from typing import Optional, Dict, Any, Union, List, TYPE_CHECKING
 
 from etl.io.base import DataSink, DataWriter
+
+if TYPE_CHECKING:
+    import pandas as pd
+    import pyarrow as pa
+
 
 @dataclass
 class TimescaleDBSink(DataSink):
@@ -63,12 +70,16 @@ class TimescaleDBWriter(DataWriter):
         self._cursor = None
         self._conn = None
 
-    def write_batch(self, data: Union[pd.DataFrame, pa.Table, List[Dict[str, Any]]]):
+    def write_batch(self, data: Union[Any, Any, List[Dict[str, Any]]]):
         """
         Writes a batch of data to the target table using execute_values.
         """
-        self._connect()
+        # Heavy imports inside method - executes on Ray worker
+        import pandas as pd
+        import pyarrow as pa
         from psycopg2.extras import execute_values
+        
+        self._connect()
 
         # Normalize to list of dicts or list of tuples
         records = []
@@ -76,18 +87,17 @@ class TimescaleDBWriter(DataWriter):
 
         if isinstance(data, pd.DataFrame):
             columns = list(data.columns)
-            records = data.to_records(index=False).tolist() # List of tuples
+            records = data.to_records(index=False).tolist()  # List of tuples
         elif isinstance(data, pa.Table):
             columns = data.column_names
-            records = data.to_pylist() # List of dicts, careful with order
-            # Convert list of dicts to list of tuples for execute_values efficiency
+            records = data.to_pylist()  # List of dicts
             records = [tuple(r[c] for c in columns) for r in records]
         elif isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
             columns = list(data[0].keys())
             records = [tuple(r.get(c, None) for c in columns) for r in data]
         else:
             if not data:
-                return # Empty batch
+                return  # Empty batch
             raise ValueError(f"Unsupported data type for TimescaleDBWriter: {type(data)}")
 
         if not records:

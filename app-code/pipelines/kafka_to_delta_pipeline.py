@@ -1,33 +1,42 @@
 """
-Example pipeline demonstrating KafkaSource for event-driven ingestion.
+Kafka to Delta Lake Pipeline
 
-This pipeline:
-1. Consumes events from a Kafka topic
-2. Transforms the data (extracts relevant fields)
-3. Writes to Delta Lake for historical storage
+Demonstrates consuming events from Kafka and writing to Delta Lake.
+Imports are inside task methods for remote Ray execution.
 
 Usage:
     python -m pipelines.kafka_to_delta_pipeline
     
 Requires:
-    - Kafka broker running at localhost:9092
+    - Kafka broker running
     - Topic 'events' created
 """
 from typing import List, Dict, Any
-import pandas as pd
 from prefect import flow, task
 from prefect_ray.task_runners import RayTaskRunner
 
-from etl.io.sources.kafka import KafkaSource
-from etl.io.sinks.delta_lake import DeltaLakeSink
-
 
 @task(name="Consume Kafka Events")
-def consume_events(source: KafkaSource, max_batches: int = 10) -> List[Dict]:
+def consume_events(
+    bootstrap_servers: str,
+    topic: str,
+    group_id: str,
+    max_batches: int = 10
+) -> List[Dict]:
     """
     Consume events from Kafka until max_batches reached.
-    In production, this would run continuously in a ServiceTask.
     """
+    # Heavy imports inside task - executes on Ray worker
+    from etl.io.sources.kafka import KafkaSource
+    
+    source = KafkaSource(
+        bootstrap_servers=bootstrap_servers,
+        topics=[topic],
+        group_id=group_id,
+        batch_size=100,
+        poll_timeout=2.0
+    )
+    
     all_events = []
     batch_count = 0
     
@@ -46,11 +55,13 @@ def consume_events(source: KafkaSource, max_batches: int = 10) -> List[Dict]:
 
 
 @task(name="Transform Events")
-def transform_events(events: List[Dict]) -> pd.DataFrame:
+def transform_events(events: List[Dict]) -> Any:
     """
     Transform raw Kafka events into a structured DataFrame.
-    Extracts the 'value' field which contains the actual event data.
     """
+    # Heavy imports inside task - executes on Ray worker
+    import pandas as pd
+    
     records = []
     for event in events:
         value = event.get("value", {})
@@ -70,16 +81,22 @@ def transform_events(events: List[Dict]) -> pd.DataFrame:
 
 
 @task(name="Write to Delta Lake")
-def write_to_delta(df: pd.DataFrame, sink: DeltaLakeSink):
+def write_to_delta(df: Any, delta_uri: str, mode: str = "append"):
     """Write the transformed data to Delta Lake."""
-    if df.empty:
+    # Heavy imports inside task - executes on Ray worker
+    import pandas as pd
+    from etl.io.sinks.delta_lake import DeltaLakeSink
+    
+    if isinstance(df, pd.DataFrame) and df.empty:
         print("[Delta] No data to write")
         return
+    
+    sink = DeltaLakeSink(uri=delta_uri, mode=mode)
     
     with sink.open() as writer:
         writer.write_batch(df)
     
-    print(f"[Delta] Wrote {len(df)} rows to {sink.uri}")
+    print(f"[Delta] Wrote {len(df)} rows to {delta_uri}")
 
 
 @flow(name="Kafka to Delta Pipeline", task_runner=RayTaskRunner)
@@ -98,25 +115,15 @@ def kafka_to_delta_flow(
         delta_uri: Delta Lake output path
         max_batches: Max number of batches to consume (for demo)
     """
-    # Configure Source
-    source = KafkaSource(
-        bootstrap_servers=kafka_bootstrap,
-        topics=[kafka_topic],
-        group_id="etl-delta-consumer",
-        batch_size=100,
-        poll_timeout=2.0
+    # Execute Pipeline - all task code runs on Ray workers
+    raw_events = consume_events.submit(
+        kafka_bootstrap, 
+        kafka_topic, 
+        "etl-delta-consumer",
+        max_batches
     )
-    
-    # Configure Sink
-    sink = DeltaLakeSink(
-        uri=delta_uri,
-        mode="append"
-    )
-    
-    # Execute Pipeline
-    raw_events = consume_events(source, max_batches)
-    transformed_df = transform_events(raw_events)
-    write_to_delta(transformed_df, sink)
+    transformed_df = transform_events.submit(raw_events)
+    write_to_delta.submit(transformed_df, delta_uri)
 
 
 if __name__ == "__main__":

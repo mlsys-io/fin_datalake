@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List, Iterator, Union
 from time import sleep
-from loguru import logger
 
 from etl.io.base import DataSource, DataReader
 
@@ -62,6 +61,7 @@ class RestApiReader(DataReader):
         import requests
         from requests.adapters import HTTPAdapter
         from urllib3.util.retry import Retry
+        from loguru import logger
         
         self._session = requests.Session()
         

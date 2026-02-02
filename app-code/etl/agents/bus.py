@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from collections import defaultdict
 import ray
-from loguru import logger
 
 
 @dataclass
@@ -38,6 +37,7 @@ class MessageBus:
     """
     
     def __init__(self):
+        from loguru import logger
         self._subscriptions: Dict[str, List[str]] = defaultdict(list)
         self._failed_deliveries: Dict[str, int] = defaultdict(int)
         logger.info("MessageBus initialized (push-based)")
@@ -55,6 +55,7 @@ class MessageBus:
         """
         if agent_name not in self._subscriptions[topic]:
             self._subscriptions[topic].append(agent_name)
+            from loguru import logger
             logger.info(f"Agent '{agent_name}' subscribed to topic '{topic}'")
         return True
     
@@ -79,6 +80,8 @@ class MessageBus:
         Returns:
             Number of agents message was pushed to
         """
+        from loguru import logger
+        
         subscribers = self._subscriptions.get(topic, [])
         delivered = 0
         

@@ -1,0 +1,27 @@
+# Requirements for RAY WORKERS (installed in Docker image)
+# These are the heavy data processing libraries
+
+# Core data processing
+pandas>=2.0
+pyarrow>=14.0
+deltalake>=0.14
+
+# Logging
+loguru>=0.7
+
+# Data sources
+requests>=2.28
+websocket-client>=1.6
+confluent-kafka>=2.3
+
+# Database connectors
+psycopg2-binary>=2.9
+
+# Vector database
+pymilvus>=2.3
+
+# Hive metastore
+thrift>=0.16
+
+# Ray (already in base image, but listed for reference)
+# ray>=2.9

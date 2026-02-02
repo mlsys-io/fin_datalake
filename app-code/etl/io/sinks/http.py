@@ -1,14 +1,15 @@
 """
 HTTP Sink for webhook and API notifications.
-Sends data batches to HTTP endpoints for downstream processing.
+Heavy imports are deferred to runtime for Ray worker execution.
 """
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List, Union, Callable
-import pandas as pd
-import pyarrow as pa
-from loguru import logger
+from typing import Optional, Dict, Any, List, Union, TYPE_CHECKING
 
 from etl.io.base import DataSink, DataWriter
+
+if TYPE_CHECKING:
+    import pandas as pd
+    import pyarrow as pa
 
 
 @dataclass
@@ -36,8 +37,8 @@ class HttpSink(DataSink):
     auth_header_name: str = "Authorization"
     
     # Payload configuration
-    batch_key: Optional[str] = "data"  # Key to wrap batch in JSON, None for raw list
-    include_metadata: bool = False  # Add timestamp and count to payload
+    batch_key: Optional[str] = "data"
+    include_metadata: bool = False
     
     # Request configuration
     timeout: float = 30.0
@@ -63,11 +64,6 @@ class HttpSink(DataSink):
 class HttpWriter(DataWriter):
     """
     Runtime HTTP client for sending data to webhooks/APIs.
-    
-    Features:
-    - Automatic retry with exponential backoff
-    - Flexible authentication (Bearer, Header, Basic)
-    - Batch wrapping with metadata
     """
     
     def __init__(self, sink: HttpSink):
@@ -110,20 +106,21 @@ class HttpWriter(DataWriter):
             elif self.sink.auth_type == "header":
                 self._session.headers[self.sink.auth_header_name] = self.sink.auth_token
             elif self.sink.auth_type == "basic":
-                # For basic auth, token should be "username:password"
                 import base64
                 encoded = base64.b64encode(self.sink.auth_token.encode()).decode()
                 self._session.headers["Authorization"] = f'Basic {encoded}'
         
         return self._session
     
-    def write_batch(self, data: Union[pd.DataFrame, pa.Table, List[Dict[str, Any]]]):
+    def write_batch(self, data: Union[Any, Any, List[Dict[str, Any]]]):
         """
         Send a batch of data to the configured HTTP endpoint.
-        
-        Args:
-            data: DataFrame, Arrow Table, or list of dicts to send
         """
+        # Heavy imports inside method - executes on Ray worker
+        import pandas as pd
+        import pyarrow as pa
+        from loguru import logger
+        
         session = self._get_session()
         
         # Normalize to list of dicts
@@ -156,6 +153,9 @@ class HttpWriter(DataWriter):
     
     def _normalize_data(self, data) -> List[Dict[str, Any]]:
         """Convert various data types to list of dicts."""
+        import pandas as pd
+        import pyarrow as pa
+        
         if isinstance(data, pd.DataFrame):
             return data.to_dict('records')
         elif isinstance(data, pa.Table):
@@ -179,7 +179,6 @@ class HttpWriter(DataWriter):
             
             return payload
         else:
-            # Send raw list (no wrapping)
             return records
     
     def close(self):
@@ -188,6 +187,7 @@ class HttpWriter(DataWriter):
             try:
                 self._session.close()
             except Exception as e:
+                from loguru import logger
                 logger.warning(f"Error closing HTTP session: {e}")
             finally:
                 self._session = None

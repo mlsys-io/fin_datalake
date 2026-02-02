@@ -1,0 +1,14 @@
+# Requirements for CLIENT-SIDE (local machine that submits pipelines)
+# These are lightweight - no heavy data processing libraries needed
+
+# Core orchestration
+prefect>=2.14
+prefect-ray>=0.3
+
+# Config and utilities
+python-dotenv>=1.0
+pydantic>=2.0
+
+# Optional (for local debugging/testing)
+loguru>=0.7
+requests>=2.28

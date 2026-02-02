@@ -4,7 +4,6 @@ Uses confluent-kafka for high-performance Kafka consumption.
 """
 from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Any, Iterator, Callable
-from loguru import logger
 
 from etl.io.base import DataSource, DataReader
 
@@ -64,6 +63,8 @@ class KafkaReader(DataReader):
         if self._consumer:
             return
         
+        from loguru import logger
+        
         try:
             from confluent_kafka import Consumer
         except ImportError:
@@ -99,6 +100,8 @@ class KafkaReader(DataReader):
         This is an infinite generator intended for streaming pipelines.
         Use stop() to gracefully terminate.
         """
+        from loguru import logger
+        
         self._connect()
         
         while self._running:
@@ -152,11 +155,13 @@ class KafkaReader(DataReader):
     
     def stop(self):
         """Signal the reader to stop consuming."""
+        from loguru import logger
         self._running = False
         logger.info("KafkaReader stop requested")
     
     def close(self):
         """Close the Kafka consumer connection."""
+        from loguru import logger
         self._running = False
         if self._consumer:
             try:

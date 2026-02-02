@@ -1,8 +1,12 @@
+"""
+Delta Lake Source for reading from Delta Lake tables.
+Heavy imports are deferred to runtime for Ray worker execution.
+"""
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Iterator, List, Any
-from deltalake import DeltaTable
 
 from etl.io.base import DataSource, DataReader
+
 
 @dataclass
 class DeltaLakeSource(DataSource):
@@ -20,6 +24,7 @@ class DeltaLakeSource(DataSource):
     
     def open(self) -> 'DeltaLakeReader':
         return DeltaLakeReader(self)
+
 
 class DeltaLakeReader(DataReader):
     """
@@ -48,6 +53,9 @@ class DeltaLakeReader(DataReader):
         Yields the entire table as one batch (for now).
         TODO: Implement batch scanning with PyArrow for large tables.
         """
+        # Heavy imports inside method - executes on Ray worker
+        from deltalake import DeltaTable
+        
         try:
             dt = DeltaTable(self.source.uri, storage_options=self._storage_options)
             df = dt.to_pandas()

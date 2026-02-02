@@ -1,9 +1,15 @@
-from typing import Any, Dict, Optional
+"""
+Base Agent class for AI Agents running as Ray Actors.
+Heavy imports (ray, loguru) are deferred to runtime methods.
+"""
+from typing import Any, Dict, Optional, TYPE_CHECKING
 from abc import abstractmethod
-import ray
-from loguru import logger
 
 from etl.core.base_service import ServiceTask
+
+if TYPE_CHECKING:
+    import ray
+
 
 class BaseAgent(ServiceTask):
     """
@@ -28,6 +34,8 @@ class BaseAgent(ServiceTask):
         Builds the heavy logic (LLM, Tools) to ensure they live on the Cluster Node.
         Also auto-registers with the AgentRegistry if CAPABILITIES are defined.
         """
+        from loguru import logger
+        
         logger.info(f"[{self.name}] Setting up Agent Intelligence...")
         self.executor = self.build_executor()
         
@@ -39,6 +47,9 @@ class BaseAgent(ServiceTask):
     
     def _register_with_registry(self):
         """Register this agent with the AgentRegistry."""
+        import ray
+        from loguru import logger
+        
         try:
             from etl.agents.registry import get_registry
             registry = get_registry()
@@ -80,6 +91,8 @@ class BaseAgent(ServiceTask):
         Synchronous Request/Response Interaction.
         Called by API Gateway or other Tasks.
         """
+        from loguru import logger
+        
         if not self.executor:
             # Safety check if called before run/setup complete
             self.setup()
@@ -108,6 +121,8 @@ class BaseAgent(ServiceTask):
         
         Subclasses should override handle_<topic>() or on_message() to process.
         """
+        from loguru import logger
+        
         try:
             topic = event.get("topic", "")
             payload = event.get("payload", {})
@@ -133,6 +148,7 @@ class BaseAgent(ServiceTask):
         Args:
             event: Full message dict with topic, payload, sender, timestamp
         """
+        from loguru import logger
         logger.info(f"[{self.name}] Received: {event.get('topic')} from {event.get('sender')}")
 
     def delegate(
@@ -161,6 +177,8 @@ class BaseAgent(ServiceTask):
             ValueError: If no agent with the capability is found
             RuntimeError: If all capable agents fail
         """
+        import ray
+        from loguru import logger
         from etl.agents.registry import get_registry
         
         registry = get_registry()
@@ -201,4 +219,3 @@ class BaseAgent(ServiceTask):
             f"All {attempts} agents with capability '{capability}' failed. "
             f"Last error: {last_error}"
         )
-

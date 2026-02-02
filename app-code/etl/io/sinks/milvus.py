@@ -1,9 +1,16 @@
+"""
+Milvus Sink for writing to Milvus Vector Database.
+Heavy imports are deferred to runtime for Ray worker execution.
+"""
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, Union, List
-import pandas as pd
-import pyarrow as pa
+from typing import Optional, Dict, Any, Union, List, TYPE_CHECKING
 
 from etl.io.base import DataSink, DataWriter
+
+if TYPE_CHECKING:
+    import pandas as pd
+    import pyarrow as pa
+
 
 @dataclass
 class MilvusSink(DataSink):
@@ -12,9 +19,9 @@ class MilvusSink(DataSink):
     """
     REQUIRED_DEPENDENCIES = ["pymilvus"]
 
-    uri: str = "http://localhost:19530" # Or host/port separation
+    uri: str = "http://localhost:19530"
     collection_name: str = "default_collection"
-    token: Optional[str] = None # For Zilliz Cloud or Auth
+    token: Optional[str] = None
     user: Optional[str] = None
     password: Optional[str] = None
     db_name: str = "default"
@@ -45,7 +52,7 @@ class MilvusWriter(DataWriter):
         except ImportError:
             raise ImportError("MilvusSink requires 'pymilvus'. Please install it.")
 
-        # connection args
+        # Connection args
         conn_args = {"uri": self.sink.uri}
         if self.sink.token:
             conn_args["token"] = self.sink.token
@@ -60,8 +67,6 @@ class MilvusWriter(DataWriter):
         
         # Check collection existence
         if not utility.has_collection(self.sink.collection_name):
-            # We do NOT auto-create collections because Vector DB schemas (dim, metric) 
-            # are too complex to infer reliably from a DataFrame. 
             raise ValueError(f"[MilvusWriter] Collection '{self.sink.collection_name}' does not exist. Please create it first.")
             
         self._collection = Collection(self.sink.collection_name)
@@ -77,29 +82,25 @@ class MilvusWriter(DataWriter):
             self._conn = None
             self._collection = None
 
-    def write_batch(self, data: Union[pd.DataFrame, pa.Table, List[Dict[str, Any]]]):
+    def write_batch(self, data: Union[Any, Any, List[Dict[str, Any]]]):
         """
         Write batch to Milvus.
         """
-        self._connect()
+        # Heavy imports inside method - executes on Ray worker
+        import pandas as pd
+        import pyarrow as pa
         
-        # Normalize to List of Dicts or Pandas
-        # Milvus Python SDK supports Pandas DataFrame directly usually, 
-        # or list of dicts.
+        self._connect()
         
         target_data = data
         
         if isinstance(data, pa.Table):
             target_data = data.to_pandas()
         elif isinstance(data, list):
-            # Keep as list of dicts
             pass
             
         try:
-            # Insert returns a MutationResult
             res = self._collection.insert(target_data)
-            # Milvus insert is async-ish, data is not immediately searchable until flush/index
-            # But for sink purposes, insert is enough.
             print(f"[MilvusWriter] Inserted {res.insert_count} entities into {self.sink.collection_name}")
             
         except Exception as e:

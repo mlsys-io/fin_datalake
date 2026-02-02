@@ -6,7 +6,6 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime
 import ray
-from loguru import logger
 
 
 @dataclass
@@ -39,6 +38,7 @@ class AgentRegistry:
     """
     
     def __init__(self):
+        from loguru import logger
         self._agents: Dict[str, AgentInfo] = {}
         self._capability_index: Dict[str, List[str]] = {}
         logger.info("AgentRegistry initialized")
@@ -55,6 +55,8 @@ class AgentRegistry:
         Returns:
             True if registered successfully
         """
+        from loguru import logger
+        
         if name in self._agents:
             logger.warning(f"Agent '{name}' already registered, updating...")
         
@@ -97,6 +99,7 @@ class AgentRegistry:
                 ]
         
         del self._agents[name]
+        from loguru import logger
         logger.info(f"Unregistered agent '{name}'")
         return True
     
@@ -130,6 +133,7 @@ class AgentRegistry:
         
         # Check if actor is still alive
         if not self._is_actor_alive(name):
+            from loguru import logger
             logger.warning(f"Agent '{name}' is no longer alive, removing from registry")
             self.unregister(name)
             return None

@@ -1,9 +1,16 @@
+"""
+Demo Pipeline
+
+Example pipeline showing class-based and functional task patterns.
+Imports are inside task methods for remote Ray execution.
+"""
+from typing import List, Dict, Any
 from prefect import flow, task
 from prefect_ray.task_runners import RayTaskRunner
-from etl.io.sources.rest_api import RestApiSource, PaginationConfig
-from etl.io.base import DataSource
+
+# Only import lightweight base class at module level
 from etl.core.base_task import BaseTask
-from typing import List, Dict, Any
+
 
 class DataFilteringTask(BaseTask):
     """
@@ -14,22 +21,25 @@ class DataFilteringTask(BaseTask):
         print(f"[DataFilteringTask] Filtering items with id < {min_id}")
         return [d for d in data if d.get("id", 0) >= min_id]
 
+
 @task(retries=2)
-def ingest_data(url: str, type: str = "rest_api") -> List[Dict]:
+def ingest_data(url: str, source_type: str = "rest_api") -> List[Dict]:
     """
     Wraps the specific Ingestion Connector logic in a Prefect Task.
     Executes remotely if RayTaskRunner is used.
     """
+    # Heavy imports inside task - executes on Ray worker
+    from etl.io.sources.rest_api import RestApiSource, PaginationConfig
+    
     print(f"Ingesting from {url}...")
     
-    # 1. Define Source (Serializable)
-    # in a real app, this might be passed in, or constructed from config
+    # Define Source (Serializable)
     source = RestApiSource(
         url=url,
         pagination=PaginationConfig(type="page", page_param="page")
     )
     
-    # 2. Open Reader (Runtime)
+    # Open Reader (Runtime)
     all_data = []
     with source.open() as reader:
         for batch in reader.read_batch():
@@ -37,16 +47,20 @@ def ingest_data(url: str, type: str = "rest_api") -> List[Dict]:
             
     return all_data
 
+
 @task
 def transform_data(data: List[Dict]) -> List[Dict]:
+    """Simple transformation task."""
     print(f"Transforming {len(data)} records...")
-    return [d for d in data if d.get("id")] # Simple filter
+    return [d for d in data if d.get("id")]  # Simple filter
+
 
 @flow(task_runner=RayTaskRunner)
 def main_pipeline(api_url: str):
-    # slightly cleaner usage of RayTaskRunner if installed, 
-    # otherwise Prefect defaults to ConcurrentTaskRunner (threads) which is fine for demo.
-    
+    """
+    Demo pipeline showing hybrid task patterns.
+    Using RayTaskRunner - all tasks execute on Ray cluster.
+    """
     # 1. Functional Task
     raw_data_future = ingest_data.submit(api_url)
     
@@ -64,6 +78,7 @@ def main_pipeline(api_url: str):
     final_result = processed_data.result()
     print(f"Pipeline finished with {len(final_result)} records.")
     return final_result
+
 
 if __name__ == "__main__":
     # Local test run

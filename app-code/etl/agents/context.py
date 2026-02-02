@@ -6,7 +6,6 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 import ray
-from loguru import logger
 
 
 @dataclass
@@ -37,6 +36,7 @@ class ContextStore:
     """
     
     def __init__(self):
+        from loguru import logger
         self._store: Dict[str, ContextEntry] = {}
         logger.info("ContextStore initialized")
     
@@ -63,6 +63,7 @@ class ContextStore:
             owner=owner
         )
         
+        from loguru import logger
         logger.debug(f"Context set: '{key}' (ttl={ttl}s, owner={owner})")
         return True
     
