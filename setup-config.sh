@@ -78,35 +78,42 @@ get_nodeport() {
 
 # Demo Sources
 API_PORT=$(get_nodeport "$NS_DEMO" "demo-api")
-WS_PORT=$(get_nodeport "$NS_DEMO" "websocket-server")
+WS_PORT=$(get_nodeport "$NS_DEMO" "demo-websocket")
 KAFKA_PORT=$(get_nodeport "$NS_DEMO" "kafka")
 STATIC_PORT=$(get_nodeport "$NS_DEMO" "static-server")
+SQLITE_PORT=$(get_nodeport "$NS_DEMO" "sqlite-server")
 
 echo "  - API Server: ${API_PORT:-not found}"
 echo "  - WebSocket: ${WS_PORT:-not found}"
 echo "  - Kafka: ${KAFKA_PORT:-not found}"
 echo "  - Static Files: ${STATIC_PORT:-not found}"
+echo "  - SQLite: ${SQLITE_PORT:-not found}"
+
+# Infrastructure Services
+PREFECT_PORT=$(get_nodeport "$NS_PREFECT" "prefect-server")
+RAY_CLIENT_PORT=$(kubectl get svc etl-ray-head-svc -n "$NS_COMPUTE" -o jsonpath='{.spec.ports[?(@.name=="client")].nodePort}' 2>/dev/null || echo "")
+RAY_DASHBOARD_PORT=$(kubectl get svc etl-ray-head-svc -n "$NS_COMPUTE" -o jsonpath='{.spec.ports[?(@.name=="dashboard")].nodePort}' 2>/dev/null || echo "")
+TSDB_PORT=$(kubectl get svc tsdb-ha -n "$NS_TSDB" -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+RISINGWAVE_PORT=$(get_nodeport "$NS_TSDB" "risingwave")
+HIVE_PORT=$(get_nodeport "etl-storage" "hms-hive-metastore")
+
+echo "  - Prefect: ${PREFECT_PORT:-not found}"
+echo "  - Ray Client: ${RAY_CLIENT_PORT:-not found}"
+echo "  - Ray Dashboard: ${RAY_DASHBOARD_PORT:-not found}"
+echo "  - TimescaleDB: ${TSDB_PORT:-not found}"
+echo "  - RisingWave: ${RISINGWAVE_PORT:-not found}"
+echo "  - Hive: ${HIVE_PORT:-not found}"
 
 # -----------------------------------------------------------------------------
 # 4. Extract Secrets
 # -----------------------------------------------------------------------------
 echo -e "${YELLOW}[4/6] Extracting secrets...${NC}"
 
-# MinIO credentials
-MINIO_ACCESS=""
-MINIO_SECRET=""
-MINIO_SECRET_NAME=$(kubectl get secrets -n "$NS_MINIO" -o name 2>/dev/null | grep -E "(minio|credentials)" | head -1 || echo "")
-if [ -n "$MINIO_SECRET_NAME" ]; then
-    MINIO_ACCESS=$(kubectl get "$MINIO_SECRET_NAME" -n "$NS_MINIO" -o jsonpath='{.data.accesskey}' 2>/dev/null | base64 -d || echo "")
-    MINIO_SECRET=$(kubectl get "$MINIO_SECRET_NAME" -n "$NS_MINIO" -o jsonpath='{.data.secretkey}' 2>/dev/null | base64 -d || echo "")
-    
-    # Try alternate field names
-    if [ -z "$MINIO_ACCESS" ]; then
-        MINIO_ACCESS=$(kubectl get "$MINIO_SECRET_NAME" -n "$NS_MINIO" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' 2>/dev/null | base64 -d || echo "")
-        MINIO_SECRET=$(kubectl get "$MINIO_SECRET_NAME" -n "$NS_MINIO" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' 2>/dev/null | base64 -d || echo "")
-    fi
-fi
-echo "  - MinIO: ${MINIO_ACCESS:+found}${MINIO_ACCESS:-not found}"
+# MinIO credentials (external MinIO - hardcoded since it's outside K8s)
+MINIO_ACCESS="minioadmin"
+MINIO_SECRET="TgICtB3pdkX5JhQS"
+MINIO_ENDPOINT="https://192.168.0.202:4000"
+echo "  - MinIO: configured (external)"
 
 # TimescaleDB password
 TSDB_PASSWORD=""
@@ -130,10 +137,10 @@ cat > "$ENV_FILE" << EOF
 # K8s Cluster
 NODE_IP=${NODE_IP}
 
-# MinIO / S3 (Delta Lake Storage)
+# MinIO / S3 (Delta Lake Storage) - External MinIO
 AWS_ACCESS_KEY_ID=${MINIO_ACCESS}
 AWS_SECRET_ACCESS_KEY=${MINIO_SECRET}
-AWS_ENDPOINT_URL=http://${NODE_IP}:9000
+AWS_ENDPOINT_URL=${MINIO_ENDPOINT}
 AWS_REGION=us-east-1
 
 # Delta Lake
@@ -141,7 +148,7 @@ DELTA_ROOT=s3://delta-lake/bronze
 
 # TimescaleDB
 TSDB_HOST=${NODE_IP}
-TSDB_PORT=5432
+TSDB_PORT=${TSDB_PORT:-30543}
 TSDB_USER=app
 TSDB_PASSWORD=${TSDB_PASSWORD}
 TSDB_DATABASE=app
@@ -155,14 +162,19 @@ WEBSOCKET_URL=ws://${NODE_IP}:${WS_PORT:-30876}
 STATIC_URL=http://${NODE_IP}:${STATIC_PORT:-30880}
 
 # Hive Metastore
-HIVE_HOST=hive-metastore.default.svc.cluster.local
-HIVE_PORT=9083
+HIVE_HOST=${NODE_IP}
+HIVE_PORT=${HIVE_PORT:-30983}
+
+# RisingWave
+RISINGWAVE_HOST=${NODE_IP}
+RISINGWAVE_PORT=${RISINGWAVE_PORT:-31001}
 
 # Prefect
-PREFECT_API_URL=http://${NODE_IP}:4200/api
+PREFECT_API_URL=http://${NODE_IP}:${PREFECT_PORT:-30420}/api
 
 # Ray
-RAY_ADDRESS=ray://${NODE_IP}:10001
+RAY_ADDRESS=ray://${NODE_IP}:${RAY_CLIENT_PORT:-30282}
+RAY_DASHBOARD_URL=http://${NODE_IP}:${RAY_DASHBOARD_PORT:-30742}
 
 # Data Paths
 INPUT_PATH=/mnt/data
