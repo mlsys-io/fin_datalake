@@ -73,7 +73,6 @@ OLD_NAMESPACES=(
     "hive"
     "postgres-operator"
     "milvus"
-    "demo-sources"
 )
 
 for ns in "${OLD_NAMESPACES[@]}"; do
