@@ -3,7 +3,9 @@ image:
   tag: standalone-metastore-4.1.0
 
 service:
+  type: NodePort
   port: 9083
+  nodePort: 30983
 
 metastore:
   thriftBindHost: "0.0.0.0"

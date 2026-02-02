@@ -31,6 +31,11 @@ spec:
       databases: ["app"]
       options: "SUPERUSER" # tighten later if you prefer
 
+  # External access via NodePort
+  service:
+    type: NodePort
+    nodePort: 30543
+
   # Simple pgBackRest repo on PVC (easy to start)
   backups:
     pgbackrest:

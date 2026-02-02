@@ -1,0 +1,6 @@
+# Prefect Server Helm values
+# NodePort enabled for external access
+
+service:
+  type: NodePort
+  nodePort: 30420
