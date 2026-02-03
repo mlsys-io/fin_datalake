@@ -7,7 +7,7 @@ CN_SERVER="localhost"
 SAN_DNS_1="localhost"
 SAN_DNS_2="luyao-storage-head.ddns.comp.nus.edu.sg"
 SAN_IP_1="127.0.0.1"
-SAN_IP_2="192.168.0.202"
+SAN_IP_2="172.28.176.117"
 
 DAYS_CA=3650        # ~10 years
 DAYS_SERVER=825     # ~27 months
