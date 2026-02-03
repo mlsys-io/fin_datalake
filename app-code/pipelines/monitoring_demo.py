@@ -1,19 +1,32 @@
+"""
+Monitoring Demo Pipeline
+
+Starts a Ray Actor service and monitors it from Prefect.
+Imports are inside flow/task for remote Ray execution.
+"""
+import os
 import time
-import ray
 from prefect import flow, get_run_logger
 from prefect.artifacts import create_markdown_artifact
-from etl.services.processing.stateful_processor import StatefulProcessorService
+
+# Read Ray cluster address from environment
+RAY_ADDRESS = os.environ.get("RAY_ADDRESS", "auto")
+
 
 @flow(name="Streaming Service with Monitoring")
 def monitor_service_flow(duration_seconds: int = 60):
     """
     Starts a Ray Actor service and monitors it from Prefect.
     """
+    # Heavy imports inside flow - executes when flow runs
+    import ray
+    from etl.services.processing.stateful_processor import StatefulProcessorService
+    
     logger = get_run_logger()
     
     # 1. Start Ray (if not already)
     if not ray.is_initialized():
-        ray.init(address="auto", ignore_reinit_error=True)
+        ray.init(address=RAY_ADDRESS, ignore_reinit_error=True)
 
     # 2. Deploy the Service Actor
     logger.info("Deploying StatefulProcessorService...")
@@ -39,7 +52,6 @@ def monitor_service_flow(duration_seconds: int = 60):
     actor_handle.run.remote()
 
     # 3. Monitoring Loop
-    # We keep this flow alive to monitor the actor.
     start_time = time.time()
     
     try:
@@ -52,7 +64,6 @@ def monitor_service_flow(duration_seconds: int = 60):
             logger.info(f"Service Status: {status}")
             
             # B. Publish Artifact (Live Dashboard)
-            # This creates/updates a Markdown view in the UI
             md_report = f"""
 # 📡 Ray Service Live Dashboard
 **Service**: CryptoProcessor
@@ -85,12 +96,12 @@ def monitor_service_flow(duration_seconds: int = 60):
         raise
     finally:
         logger.info("Stopping Service...")
-        # Try to clean up, but ignore errors if actor is already dead
         try:
             actor_handle.stop.remote()
         except Exception:
             pass
         logger.info("Service Stopped.")
+
 
 if __name__ == "__main__":
     monitor_service_flow()

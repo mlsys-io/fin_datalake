@@ -1,16 +1,20 @@
+"""
+Legacy SEC Pipeline
+
+Reads SEC Filings (Text), processes them, and writes to Delta Lake.
+Imports are inside task methods for remote Ray execution.
+"""
 import os
-import glob
 from typing import Dict, Any
 from prefect import flow
 from prefect_ray.task_runners import RayTaskRunner
-from etl.core.base_task import BaseTask
-from etl.io.sources.file import FileSource
-from etl.io.sinks.delta_lake import DeltaLakeSink
-from etl.services.hive import HiveMetastore
-from ioutils import MAX_CONCURRENCY
 
-# Import legacy transformation logic
-from transformations.sec_filings import transform_sec
+# Only import lightweight base class at module level
+from etl.core.base_task import BaseTask
+
+# Read Ray cluster address from environment
+RAY_ADDRESS = os.environ.get("RAY_ADDRESS", "auto")
+
 
 class SecProcessTask(BaseTask):
     """
@@ -19,6 +23,14 @@ class SecProcessTask(BaseTask):
     REQUIRED_DEPENDENCIES = ["ray", "pyarrow", "pandas"]
     
     def run(self, input_pattern: str, output_uri: str, hive_config: Dict[str, Any] = None):
+        # Heavy imports inside run() - executes on Ray worker
+        import glob
+        from etl.io.sources.file import FileSource
+        from etl.io.sinks.delta_lake import DeltaLakeSink
+        from etl.services.hive import HiveMetastore
+        from ioutils import MAX_CONCURRENCY
+        from transformations.sec_filings import transform_sec
+        
         print(f"[{self.name}] Finding files matching {input_pattern}...")
         files = glob.glob(input_pattern, recursive=True)
         
@@ -49,7 +61,7 @@ class SecProcessTask(BaseTask):
             sink = DeltaLakeSink(
                 uri=output_uri,
                 mode="append",
-                hive_metastore=HiveMetastore(**hive_config) if hive_config else None,
+                hive_config=hive_config,
                 hive_table_name="sec_filings" if hive_config else None
             )
             
@@ -58,7 +70,8 @@ class SecProcessTask(BaseTask):
                 
         print(f"[{self.name}] Pipeline Complete. Data written to {output_uri}")
 
-@flow(name="Legacy SEC Pipeline", task_runner=RayTaskRunner)
+
+@flow(name="Legacy SEC Pipeline", task_runner=RayTaskRunner(address=RAY_ADDRESS))
 def sec_pipeline(
     input_root: str = "mnt/data/SEC-Filings", 
     output_root: str = "s3://delta-lake/cs4221/bronze-ray",
@@ -72,6 +85,7 @@ def sec_pipeline(
     
     task_instance = SecProcessTask(name="SEC Processor")
     task_instance.as_task().submit(input_pattern, output_uri, hive_conf)
+
 
 if __name__ == "__main__":
     sec_pipeline(

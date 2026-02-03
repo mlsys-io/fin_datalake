@@ -1,17 +1,20 @@
+"""
+Legacy News Pipeline
+
+Reads News data (JSON metadata + HTML content), joins them, and writes to Delta Lake.
+Imports are inside task methods for remote Ray execution.
+"""
 import os
-import glob
 from typing import Dict, Any
-import pyarrow as pa
 from prefect import flow
 from prefect_ray.task_runners import RayTaskRunner
-from etl.core.base_task import BaseTask
-from etl.io.sources.file import FileSource
-from etl.io.sinks.delta_lake import DeltaLakeSink
-from etl.services.hive import HiveMetastore
-from ioutils import MAX_CONCURRENCY
 
-# Import legacy transformation logic
-from transformations.news import transform_news
+# Only import lightweight base class at module level
+from etl.core.base_task import BaseTask
+
+# Read Ray cluster address from environment
+RAY_ADDRESS = os.environ.get("RAY_ADDRESS", "auto")
+
 
 class NewsProcessTask(BaseTask):
     """
@@ -20,6 +23,15 @@ class NewsProcessTask(BaseTask):
     REQUIRED_DEPENDENCIES = ["ray", "pyarrow", "pandas"]
     
     def run(self, json_pattern: str, html_pattern: str, output_uri: str, hive_config: Dict[str, Any] = None):
+        # Heavy imports inside run() - executes on Ray worker
+        import glob
+        import pyarrow as pa
+        from etl.io.sources.file import FileSource
+        from etl.io.sinks.delta_lake import DeltaLakeSink
+        from etl.services.hive import HiveMetastore
+        from ioutils import MAX_CONCURRENCY
+        from transformations.news import transform_news
+        
         print(f"[{self.name}] Finding files...")
         json_files = glob.glob(json_pattern, recursive=True)
         html_files = glob.glob(html_pattern, recursive=True)
@@ -34,7 +46,6 @@ class NewsProcessTask(BaseTask):
         print(f"[{self.name}] Found {len(json_files)} JSON files and {len(html_files)} HTML files.")
 
         # 1. Define Sources
-        # Schema copied from legacy etl.py
         news_schema = pa.schema([
             pa.field("category", pa.string()),
             pa.field("datetime", pa.int64()),
@@ -67,13 +78,10 @@ class NewsProcessTask(BaseTask):
         )
 
         # 2. Read & Transform
-        # FileDatasetReader yields the Ray Dataset object directly
         with json_source.open() as json_reader, html_source.open() as html_reader:
-            # We expect single batch (one dataset reference) from FileSource
             json_ds = next(json_reader.read_batch())
             html_ds = next(html_reader.read_batch())
             
-            # Legacy Transform (Joins JSON and HTML)
             print(f"[{self.name}] Transforming and Joining Datasets...")
             final_ds = transform_news(json_ds, html_ds)
             
@@ -81,7 +89,7 @@ class NewsProcessTask(BaseTask):
             sink = DeltaLakeSink(
                 uri=output_uri,
                 mode="append",
-                hive_metastore=HiveMetastore(**hive_config) if hive_config else None,
+                hive_config=hive_config,
                 hive_table_name="news" if hive_config else None
             )
             
@@ -90,7 +98,8 @@ class NewsProcessTask(BaseTask):
                 
         print(f"[{self.name}] Pipeline Complete. Data written to {output_uri}")
 
-@flow(name="Legacy News Pipeline", task_runner=RayTaskRunner)
+
+@flow(name="Legacy News Pipeline", task_runner=RayTaskRunner(address=RAY_ADDRESS))
 def news_pipeline(
     input_root: str = "mnt/data/News", 
     output_root: str = "s3://delta-lake/cs4221/bronze-ray",
@@ -105,6 +114,7 @@ def news_pipeline(
     
     task_instance = NewsProcessTask(name="News Processor")
     task_instance.as_task().submit(json_pattern, html_pattern, output_uri, hive_conf)
+
 
 if __name__ == "__main__":
     news_pipeline(

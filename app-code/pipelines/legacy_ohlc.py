@@ -1,22 +1,20 @@
+"""
+Legacy OHLC Pipeline
+
+Reads OHLC data from files, applies legacy transformation, and writes to Delta Lake.
+Imports are inside task methods for remote Ray execution.
+"""
 import os
-import glob
 from typing import Dict, Any
-import pyarrow as pa
-from pyarrow import csv
-from prefect import flow, task
+from prefect import flow
 from prefect_ray.task_runners import RayTaskRunner
 
+# Only import lightweight base class at module level
 from etl.core.base_task import BaseTask
-from etl.io.sources.file import FileSource
-from etl.io.sinks.delta_lake import DeltaLakeSink
-from etl.services.hive import HiveMetastore
 
-# Import legacy transformation logic
-from transformations.ohlc import transform_ohlc
+# Read Ray cluster address from environment
+RAY_ADDRESS = os.environ.get("RAY_ADDRESS", "auto")
 
-# =============================================================================
-# 1. Define Processing Task
-# =============================================================================
 
 class OhlcProcessTask(BaseTask):
     """
@@ -25,6 +23,15 @@ class OhlcProcessTask(BaseTask):
     REQUIRED_DEPENDENCIES = ["ray", "pyarrow", "pandas"]
     
     def run(self, input_pattern: str, output_uri: str, hive_config: Dict[str, Any] = None):
+        # Heavy imports inside run() - executes on Ray worker
+        import glob
+        import pyarrow as pa
+        from pyarrow import csv
+        from etl.io.sources.file import FileSource
+        from etl.io.sinks.delta_lake import DeltaLakeSink
+        from etl.services.hive import HiveMetastore
+        from transformations.ohlc import transform_ohlc
+        
         print(f"[{self.name}] finding files matching {input_pattern}...")
         files = glob.glob(input_pattern, recursive=True)
         if not files:
@@ -54,7 +61,6 @@ class OhlcProcessTask(BaseTask):
         
         # 2. Read & Transform
         with source.open() as reader:
-            # reader.read_batch yields a Ray Dataset
             for ds in reader.read_batch():
                 # Apply legacy transformation
                 transformed_ds = transform_ohlc(ds)
@@ -63,21 +69,17 @@ class OhlcProcessTask(BaseTask):
                 sink = DeltaLakeSink(
                     uri=output_uri,
                     mode="append",
-                    hive_metastore=HiveMetastore(**hive_config) if hive_config else None,
+                    hive_config=hive_config,
                     hive_table_name="ohlc" if hive_config else None
                 )
                 
-                # Write using the Sink (which now handles Ray Datasets)
                 with sink.open() as writer:
                     writer.write_batch(transformed_ds)
                     
         print(f"[{self.name}] Pipeline Complete. Data written to {output_uri}")
 
-# =============================================================================
-# 2. Define Flow
-# =============================================================================
 
-@flow(name="Legacy OHLC Pipeline", task_runner=RayTaskRunner)
+@flow(name="Legacy OHLC Pipeline", task_runner=RayTaskRunner(address=RAY_ADDRESS))
 def ohlc_pipeline(
     input_root: str = "mnt/data/OHLC", 
     output_root: str = "s3://delta-lake/cs4221/bronze-ray",
@@ -93,6 +95,7 @@ def ohlc_pipeline(
     # Task
     task_instance = OhlcProcessTask(name="OHLC Processor")
     task_instance.as_task().submit(input_pattern, output_uri, hive_conf)
+
 
 if __name__ == "__main__":
     # Example usage

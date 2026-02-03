@@ -4,12 +4,16 @@ Demo Pipeline
 Example pipeline showing class-based and functional task patterns.
 Imports are inside task methods for remote Ray execution.
 """
+import os
 from typing import List, Dict, Any
 from prefect import flow, task
 from prefect_ray.task_runners import RayTaskRunner
 
 # Only import lightweight base class at module level
 from etl.core.base_task import BaseTask
+
+# Read Ray cluster address from environment
+RAY_ADDRESS = os.environ.get("RAY_ADDRESS", "auto")
 
 
 class DataFilteringTask(BaseTask):
@@ -55,7 +59,7 @@ def transform_data(data: List[Dict]) -> List[Dict]:
     return [d for d in data if d.get("id")]  # Simple filter
 
 
-@flow(task_runner=RayTaskRunner)
+@flow(task_runner=RayTaskRunner(address=RAY_ADDRESS))
 def main_pipeline(api_url: str):
     """
     Demo pipeline showing hybrid task patterns.
@@ -83,3 +87,4 @@ def main_pipeline(api_url: str):
 if __name__ == "__main__":
     # Local test run
     main_pipeline(api_url="https://jsonplaceholder.typicode.com/posts")
+
