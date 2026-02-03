@@ -2,7 +2,7 @@
 API to Delta Lake Pipeline
 
 Demonstrates fetching data from a REST API and writing to Delta Lake.
-Imports are inside task methods for remote Ray execution.
+Uses BaseTask abstraction with imports inside run() for Ray execution.
 """
 from typing import List, Dict, Any
 from prefect import flow
@@ -21,30 +21,20 @@ from etl.config import config
 
 class ApiIngestionTask(BaseTask):
     """
-    Fetches data from a REST API using the RestApiSource.
+    Fetches data from a REST API using requests.
     """
     def run(self, url: str) -> List[Dict[str, Any]]:
         # Heavy imports inside run() - executes on Ray worker
-        from etl.io.sources.rest_api import RestApiSource, PaginationConfig
+        import requests
         
-        print(f"[{self.name}] Connecting to {url}...")
+        print(f"[{self.name}] Fetching from {url}...")
         
-        # Configure Source
-        source = RestApiSource(
-            url=url,
-            pagination=PaginationConfig(type="page", page_param="page"),
-            retries=2
-        )
-        
-        all_data = []
-        # Runtime Reading
-        with source.open() as reader:
-            for batch in reader.read_batch():
-                print(f"[{self.name}] Fetched batch of {len(batch)} records")
-                all_data.extend(batch)
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        data = response.json()
                 
-        print(f"[{self.name}] Total records fetched: {len(all_data)}")
-        return all_data
+        print(f"[{self.name}] Fetched {len(data)} records")
+        return data
 
 
 # =============================================================================
@@ -53,33 +43,46 @@ class ApiIngestionTask(BaseTask):
 
 class DeltaWriteTask(BaseTask):
     """
-    Writes data to a Delta Lake table using the DeltaLakeSink.
+    Writes data to a Delta Lake table.
     """
-    def run(self, data: List[Dict[str, Any]], table_uri: str):
+    def run(self, data: List[Dict[str, Any]], table_uri: str) -> str:
         # Heavy imports inside run() - executes on Ray worker
         import pandas as pd
-        from etl.io.sinks.delta_lake import DeltaLakeSink
+        from deltalake import write_deltalake
+        from etl.config import config  # Import inside run for Ray worker
         
         if not data:
             print(f"[{self.name}] No data to write.")
-            return
+            return "No data"
 
         print(f"[{self.name}] Writing {len(data)} records to {table_uri}...")
         
-        # Convert List[Dict] to DataFrame (Writer expects DF or PA Table)
+        # Convert to DataFrame
         df = pd.DataFrame(data)
         
-        # Configure Sink
-        sink = DeltaLakeSink(
-            uri=table_uri,
-            mode="append"  # or "overwrite"
-        )
+        # S3 storage options from config (MinIO compatible)
+        storage_options = None
+        if table_uri.startswith("s3://"):
+            storage_options = {
+                "AWS_ACCESS_KEY_ID": config.AWS_ACCESS_KEY_ID,
+                "AWS_SECRET_ACCESS_KEY": config.AWS_SECRET_ACCESS_KEY,
+                "AWS_ENDPOINT_URL": config.AWS_ENDPOINT_URL,
+                "AWS_REGION": config.AWS_REGION,
+                "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
+                # Allow HTTP for local MinIO (if not using HTTPS)
+                "AWS_ALLOW_HTTP": "false",
+            }
+            print(f"[{self.name}] Using S3 endpoint: {config.AWS_ENDPOINT_URL}")
         
-        # Runtime Writing
-        with sink.open() as writer:
-            writer.write_batch(df)
+        write_deltalake(
+            table_uri, 
+            df, 
+            mode="overwrite",
+            storage_options=storage_options
+        )
             
-        print(f"[{self.name}] Write successful.")
+        print(f"[{self.name}] Successfully wrote {len(data)} records")
+        return f"Wrote {len(data)} records to {table_uri}"
 
 
 # =============================================================================
@@ -87,10 +90,18 @@ class DeltaWriteTask(BaseTask):
 # =============================================================================
 
 @flow(name="API to Delta Pipeline", task_runner=RayTaskRunner(address=config.RAY_ADDRESS))
-def api_to_delta_flow(api_url: str, output_path: str):
+def api_to_delta_flow(
+    api_url: str = "https://jsonplaceholder.typicode.com/posts",
+    output_path: str = "s3://delta-lake/bronze/api_posts"
+):
+    """
+    Pipeline that fetches data from an API and writes to Delta Lake.
+    """
+    print(f"[flow] Starting API to Delta Pipeline")
+    print(f"[flow] Ray Address: {config.RAY_ADDRESS}")
     
-    # Instantiate Tasks Config/Logic
-    ingest_logic = ApiIngestionTask(name="Ingest API Data")
+    # Instantiate Task Logic
+    ingest_logic = ApiIngestionTask(name="Fetch API Data")
     write_logic = DeltaWriteTask(name="Write to Delta")
     
     # Convert to Prefect Tasks
@@ -99,13 +110,13 @@ def api_to_delta_flow(api_url: str, output_path: str):
     
     # Execute Pipeline
     raw_data = ingest_task.submit(api_url)
-    write_task.submit(raw_data, output_path)
+    result = write_task.submit(raw_data, output_path)
+    
+    # Get result
+    final = result.result()
+    print(f"[flow] Pipeline complete: {final}")
+    return final
 
 
 if __name__ == "__main__":
-    # Example Local Run
-    # Provide a dummy public API for demonstration
-    api_to_delta_flow(
-        api_url="https://jsonplaceholder.typicode.com/posts",
-        output_path="tmp/delta/posts_table"
-    )
+    api_to_delta_flow()

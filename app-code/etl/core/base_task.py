@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
+from functools import wraps
 from prefect import task
 from etl.core.utils.dependency_aware_mixin import DependencyAwareMixin
 
@@ -47,9 +48,18 @@ class BaseTask(ABC, DependencyAwareMixin):
         # Default name if not provided in kwargs
         if "name" not in task_kwargs:
             task_kwargs["name"] = self.name
-
+        
+        # Capture self for the closure
+        task_instance = self
+        
+        # Create wrapper with proper metadata
         @task(**task_kwargs)
+        @wraps(self.run)
         def wrapper(*args, **kwargs):
-            return self.run(*args, **kwargs)
+            return task_instance.run(*args, **kwargs)
+        
+        # Ensure wrapper has the task name for logging
+        wrapper.__name__ = self.name.replace(" ", "_")
+        wrapper.__qualname__ = f"{self.__class__.__name__}.{self.name}"
             
         return wrapper
