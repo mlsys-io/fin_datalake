@@ -1,89 +1,99 @@
 """
-Demo Pipeline
+Demo Pipeline - Self-Contained
 
-Example pipeline showing class-based and functional task patterns.
-Imports are inside task methods for remote Ray execution.
+A simple demo pipeline that runs entirely on Ray cluster without
+needing any custom etl package installed on workers.
 """
-from typing import List, Dict, Any
+from typing import List, Dict
 from prefect import flow, task
 from prefect_ray.task_runners import RayTaskRunner
 
-# Only import lightweight base class at module level
-from etl.core.base_task import BaseTask
+# Load config locally (python-dotenv auto-loads .env)
+import os
+from pathlib import Path
+try:
+    from dotenv import load_dotenv
+    # Find .env file
+    for p in [Path.cwd() / ".env", Path.cwd().parent / ".env"]:
+        if p.exists():
+            load_dotenv(p)
+            break
+except ImportError:
+    pass
 
-# Load config (auto-loads .env via python-dotenv)
-from etl.config import config
+RAY_ADDRESS = os.environ.get("RAY_ADDRESS", "auto")
 
 
-class DataFilteringTask(BaseTask):
+@task(retries=2, name="Fetch Data from API")
+def fetch_data(url: str) -> List[Dict]:
     """
-    Example of a Class-based Task using the new pattern.
+    Fetch data from a REST API.
+    All imports are inside the task - runs on Ray worker.
     """
-    def run(self, data: List[Dict]) -> List[Dict]:
-        min_id = self.config.get("min_id", 0)
-        print(f"[DataFilteringTask] Filtering items with id < {min_id}")
-        return [d for d in data if d.get("id", 0) >= min_id]
-
-
-@task(retries=2)
-def ingest_data(url: str, source_type: str = "rest_api") -> List[Dict]:
-    """
-    Wraps the specific Ingestion Connector logic in a Prefect Task.
-    Executes remotely if RayTaskRunner is used.
-    """
-    # Heavy imports inside task - executes on Ray worker
-    from etl.io.sources.rest_api import RestApiSource, PaginationConfig
+    import requests
     
-    print(f"Ingesting from {url}...")
-    
-    # Define Source (Serializable)
-    source = RestApiSource(
-        url=url,
-        pagination=PaginationConfig(type="page", page_param="page")
-    )
-    
-    # Open Reader (Runtime)
-    all_data = []
-    with source.open() as reader:
-        for batch in reader.read_batch():
-            all_data.extend(batch)
-            
-    return all_data
+    print(f"[fetch_data] Fetching from {url}...")
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    data = response.json()
+    print(f"[fetch_data] Received {len(data)} records")
+    return data
 
 
-@task
+@task(name="Filter Data")
+def filter_data(data: List[Dict], min_id: int = 5) -> List[Dict]:
+    """
+    Filter records by ID threshold.
+    Pure Python - no external imports needed.
+    """
+    print(f"[filter_data] Filtering {len(data)} records (min_id={min_id})...")
+    filtered = [d for d in data if d.get("id", 0) >= min_id]
+    print(f"[filter_data] Kept {len(filtered)} records")
+    return filtered
+
+
+@task(name="Transform Data")
 def transform_data(data: List[Dict]) -> List[Dict]:
-    """Simple transformation task."""
-    print(f"Transforming {len(data)} records...")
-    return [d for d in data if d.get("id")]  # Simple filter
+    """
+    Apply transformations to the data.
+    Pure Python - no external imports needed.
+    """
+    print(f"[transform_data] Transforming {len(data)} records...")
+    
+    # Example transformation: add a computed field
+    for record in data:
+        record["title_length"] = len(record.get("title", ""))
+    
+    return data
 
 
-@flow(task_runner=RayTaskRunner(address=config.RAY_ADDRESS))
-def main_pipeline(api_url: str):
+@flow(name="Demo Pipeline", task_runner=RayTaskRunner(address=RAY_ADDRESS))
+def demo_pipeline(api_url: str = "https://jsonplaceholder.typicode.com/posts"):
     """
-    Demo pipeline showing hybrid task patterns.
-    Using RayTaskRunner - all tasks execute on Ray cluster.
+    Demo pipeline showing distributed execution on Ray.
+    
+    All tasks run on Ray workers, not locally.
     """
-    # 1. Functional Task
-    raw_data_future = ingest_data.submit(api_url)
+    print(f"[flow] Starting pipeline with Ray at {RAY_ADDRESS}")
     
-    # 2. Class-Based Task (The new Pattern)
-    # Define/Instantiate logic
-    filter_logic = DataFilteringTask(config={"min_id": 5})
-    # Convert to Prefect Task
-    filter_task = filter_logic.as_task(retries=1)
+    # 1. Fetch data (runs on Ray worker)
+    raw_data = fetch_data.submit(api_url)
     
-    filtered_future = filter_task.submit(raw_data_future)
+    # 2. Filter data (runs on Ray worker)
+    filtered_data = filter_data.submit(raw_data, min_id=10)
     
-    # 3. Functional Transform
-    processed_data = transform_data.submit(filtered_future)
+    # 3. Transform data (runs on Ray worker)
+    final_data = transform_data.submit(filtered_data)
     
-    final_result = processed_data.result()
-    print(f"Pipeline finished with {len(final_result)} records.")
-    return final_result
+    # Get result
+    result = final_data.result()
+    print(f"[flow] Pipeline complete! {len(result)} records processed.")
+    
+    return result
 
 
 if __name__ == "__main__":
-    # Local test run
-    main_pipeline(api_url="https://jsonplaceholder.typicode.com/posts")
-
+    result = demo_pipeline()
+    print(f"\nFirst 3 records:")
+    for r in result[:3]:
+        print(f"  - ID {r['id']}: {r['title'][:40]}... (len={r['title_length']})")

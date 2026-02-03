@@ -1,8 +1,16 @@
-# Custom Ray image with ETL dependencies - Python 3.12 compatible
+# Custom Ray image with ETL dependencies + etl package
 # Using latest Ray with Python 3.12
 FROM rayproject/ray:latest-py312
 
-# Install ETL framework dependencies + Prefect (needed for task execution)
+# Copy only the etl package (from build context = project root)
+COPY app-code/etl /home/ray/etl
+
+# Add to Python path so 'import etl' works
+ENV PYTHONPATH="/home/ray:${PYTHONPATH}"
+
+WORKDIR /home/ray
+
+# Install dependencies
 RUN pip install --no-cache-dir \
     # Prefect (needed for task deserialization on workers)
     prefect>=2.14 \
@@ -15,10 +23,9 @@ RUN pip install --no-cache-dir \
     loguru>=0.7 \
     requests>=2.28 \
     websocket-client>=1.6 \
+    python-dotenv>=1.0 \
     # Connectors
     confluent-kafka>=2.3 \
     psycopg2-binary>=2.9 \
     pymilvus>=2.3 \
     thrift>=0.16
-
-WORKDIR /home/ray
