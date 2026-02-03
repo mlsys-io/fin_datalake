@@ -112,7 +112,7 @@ echo -e "${YELLOW}[4/6] Extracting secrets...${NC}"
 # MinIO credentials (external MinIO - hardcoded since it's outside K8s)
 MINIO_ACCESS="minioadmin"
 MINIO_SECRET="TgICtB3pdkX5JhQS"
-MINIO_ENDPOINT="https://192.168.0.202:4000"
+MINIO_ENDPOINT="https://172.28.176.117:4000"
 echo "  - MinIO: configured (external)"
 
 # TimescaleDB password
