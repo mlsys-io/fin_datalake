@@ -4,7 +4,7 @@ metadata:
   name: etl-ray
   namespace: etl-compute
 spec:
-  rayVersion: "2.9.3"
+  rayVersion: "2.31.0"
 
   # Head node configuration
   headGroupSpec:
@@ -19,7 +19,7 @@ spec:
       spec:
         containers:
           - name: ray-head
-            image: docker.io/library/etl-ray:2.9.3-py311
+            image: docker.io/library/etl-ray:2.31.0-py312
             imagePullPolicy: Never # Use local image
             resources:
               limits:
@@ -61,7 +61,7 @@ spec:
         spec:
           containers:
             - name: ray-worker
-              image: docker.io/library/etl-ray:2.9.3-py311
+              image: docker.io/library/etl-ray:2.31.0-py312
               imagePullPolicy: Never # Use local image
               resources:
                 limits:
