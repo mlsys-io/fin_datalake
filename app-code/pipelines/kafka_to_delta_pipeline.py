@@ -11,13 +11,12 @@ Requires:
     - Kafka broker running
     - Topic 'events' created
 """
-import os
 from typing import List, Dict, Any
 from prefect import flow, task
 from prefect_ray.task_runners import RayTaskRunner
 
-# Read Ray cluster address from environment
-RAY_ADDRESS = os.environ.get("RAY_ADDRESS", "auto")
+# Load config (auto-loads .env via python-dotenv)
+from etl.config import config
 
 
 @task(name="Consume Kafka Events")
@@ -103,7 +102,7 @@ def write_to_delta(df: Any, delta_uri: str, mode: str = "append"):
     print(f"[Delta] Wrote {len(df)} rows to {delta_uri}")
 
 
-@flow(name="Kafka to Delta Pipeline", task_runner=RayTaskRunner(address=RAY_ADDRESS))
+@flow(name="Kafka to Delta Pipeline", task_runner=RayTaskRunner(address=config.RAY_ADDRESS))
 def kafka_to_delta_flow(
     kafka_bootstrap: str = "localhost:9092",
     kafka_topic: str = "events",

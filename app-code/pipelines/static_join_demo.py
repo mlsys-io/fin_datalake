@@ -5,7 +5,6 @@ Reads two datasets, performs a distributed join, and writes to Delta Lake.
 Demonstrates Milestone 3 (Static Data + Distributed Transform).
 Imports are inside task methods for remote Ray execution.
 """
-import os
 from typing import Dict, Any
 from prefect import flow
 from prefect_ray.task_runners import RayTaskRunner
@@ -13,8 +12,8 @@ from prefect_ray.task_runners import RayTaskRunner
 # Only import lightweight base class at module level
 from etl.core.base_task import BaseTask
 
-# Read Ray cluster address from environment
-RAY_ADDRESS = os.environ.get("RAY_ADDRESS", "auto")
+# Load config (auto-loads .env via python-dotenv)
+from etl.config import config
 
 
 class JoinProcessTask(BaseTask):
@@ -65,7 +64,7 @@ class JoinProcessTask(BaseTask):
         print(f"[{self.name}] Join Pipeline Complete.")
 
 
-@flow(name="Static Distributed Join Demo", task_runner=RayTaskRunner(address=RAY_ADDRESS))
+@flow(name="Static Distributed Join Demo", task_runner=RayTaskRunner(address=config.RAY_ADDRESS))
 def static_join_pipeline(
     orders_path: str = "mnt/data/orders/*.csv",
     customers_path: str = "mnt/data/customers/*.csv",

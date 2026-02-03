@@ -4,7 +4,6 @@ Legacy News Pipeline
 Reads News data (JSON metadata + HTML content), joins them, and writes to Delta Lake.
 Imports are inside task methods for remote Ray execution.
 """
-import os
 from typing import Dict, Any
 from prefect import flow
 from prefect_ray.task_runners import RayTaskRunner
@@ -12,8 +11,8 @@ from prefect_ray.task_runners import RayTaskRunner
 # Only import lightweight base class at module level
 from etl.core.base_task import BaseTask
 
-# Read Ray cluster address from environment
-RAY_ADDRESS = os.environ.get("RAY_ADDRESS", "auto")
+# Load config (auto-loads .env via python-dotenv)
+from etl.config import config
 
 
 class NewsProcessTask(BaseTask):
@@ -99,7 +98,7 @@ class NewsProcessTask(BaseTask):
         print(f"[{self.name}] Pipeline Complete. Data written to {output_uri}")
 
 
-@flow(name="Legacy News Pipeline", task_runner=RayTaskRunner(address=RAY_ADDRESS))
+@flow(name="Legacy News Pipeline", task_runner=RayTaskRunner(address=config.RAY_ADDRESS))
 def news_pipeline(
     input_root: str = "mnt/data/News", 
     output_root: str = "s3://delta-lake/cs4221/bronze-ray",

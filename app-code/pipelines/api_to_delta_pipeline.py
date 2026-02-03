@@ -4,7 +4,6 @@ API to Delta Lake Pipeline
 Demonstrates fetching data from a REST API and writing to Delta Lake.
 Imports are inside task methods for remote Ray execution.
 """
-import os
 from typing import List, Dict, Any
 from prefect import flow
 from prefect_ray.task_runners import RayTaskRunner
@@ -12,8 +11,8 @@ from prefect_ray.task_runners import RayTaskRunner
 # Only import lightweight base class at module level
 from etl.core.base_task import BaseTask
 
-# Read Ray cluster address from environment
-RAY_ADDRESS = os.environ.get("RAY_ADDRESS", "auto")
+# Load config (auto-loads .env via python-dotenv)
+from etl.config import config
 
 
 # =============================================================================
@@ -87,7 +86,7 @@ class DeltaWriteTask(BaseTask):
 # 3. Define the Flow
 # =============================================================================
 
-@flow(name="API to Delta Pipeline", task_runner=RayTaskRunner(address=RAY_ADDRESS))
+@flow(name="API to Delta Pipeline", task_runner=RayTaskRunner(address=config.RAY_ADDRESS))
 def api_to_delta_flow(api_url: str, output_path: str):
     
     # Instantiate Tasks Config/Logic

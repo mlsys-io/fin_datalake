@@ -4,13 +4,12 @@ Monitoring Demo Pipeline
 Starts a Ray Actor service and monitors it from Prefect.
 Imports are inside flow/task for remote Ray execution.
 """
-import os
 import time
 from prefect import flow, get_run_logger
 from prefect.artifacts import create_markdown_artifact
 
-# Read Ray cluster address from environment
-RAY_ADDRESS = os.environ.get("RAY_ADDRESS", "auto")
+# Load config (auto-loads .env via python-dotenv)
+from etl.config import config
 
 
 @flow(name="Streaming Service with Monitoring")
@@ -26,7 +25,7 @@ def monitor_service_flow(duration_seconds: int = 60):
     
     # 1. Start Ray (if not already)
     if not ray.is_initialized():
-        ray.init(address=RAY_ADDRESS, ignore_reinit_error=True)
+        ray.init(address=config.RAY_ADDRESS, ignore_reinit_error=True)
 
     # 2. Deploy the Service Actor
     logger.info("Deploying StatefulProcessorService...")

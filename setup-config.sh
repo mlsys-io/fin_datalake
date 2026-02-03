@@ -135,49 +135,49 @@ cat > "$ENV_FILE" << EOF
 # =============================================================================
 
 # K8s Cluster
-NODE_IP=${NODE_IP}
+export NODE_IP=${NODE_IP}
 
 # MinIO / S3 (Delta Lake Storage) - External MinIO
-AWS_ACCESS_KEY_ID=${MINIO_ACCESS}
-AWS_SECRET_ACCESS_KEY=${MINIO_SECRET}
-AWS_ENDPOINT_URL=${MINIO_ENDPOINT}
-AWS_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=${MINIO_ACCESS}
+export AWS_SECRET_ACCESS_KEY=${MINIO_SECRET}
+export AWS_ENDPOINT_URL=${MINIO_ENDPOINT}
+export AWS_REGION=us-east-1
 
 # Delta Lake
-DELTA_ROOT=s3://delta-lake/bronze
+export DELTA_ROOT=s3://delta-lake/bronze
 
 # TimescaleDB
-TSDB_HOST=${NODE_IP}
-TSDB_PORT=${TSDB_PORT:-30543}
-TSDB_USER=app
-TSDB_PASSWORD='${TSDB_PASSWORD}'
-TSDB_DATABASE=app
+export TSDB_HOST=${NODE_IP}
+export TSDB_PORT=${TSDB_PORT:-30543}
+export TSDB_USER=app
+export TSDB_PASSWORD='${TSDB_PASSWORD}'
+export TSDB_DATABASE=app
 
 # Kafka
-KAFKA_BOOTSTRAP_SERVERS=${NODE_IP}:${KAFKA_PORT:-30909}
+export KAFKA_BOOTSTRAP_SERVERS=${NODE_IP}:${KAFKA_PORT:-30909}
 
 # Demo Sources
-API_URL=http://${NODE_IP}:${API_PORT:-30800}
-WEBSOCKET_URL=ws://${NODE_IP}:${WS_PORT:-30876}
-STATIC_URL=http://${NODE_IP}:${STATIC_PORT:-30880}
+export API_URL=http://${NODE_IP}:${API_PORT:-30800}
+export WEBSOCKET_URL=ws://${NODE_IP}:${WS_PORT:-30876}
+export STATIC_URL=http://${NODE_IP}:${STATIC_PORT:-30880}
 
 # Hive Metastore
-HIVE_HOST=${NODE_IP}
-HIVE_PORT=${HIVE_PORT:-30983}
+export HIVE_HOST=${NODE_IP}
+export HIVE_PORT=${HIVE_PORT:-30983}
 
 # RisingWave
-RISINGWAVE_HOST=${NODE_IP}
-RISINGWAVE_PORT=${RISINGWAVE_PORT:-31001}
+export RISINGWAVE_HOST=${NODE_IP}
+export RISINGWAVE_PORT=${RISINGWAVE_PORT:-31001}
 
 # Prefect
-PREFECT_API_URL=http://${NODE_IP}:${PREFECT_PORT:-30420}/api
+export PREFECT_API_URL=http://${NODE_IP}:${PREFECT_PORT:-30420}/api
 
 # Ray
-RAY_ADDRESS=ray://${NODE_IP}:${RAY_CLIENT_PORT:-30282}
-RAY_DASHBOARD_URL=http://${NODE_IP}:${RAY_DASHBOARD_PORT:-30742}
+export RAY_ADDRESS=ray://${NODE_IP}:${RAY_CLIENT_PORT:-30282}
+export RAY_DASHBOARD_URL=http://${NODE_IP}:${RAY_DASHBOARD_PORT:-30742}
 
 # Data Paths
-INPUT_PATH=/mnt/data
+export INPUT_PATH=/mnt/data
 EOF
 
 echo -e "${GREEN}✅ Generated: ${ENV_FILE}${NC}"

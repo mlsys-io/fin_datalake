@@ -2,21 +2,70 @@
 
 A distributed ETL framework built on Prefect and Ray for scalable data pipelines.
 
-## Installation
-
-### Client Side (Local Machine)
+## Quick Start
 
 ```bash
-cd app-code
-python3 -m venv .venv
+cd ~/zdb_deployment/app-code
+source ~/zdb_deployment/.env
 source .venv/bin/activate
-pip install -r requirements-client.txt
+
+# Configure Prefect to use dedicated server
+prefect config set PREFECT_API_URL="http://${NODE_IP}:30420/api"
+
+# Run a pipeline
+python pipelines/demo_pipeline.py
 ```
 
-### Ray Workers (Kubernetes)
+---
 
-Workers use a custom Docker image with all dependencies pre-installed.
-See `deps/kuberay/Dockerfile` for the worker image.
+## Installation
+
+### 1. Create Virtual Environment
+
+```bash
+cd ~/zdb_deployment/app-code
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 2. Install Dependencies
+
+```bash
+# Install the ETL framework package
+pip install -e .
+
+# Install client dependencies
+pip install -r requirements-client.txt
+
+# Install Ray (must match cluster version)
+pip install ray
+```
+
+### 3. Configure Services
+
+```bash
+# Generate environment variables
+cd ~/zdb_deployment
+bash setup-config.sh
+source .env
+
+# Configure Prefect to use dedicated server
+prefect config set PREFECT_API_URL="http://${NODE_IP}:30420/api"
+
+# Verify configuration
+prefect config view
+echo "RAY_ADDRESS=$RAY_ADDRESS"
+```
+
+### 4. Verify Connection
+
+```bash
+# Test Ray connection
+python3 -c "import ray; ray.init(address='$RAY_ADDRESS'); print('✅ Ray connected:', ray.cluster_resources())"
+
+# Test Prefect connection (should NOT show "temporary server")
+python pipelines/demo_pipeline.py
+```
 
 ---
 
@@ -96,10 +145,48 @@ def my_pipeline():
 # Activate environment
 cd ~/zdb_deployment/app-code
 source .venv/bin/activate
-
-# Load environment variables
 source ~/zdb_deployment/.env
 
-# Run a pipeline
-python -m pipelines.demo_pipeline
+# Run a specific pipeline
+python pipelines/demo_pipeline.py
+python pipelines/api_to_delta_pipeline.py
+python pipelines/kafka_to_delta_pipeline.py
+```
+
+---
+
+## Troubleshooting
+
+### "Starting temporary server" message
+Prefect isn't using your dedicated server. Fix:
+```bash
+prefect config set PREFECT_API_URL="http://172.28.176.60:30420/api"
+```
+
+### "Creating a local Ray instance" message
+Ray isn't connecting to the cluster. Fix:
+```bash
+# Make sure RAY_ADDRESS is set
+source ~/zdb_deployment/.env
+echo $RAY_ADDRESS  # Should show ray://IP:PORT
+
+# Test connection
+python3 -c "import ray; ray.init(address='$RAY_ADDRESS'); print(ray.cluster_resources())"
+```
+
+### Version mismatch error
+Ray client version must match cluster. Check cluster version:
+```bash
+kubectl exec -n etl-compute $(kubectl get pods -n etl-compute -l app=ray-head -o name | head -1) -- pip show ray | grep Version
+```
+Then install matching version locally:
+```bash
+pip install ray==<version>
+```
+
+### ModuleNotFoundError: 'etl'
+Install the package:
+```bash
+cd ~/zdb_deployment/app-code
+pip install -e .
 ```
