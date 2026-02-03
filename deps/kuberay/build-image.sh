@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_NAME="etl-ray"
-IMAGE_TAG="2.31.0-py312"
+IMAGE_TAG="latest-py312"
 
 # Use local registry or Docker Hub
 # Change this to your registry

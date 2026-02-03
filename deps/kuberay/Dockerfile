@@ -1,5 +1,6 @@
 # Custom Ray image with ETL dependencies - Python 3.12 compatible
-FROM rayproject/ray:2.31.0-py312
+# Using latest Ray with Python 3.12
+FROM rayproject/ray:latest-py312
 
 # Install ETL framework dependencies
 RUN pip install --no-cache-dir \
