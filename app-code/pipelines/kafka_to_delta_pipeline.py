@@ -171,7 +171,7 @@ def kafka_to_delta_flow(
 if __name__ == "__main__":
     # Run with config values
     kafka_to_delta_flow(
-        kafka_topic="events",
+        kafka_topic="ohlc-events",
         delta_uri="s3://delta-lake/bronze/kafka-events",
         max_batches=1
     )
