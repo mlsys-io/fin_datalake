@@ -40,12 +40,24 @@ spec:
             env:
               - name: RAY_GRAFANA_IFRAME_HOST
                 value: "http://127.0.0.1:3000"
+              - name: CA_PATH
+                value: "/opt/certs/public.crt"
+              - name: SSL_CERT_FILE
+                value: "/opt/certs/public.crt"
+              - name: AWS_EC2_METADATA_DISABLED
+                value: "true"
             volumeMounts:
               - mountPath: /tmp/ray
                 name: ray-logs
+              - mountPath: /opt/certs
+                name: minio-ca
+                readOnly: true
         volumes:
           - name: ray-logs
             emptyDir: {}
+          - name: minio-ca
+            configMap:
+              name: minio-ca
 
   # Worker nodes configuration
   workerGroupSpecs:
@@ -70,9 +82,22 @@ spec:
                 requests:
                   cpu: "1"
                   memory: "2Gi"
+              env:
+                - name: CA_PATH
+                  value: "/opt/certs/public.crt"
+                - name: SSL_CERT_FILE
+                  value: "/opt/certs/public.crt"
+                - name: AWS_EC2_METADATA_DISABLED
+                  value: "true"
               volumeMounts:
                 - mountPath: /tmp/ray
                   name: ray-logs
+                - mountPath: /opt/certs
+                  name: minio-ca
+                  readOnly: true
           volumes:
             - name: ray-logs
               emptyDir: {}
+            - name: minio-ca
+              configMap:
+                name: minio-ca
