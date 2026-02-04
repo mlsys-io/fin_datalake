@@ -110,9 +110,9 @@ def write_to_delta(df: Any, delta_uri: str, mode: str = "append"):
 @flow(name="Kafka to Delta Pipeline", task_runner=RayTaskRunner(address=config.RAY_ADDRESS))
 def kafka_to_delta_flow(
     kafka_bootstrap: str = "",
-    kafka_topic: str = "events",
+    kafka_topic: str = "ohlc-events",
     delta_uri: str = "s3://delta-lake/bronze/kafka-events",
-    max_batches: int = 10
+    max_batches: int = 5  # Limit for demo (each batch ~100 msgs)
 ):
     """
     End-to-end pipeline: Kafka -> Transform -> Delta Lake
@@ -173,5 +173,5 @@ if __name__ == "__main__":
     kafka_to_delta_flow(
         kafka_topic="events",
         delta_uri="s3://delta-lake/bronze/kafka-events",
-        max_batches=5
+        max_batches=1
     )
