@@ -60,6 +60,9 @@ class Config:
     AWS_ENDPOINT_URL: str = os.environ.get("AWS_ENDPOINT_URL", "")
     AWS_REGION: str = os.environ.get("AWS_REGION", "us-east-1")
     
+    # S3 / MinIO TLS Certificate
+    CA_PATH: str = os.environ.get("CA_PATH", "/opt/certs/public.crt")
+    
     # Delta Lake
     DELTA_ROOT: str = os.environ.get("DELTA_ROOT", "s3://delta-lake/bronze")
     
