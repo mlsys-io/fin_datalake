@@ -112,7 +112,7 @@ echo -e "${YELLOW}[4/6] Extracting secrets...${NC}"
 # MinIO credentials (external MinIO - hardcoded since it's outside K8s)
 MINIO_ACCESS="minioadmin"
 MINIO_SECRET="TgICtB3pdkX5JhQS"
-MINIO_ENDPOINT="https://172.28.176.117:4000"
+MINIO_ENDPOINT="https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
 # MinIO TLS certificate path (for HTTPS connections)
 MINIO_CA_PATH="/mnt/data/minio-certs/minio-storage-head.crt"
 echo "  - MinIO: configured (external)"
