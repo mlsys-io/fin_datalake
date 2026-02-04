@@ -109,7 +109,7 @@ def write_to_delta(df: Any, delta_uri: str, mode: str = "append"):
 
 @flow(name="Kafka to Delta Pipeline", task_runner=RayTaskRunner(address=config.RAY_ADDRESS))
 def kafka_to_delta_flow(
-    kafka_bootstrap: str = None,
+    kafka_bootstrap: str = "",
     kafka_topic: str = "events",
     delta_uri: str = "s3://delta-lake/bronze/kafka-events",
     max_batches: int = 10
@@ -131,7 +131,7 @@ def kafka_to_delta_flow(
     from etl.io.tasks.delta_lake_write_task import DeltaLakeWriteTask
     
     # Use config if not specified
-    if kafka_bootstrap is None:
+    if not kafka_bootstrap:
         kafka_bootstrap = config.KAFKA_BOOTSTRAP_SERVERS
     
     print(f"[flow] Starting Kafka to Delta Pipeline")
