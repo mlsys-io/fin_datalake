@@ -146,9 +146,8 @@ export AWS_SECRET_ACCESS_KEY=${MINIO_SECRET}
 export AWS_ENDPOINT_URL=${MINIO_ENDPOINT}
 export AWS_REGION=us-east-1
 
-# MinIO TLS Certificate (required for HTTPS connections to external MinIO)
+# MinIO TLS Certificate (CA_PATH only - SSL_CERT_FILE is set programmatically by DeltaLakeSink)
 export CA_PATH=${MINIO_CA_PATH}
-export SSL_CERT_FILE=${MINIO_CA_PATH}
 
 # Delta Lake
 export DELTA_ROOT=s3://delta-lake/bronze
