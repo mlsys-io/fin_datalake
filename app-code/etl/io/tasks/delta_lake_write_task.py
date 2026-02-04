@@ -71,12 +71,15 @@ class DeltaLakeWriteTask(BaseTask):
         Returns:
             Status message
         """
+        import os
         from etl.config import config
         import pandas as pd
         
         target_uri = uri or self.uri
         if not target_uri:
             raise ValueError("Delta Lake URI is required")
+        
+        # Note: SSL certificate handling is now centralized in DeltaLakeSink
         
         # Convert list of dicts to DataFrame if needed
         if isinstance(data, list):

@@ -113,7 +113,10 @@ echo -e "${YELLOW}[4/6] Extracting secrets...${NC}"
 MINIO_ACCESS="minioadmin"
 MINIO_SECRET="TgICtB3pdkX5JhQS"
 MINIO_ENDPOINT="https://172.28.176.117:4000"
+# MinIO TLS certificate path (for HTTPS connections)
+MINIO_CA_PATH="/mnt/data/minio-certs/minio-storage-head.crt"
 echo "  - MinIO: configured (external)"
+echo "  - MinIO CA: ${MINIO_CA_PATH}"
 
 # TimescaleDB password
 TSDB_PASSWORD=""
@@ -142,6 +145,10 @@ export AWS_ACCESS_KEY_ID=${MINIO_ACCESS}
 export AWS_SECRET_ACCESS_KEY=${MINIO_SECRET}
 export AWS_ENDPOINT_URL=${MINIO_ENDPOINT}
 export AWS_REGION=us-east-1
+
+# MinIO TLS Certificate (required for HTTPS connections to external MinIO)
+export CA_PATH=${MINIO_CA_PATH}
+export SSL_CERT_FILE=${MINIO_CA_PATH}
 
 # Delta Lake
 export DELTA_ROOT=s3://delta-lake/bronze
@@ -202,6 +209,8 @@ data:
   HIVE_PORT: "9083"
   API_URL: "http://demo-api.${NS_DEMO}.svc:8000"
   WEBSOCKET_URL: "ws://websocket-server.${NS_DEMO}.svc:8765"
+  CA_PATH: "/opt/certs/public.crt"
+  SSL_CERT_FILE: "/opt/certs/public.crt"
 ---
 apiVersion: v1
 kind: Secret

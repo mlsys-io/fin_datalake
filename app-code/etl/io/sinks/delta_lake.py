@@ -66,10 +66,27 @@ class DeltaLakeWriter(DataWriter):
         opts.update(self.sink.storage_options_extra)
         return opts
 
+    def _ensure_ssl_cert(self):
+        """Set SSL_CERT_FILE for Rust object_store if certificate exists."""
+        import os
+        from loguru import logger
+        from etl.config import config
+        
+        ca_path = getattr(config, 'CA_PATH', '/opt/certs/public.crt')
+        if ca_path and os.path.exists(ca_path):
+            os.environ.setdefault("SSL_CERT_FILE", ca_path)
+            logger.info(f"[DeltaLake] SSL certificate configured: {ca_path}")
+        else:
+            logger.warning(f"[DeltaLake] SSL certificate not found at: {ca_path}")
+        os.environ.setdefault("AWS_EC2_METADATA_DISABLED", "true")
+
     def write_batch(self, data: Union[Any, Any, Any]):
         """
         Write a batch (DataFrame, Table, or Ray Dataset) to Delta Lake.
         """
+        # Ensure SSL certificate is set for HTTPS MinIO connections
+        self._ensure_ssl_cert()
+        
         # Heavy imports - only executed on Ray workers
         import pyarrow as pa
         import pandas as pd
@@ -134,12 +151,15 @@ class DeltaLakeWriter(DataWriter):
         import pyarrow as pa
         import pandas as pd
         from deltalake import write_deltalake
+        from loguru import logger
         
         if isinstance(data, pd.DataFrame):
             data = pa.Table.from_pandas(data, preserve_index=False)
             
         # Schema Cleaning (Timezone stripping)
         data = self._clean_schema(data)
+        
+        logger.info(f"[DeltaLake] Writing {data.num_rows} rows to {self.sink.uri}...")
         
         write_deltalake(
             table_or_uri=self.sink.uri,
@@ -149,6 +169,8 @@ class DeltaLakeWriter(DataWriter):
             storage_options=self._storage_options,
             schema_mode=self.sink.schema_mode or ("overwrite" if self.sink.mode == "overwrite" else "merge")
         )
+        
+        logger.success(f"[DeltaLake] ✅ Successfully wrote {data.num_rows} rows to {self.sink.uri}")
         
         if self.sink.hive_config and self.sink.hive_table_name:
             self._register_in_hive(data.schema)
