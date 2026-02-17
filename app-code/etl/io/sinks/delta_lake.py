@@ -80,6 +80,36 @@ class DeltaLakeWriter(DataWriter):
             logger.warning(f"[DeltaLake] SSL certificate not found at: {ca_path}")
         os.environ.setdefault("AWS_EC2_METADATA_DISABLED", "true")
 
+    def write_dataset(self, ds: "ray.data.Dataset") -> None:
+        """
+        Write a Ray Dataset to Delta Lake (distributed execution).
+        
+        Uses Ray's native write_deltalake which handles Tokio runtime internally.
+        This avoids conflicts with Ray's async loop.
+        
+        Args:
+            ds: Ray Dataset to write
+        """
+        self._ensure_ssl_cert()
+        from loguru import logger
+        
+        logger.info(f"[DeltaLake] Writing Ray Dataset to {self.sink.uri} (Distributed)...")
+        
+        try:
+            ds.write_deltalake(
+                self.sink.uri,
+                mode=self.sink.mode,
+                storage_options=self._storage_options,
+            )
+            logger.success(f"[DeltaLake] ✅ Successfully wrote dataset to {self.sink.uri}")
+        except Exception as e:
+            logger.error(f"[DeltaLake] Failed to write Ray Dataset: {e}")
+            raise
+
+        # Hive Registration
+        if self.sink.hive_config and self.sink.hive_table_name:
+            self._register_in_hive(ds.schema())
+
     def write_batch(self, data: Union[Any, Any, Any]):
         """
         Write a batch (DataFrame, Table, or Ray Dataset) to Delta Lake.

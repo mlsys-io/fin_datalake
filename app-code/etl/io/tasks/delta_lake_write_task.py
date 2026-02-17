@@ -1,10 +1,8 @@
 """
 Delta Lake Write Task - BaseTask implementation for Delta Lake writes.
 
-IMPORTANT: Due to Tokio runtime conflicts with Ray, this task should be 
-called with .local() instead of regular distributed execution.
-
-See: etl/docs/RUNTIME_CONFLICTS.md for details.
+Now uses Ray Data for distributed writes to avoid Tokio/Ray conflicts.
+Supports both distributed (.submit()) and local (.local()) execution.
 """
 from typing import Any, Dict, List, Optional, Union
 from etl.core.base_task import BaseTask
@@ -15,7 +13,11 @@ class DeltaLakeWriteTask(BaseTask):
     """
     Task for writing data to Delta Lake.
     
-    WARNING: Use .local() due to Tokio/Ray runtime conflict.
+    Distributed Execution (Recommended):
+        Uses Ray Data's write_deltalake() which handles Tokio runtime safely.
+    
+    Local Execution:
+        Use .local() to run on driver for small datasets or debugging.
     
     Usage:
         task = DeltaLakeWriteTask(
@@ -23,16 +25,12 @@ class DeltaLakeWriteTask(BaseTask):
             uri="s3://delta-lake/bronze/table",
         )
         
-        # ✅ Correct - runs on driver (avoids Tokio crash)
-        task.local(data)
+        # ✅ Distributed - uses Ray Data (recommended)
+        task(data)
         
-        # ❌ Avoid - will crash on Ray workers
-        # task(data)
+        # ✅ Local - runs on driver
+        task.local(data)
     """
-    
-    # Mark this task as requiring local execution
-    REQUIRES_LOCAL_EXECUTION = True
-    CONFLICT_REASON = "Delta Lake uses Tokio (Rust async runtime) which conflicts with Ray"
     
     def __init__(
         self,
@@ -60,30 +58,24 @@ class DeltaLakeWriteTask(BaseTask):
         self.hive_table_name = hive_table_name
         self.hive_config = hive_config
     
-    def run(self, data: Any, uri: Optional[str] = None) -> str:
+    def run(self, data: Any, uri: Optional[str] = None, use_ray_data: bool = True) -> str:
         """
         Write data to Delta Lake.
         
         Args:
-            data: DataFrame, PyArrow Table, or list of dicts
+            data: DataFrame, PyArrow Table, Ray Dataset, or list of dicts
             uri: Override URI (optional, uses instance URI if not provided)
+            use_ray_data: If True, convert to Ray Dataset for distributed write (default: True)
             
         Returns:
             Status message
         """
-        import os
         from etl.config import config
         import pandas as pd
         
         target_uri = uri or self.uri
         if not target_uri:
             raise ValueError("Delta Lake URI is required")
-        
-        # Note: SSL certificate handling is now centralized in DeltaLakeSink
-        
-        # Convert list of dicts to DataFrame if needed
-        if isinstance(data, list):
-            data = pd.DataFrame(data)
         
         # Create sink with config
         sink = DeltaLakeSink(
@@ -98,24 +90,40 @@ class DeltaLakeWriteTask(BaseTask):
             hive_config=self.hive_config,
         )
         
-        # Write using the sink
         writer = sink.open()
         try:
-            writer.write_batch(data)
-            row_count = len(data) if hasattr(data, '__len__') else 'unknown'
-            print(f"[{self.name}] Successfully wrote {row_count} records to {target_uri}")
-            return f"Wrote {row_count} records to {target_uri}"
+            # Determine execution mode
+            if use_ray_data:
+                # Convert to Ray Dataset for distributed write
+                import ray.data as rd
+                
+                ds = data
+                if not isinstance(data, rd.Dataset):
+                    if isinstance(data, pd.DataFrame):
+                        ds = rd.from_pandas(data)
+                    elif isinstance(data, list):
+                        ds = rd.from_items(data)
+                    else:
+                        # Try to convert
+                        ds = rd.from_pandas(pd.DataFrame(data))
+                
+                writer.write_dataset(ds)
+                return f"Successfully wrote dataset to {target_uri} (distributed)"
+            else:
+                # Local execution fallback
+                if isinstance(data, list):
+                    data = pd.DataFrame(data)
+                
+                writer.write_batch(data)
+                row_count = len(data) if hasattr(data, '__len__') else 'unknown'
+                return f"Wrote {row_count} records to {target_uri} (local)"
         finally:
             writer.close()
     
-    def __call__(self, *args, **kwargs):
+    def local(self, *args, **kwargs):
         """
-        Override to warn about runtime conflict.
+        Execute task locally on the driver.
+        Forces use_ray_data=False to bypass Ray Dataset conversion.
         """
-        import warnings
-        warnings.warn(
-            f"{self.name}: Delta Lake has Tokio/Ray conflict. "
-            "Consider using .local() instead for reliable execution.",
-            RuntimeWarning
-        )
-        return super().__call__(*args, **kwargs)
+        kwargs['use_ray_data'] = False
+        return super().local(*args, **kwargs)

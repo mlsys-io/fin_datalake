@@ -156,13 +156,10 @@ def kafka_to_delta_flow(
     
     print(f"[flow] Got {len(df)} rows, writing to Delta Lake...")
     
-    # Execute: Write locally (avoids Tokio crash)
-    write_task = DeltaLakeWriteTask(
-        name="Write Kafka to Delta",
-        uri=delta_uri,
-        mode="append"  # Append for streaming data
-    )
-    result = write_task.local(df)
+    # Execute: Write using Ray Data (Distributed)
+    # Now uses distributed execution thanks to Ray Data integration
+    write_future = write_task(df)
+    result = write_future.result()
     
     print(f"[flow] Pipeline complete: {result}")
     return result

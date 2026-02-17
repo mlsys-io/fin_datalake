@@ -72,8 +72,10 @@ def api_to_delta_flow(
     data = raw_data.result()
     print(f"[flow] Fetched {len(data)} records from API")
     
-    # Execute: Write locally (avoids Tokio crash)
-    result = write_task.local(data)
+    # Execute: Write using Ray Data (Distributed)
+    # Now uses distributed execution thanks to Ray Data integration
+    write_future = write_task(data)
+    result = write_future.result()
     
     print(f"[flow] Pipeline complete: {result}")
     return result
