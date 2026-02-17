@@ -67,6 +67,34 @@ class ContextStore:
         logger.debug(f"Context set: '{key}' (ttl={ttl}s, owner={owner})")
         return True
     
+    def append(self, key: str, item: Any, ttl: int = None, owner: str = None) -> bool:
+        """
+        Append an item to a list in the context (Atomic operation).
+        
+        Args:
+            key: Context key
+            item: Item to append
+            ttl: Update TTL if provided
+            owner: Update owner if provided
+        """
+        entry = self._store.get(key)
+        
+        if entry is None:
+            # Create new list
+            value = [item]
+        else:
+            if not isinstance(entry.value, list):
+                # Convert to list if existing value is single item (optional behavior)
+                # or raise error. For now, we assume usage is consistent.
+                from loguru import logger
+                logger.warning(f"Context key '{key}' is not a list, overwriting with list.")
+                value = [item]
+            else:
+                entry.value.append(item)
+                value = entry.value
+        
+        return self.set(key, value, ttl, owner)
+    
     def get(self, key: str, default: Any = None) -> Any:
         """
         Retrieve a value from the context.
