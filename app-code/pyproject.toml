@@ -39,10 +39,32 @@ worker = [
     "pymilvus>=2.3",
     "thrift>=0.16",
 ]
+gateway = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlalchemy>=2.0",
+    "aiosqlite>=0.20.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt<4.0.0",
+    "mcp>=1.0.0",
+    "typer>=0.12.0",
+    "rich>=13.0.0",
+    "httpx>=0.27.0",
+]
+overseer = [
+    "httpx>=0.27.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+gateway-api = "gateway.api.main:app"
+gateway-mcp = "gateway.mcp.server:main"
+overseer = "overseer.main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["etl*", "pipelines*", "ioutils*", "transformations*"]
+include = ["etl*", "pipelines*", "ioutils*", "transformations*", "gateway*", "overseer*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.json"]
