@@ -1,0 +1,48 @@
+# ============================================================
+# Overseer Service Configuration
+# ============================================================
+# Each entry defines a service the Overseer monitors.
+# Add a new service = add 4 lines here + one Collector class.
+#
+# Environment variable overrides:
+#   OVERSEER_RAY_HOST, OVERSEER_RAY_PORT, etc.
+# ============================================================
+
+services:
+  ray:
+    host: localhost
+    port: 8265
+    protocol: http
+    health_path: /api/v0/cluster_status
+
+  kafka:
+    host: localhost
+    port: 9092
+    protocol: kafka
+    extra:
+      consumer_group: etl-consumer-group
+
+  prefect:
+    host: localhost
+    port: 4200
+    protocol: http
+    health_path: /api/health
+
+  minio:
+    host: localhost
+    port: 9000
+    protocol: http
+    health_path: /minio/health/live
+
+  gateway:
+    host: localhost
+    port: 8000
+    protocol: http
+    health_path: /api/v1/auth/verify
+
+# ============================================================
+# Overseer behaviour
+# ============================================================
+overseer:
+  loop_interval_seconds: 15
+  metrics_history_size: 200
