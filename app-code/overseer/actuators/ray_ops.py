@@ -7,12 +7,10 @@ The address is configured via the RAY_ADDRESS env var or config.yaml.
 
 from __future__ import annotations
 
-import logging
+from loguru import logger
 
 from overseer.actuators.base import BaseActuator
 from overseer.models import ActionResult, ActionType, OverseerAction
-
-logger = logging.getLogger("overseer.actuators.ray")
 
 
 class RayActuator(BaseActuator):

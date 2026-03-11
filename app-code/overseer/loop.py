@@ -8,8 +8,9 @@ Completely standalone from Ray — connects to services via their external APIs.
 from __future__ import annotations
 
 import asyncio
-import logging
 from typing import Optional
+
+from loguru import logger
 
 from overseer.collectors import (
     GenericHealthCollector,
@@ -30,8 +31,6 @@ from overseer.policies.base import BasePolicy
 from overseer.actuators import AlertActuator, RayActuator
 from overseer.actuators import BaseActuator
 from overseer.store import MetricsStore
-
-logger = logging.getLogger("overseer")
 
 
 # ---------------------------------------------------------------------------

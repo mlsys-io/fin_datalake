@@ -4,12 +4,10 @@ AlertActuator — Logs every action and optionally POSTs alerts to the Gateway.
 
 from __future__ import annotations
 
-import logging
+from loguru import logger
 
 from overseer.actuators.base import BaseActuator
 from overseer.models import ActionResult, OverseerAction
-
-logger = logging.getLogger("overseer.actuators.alerts")
 
 
 class AlertActuator(BaseActuator):

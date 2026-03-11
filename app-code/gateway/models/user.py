@@ -51,6 +51,7 @@ class Permission(str, Enum):
     BROKER_VEND = "broker:vend"      # get_s3_creds, get_psql_string (sensitive)
 
     # System
+    SYSTEM_READ = "system:read"      # Query logs, view health
     SYSTEM_ADMIN = "system:admin"    # User management, provisioning
 
 

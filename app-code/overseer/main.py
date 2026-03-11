@@ -11,20 +11,16 @@ continuously monitoring Ray, Kafka, Prefect, and other services.
 from __future__ import annotations
 
 import asyncio
-import logging
 import sys
 
 
 def main():
-    # Configure structured logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(name)-20s | %(levelname)-5s | %(message)s",
-        datefmt="%H:%M:%S",
-        stream=sys.stdout,
-    )
+    # Use the unified logging framework
+    from etl.utils.logging import setup_logging
+    from loguru import logger
 
-    logger = logging.getLogger("overseer")
+    setup_logging(component="overseer")
+
     logger.info("=" * 60)
     logger.info("  System Overseer — AI Lakehouse Autonomic Controller")
     logger.info("=" * 60)
@@ -38,7 +34,7 @@ def main():
     except KeyboardInterrupt:
         logger.info("Overseer shut down by user (Ctrl+C)")
     except Exception as e:
-        logger.critical(f"Overseer crashed: {e}", exc_info=True)
+        logger.critical(f"Overseer crashed: {e}")
         sys.exit(1)
 
 
