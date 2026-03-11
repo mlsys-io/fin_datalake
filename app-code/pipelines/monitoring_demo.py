@@ -27,36 +27,33 @@ def monitor_service_flow(duration_seconds: int = 60):
     if not ray.is_initialized():
         ray.init(address=config.RAY_ADDRESS, ignore_reinit_error=True)
 
-    # 2. Deploy the Service Actor
+    # 2. Deploy the Service Actor using deploy()
     logger.info("Deploying StatefulProcessorService...")
     
-    # Example Config
-    source_conf = {"url": "wss://ws.bitstamp.net", "read_timeout": 1.0}
-    sink_conf = {
-        "host": "localhost", "user": "admin", "password": "pwd", 
-        "database": "mydb", "table_name": "crypto_windowed"
-    }
-
-    ProcessorActor = StatefulProcessorService(
+    svc = StatefulProcessorService.deploy(
         name="CryptoProcessor",
-        source_config=source_conf,
-        sink_config=sink_conf,
-        window_seconds=5
-    ).as_ray_actor(num_cpus=1)
-
-    actor_handle = ProcessorActor.remote()
+        config={
+            "source_config": {"url": "wss://ws.bitstamp.net", "read_timeout": 1.0},
+            "sink_config": {
+                "host": "localhost", "user": "admin", "password": "pwd", 
+                "database": "mydb", "table_name": "crypto_windowed"
+            },
+            "window_seconds": 5,
+        },
+        num_cpus=1,
+    )
     
-    # Start the processing loop in background
+    # Start the processing loop in background (fire-and-forget)
     logger.info("Starting processing loop in background...")
-    actor_handle.run.remote()
+    svc.async_run()
 
     # 3. Monitoring Loop
     start_time = time.time()
     
     try:
         while time.time() - start_time < duration_seconds:
-            # Poll status
-            status = ray.get(actor_handle.get_status.remote())
+            # Poll status — SyncHandle makes this clean
+            status = svc.get_status()
             metrics = status.get("metrics", {})
             
             # A. Log to Console (History)
@@ -96,7 +93,7 @@ def monitor_service_flow(duration_seconds: int = 60):
     finally:
         logger.info("Stopping Service...")
         try:
-            actor_handle.stop.remote()
+            svc.stop()
         except Exception:
             pass
         logger.info("Service Stopped.")

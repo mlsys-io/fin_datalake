@@ -36,8 +36,13 @@ class ContextStore:
     """
     
     def __init__(self):
+        from etl.utils.logging import setup_logging
         from loguru import logger
+
+        setup_logging(component="context")
+
         self._store: Dict[str, ContextEntry] = {}
+        self._write_count: int = 0
         logger.info("ContextStore initialized")
     
     def set(self, key: str, value: Any, ttl: int = None, owner: str = None) -> bool:
@@ -62,6 +67,11 @@ class ContextStore:
             expires_at=expires_at,
             owner=owner
         )
+        
+        # Periodic cleanup: every 100 writes, purge expired entries
+        self._write_count += 1
+        if self._write_count % 100 == 0:
+            self._cleanup_expired()
         
         from loguru import logger
         logger.debug(f"Context set: '{key}' (ttl={ttl}s, owner={owner})")
@@ -169,10 +179,19 @@ def get_context() -> ray.actor.ActorHandle:
     """
     Get or create the singleton ContextStore actor.
     
+    Thread-safe: handles race condition where two processes
+    try to create the store simultaneously.
+    
     Returns:
         Ray ActorHandle to the ContextStore
     """
     try:
         return ray.get_actor("ContextStore")
     except ValueError:
-        return ContextStore.options(name="ContextStore", lifetime="detached").remote()
+        try:
+            return ContextStore.options(
+                name="ContextStore", lifetime="detached"
+            ).remote()
+        except ValueError:
+            # Another process created it between our check and create
+            return ray.get_actor("ContextStore")

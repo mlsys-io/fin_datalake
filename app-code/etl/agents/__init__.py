@@ -1,8 +1,7 @@
 from .base import BaseAgent
 from .langchain_adapter import LangChainAgent
 from .tools import TimescaleTool, MilvusTool
-from .registry import AgentRegistry, get_registry
-from .bus import MessageBus, get_bus
+from .hub import AgentHub, get_hub
 from .context import ContextStore, get_context
 
 __all__ = [
@@ -10,10 +9,8 @@ __all__ = [
     "LangChainAgent",
     "TimescaleTool",
     "MilvusTool",
-    "AgentRegistry",
-    "get_registry",
-    "MessageBus",
-    "get_bus",
+    "AgentHub",
+    "get_hub",
     "ContextStore",
     "get_context",
 ]

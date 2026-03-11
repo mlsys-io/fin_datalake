@@ -14,13 +14,15 @@ class StatefulProcessorService(ServiceTask):
     """
     REQUIRED_DEPENDENCIES = ["websocket-client", "psycopg2"]
 
-    def __init__(self, name: str, source_config: Dict, sink_config: Dict, window_seconds: int = 10):
-        super().__init__(name)
-        self.source_config = source_config
-        self.sink_config = sink_config
-        self.window_seconds = window_seconds
+    def __init__(self, name: str = None, config: Dict = None, 
+                 source_config: Dict = None, sink_config: Dict = None, 
+                 window_seconds: int = 10):
+        config = config or {}
+        super().__init__(name=name or self.__class__.__name__, config=config)
+        self.source_config = source_config or config.get("source_config", {})
+        self.sink_config = sink_config or config.get("sink_config", {})
+        self.window_seconds = window_seconds or config.get("window_seconds", 10)
         
-        # State: {symbol: {count: int, total_price: float}}
         # State: {symbol: {count: int, total_price: float}}
         self.state = defaultdict(lambda: {"count": 0, "sum_price": 0.0})
         self.metrics = {"total_processed": 0, "last_flush_count": 0, "last_flush_time": None}

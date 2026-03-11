@@ -50,6 +50,6 @@ class MarketAnalystAgent(LangChainAgent):
 
 # Example Usage helper
 def deploy_analyst():
-    # Deploy as Ray Actor
-    actor = MarketAnalystAgent.as_ray_actor(num_cpus=1).remote()
-    return actor
+    """Deploy as a named Ray Actor — returns SyncHandle."""
+    return MarketAnalystAgent.deploy(name="MarketAnalyst", num_cpus=1)
+

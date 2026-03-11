@@ -2,7 +2,7 @@
 Base Agent class for AI Agents running as Ray Actors.
 Heavy imports (ray, loguru) are deferred to runtime methods.
 """
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from abc import abstractmethod
 
 from etl.core.base_service import ServiceTask
@@ -18,6 +18,13 @@ class BaseAgent(ServiceTask):
     This class handles the infrastructure (Ray Actor lifecycle, messaging),
     while the subclass defines the intelligence (LLM, Chain, etc.) via `build_executor`.
     
+    Deployment:
+        Use ``deploy()`` to create a named Ray Actor with all methods
+        remotely callable. This is the recommended way to start agents.
+
+        >>> handle = MyAgent.deploy(name="MyAgent")
+        >>> ray.get(handle.ask.remote("question"))
+
     Class Attributes:
         CAPABILITIES: List of capabilities this agent provides (for registry discovery)
     """
@@ -28,39 +35,111 @@ class BaseAgent(ServiceTask):
         super().__init__(name=self.__class__.__name__, config=config)
         self.executor = None
 
+    # =========================================================================
+    # Deployment — extends ServiceTask.deploy() with agent setup
+    # =========================================================================
+
+    @classmethod
+    def deploy(
+        cls,
+        name: Optional[str] = None,
+        num_cpus: float = 0,
+        max_concurrency: int = 10,
+        lifetime: str = "detached",
+        config: Dict[str, Any] = None,
+        **ray_options,
+    ):
+        """
+        Deploy this agent as a named Ray Actor.
+
+        Extends ``ServiceTask.deploy()`` by calling ``setup()`` after creation,
+        which builds the executor and auto-registers with the AgentRegistry.
+
+        Args:
+            name:              Actor name for discovery (defaults to class name).
+            num_cpus:          CPU reservation per actor (0 = fractional scheduling).
+            max_concurrency:   How many remote calls the actor can handle at once.
+            lifetime:          Ray actor lifetime ("detached" survives driver exit).
+            config:            Optional config dict passed to __init__.
+            **ray_options:     Extra options forwarded to ray.remote().
+
+        Returns:
+            A SyncHandle with all methods (ask, notify, delegate, …) callable.
+        """
+        sync_handle = super().deploy(
+            name=name,
+            num_cpus=num_cpus,
+            max_concurrency=max_concurrency,
+            lifetime=lifetime,
+            config=config,
+            **ray_options,
+        )
+
+        # setup() must run AFTER the actor is fully alive and named,
+        # so the AgentRegistry can resolve the actor handle via ray.get_actor().
+        # SyncHandle translates this into ray.get(handle.setup.remote())
+        sync_handle.setup()
+
+        return sync_handle
+
+    # =========================================================================
+    # Lifecycle
+    # =========================================================================
+
     def setup(self):
         """
         Called once when the Actor starts.
         Builds the heavy logic (LLM, Tools) to ensure they live on the Cluster Node.
-        Also auto-registers with the AgentRegistry if CAPABILITIES are defined.
+        Also auto-registers with the AgentHub if CAPABILITIES are defined.
+
+        Idempotent — safe to call multiple times; only runs once.
         """
+        if self.executor is not None:
+            return  # Already set up
+
+        from etl.utils.logging import setup_logging
         from loguru import logger
+
+        setup_logging(component="agent")
         
         logger.info(f"[{self.name}] Setting up Agent Intelligence...")
         self.executor = self.build_executor()
         
-        # Auto-register with AgentRegistry if capabilities defined
+        # Auto-register with AgentHub if capabilities defined
         if self.CAPABILITIES:
-            self._register_with_registry()
+            self._register_with_hub()
         
         logger.info(f"[{self.name}] Ready.")
     
-    def _register_with_registry(self):
-        """Register this agent with the AgentRegistry."""
+    def _register_with_hub(self):
+        """Register this agent with the AgentHub."""
         import ray
         from loguru import logger
         
         try:
-            from etl.agents.registry import get_registry
-            registry = get_registry()
-            ray.get(registry.register.remote(
+            from etl.agents.hub import get_hub
+            hub = get_hub()
+            ray.get(hub.register.remote(
                 name=self.name,
                 capabilities=self.CAPABILITIES,
                 metadata={"class": self.__class__.__name__}
             ))
-            logger.info(f"[{self.name}] Registered with capabilities: {self.CAPABILITIES}")
+            logger.info(f"[{self.name}] Registered with AgentHub (capabilities: {self.CAPABILITIES})")
         except Exception as e:
-            logger.warning(f"[{self.name}] Failed to register with AgentRegistry: {e}")
+            logger.warning(f"[{self.name}] Failed to register with AgentHub: {e}")
+
+    def _deregister_from_hub(self):
+        """Remove this agent from the AgentHub on shutdown."""
+        import ray
+        from loguru import logger
+
+        try:
+            from etl.agents.hub import get_hub
+            hub = get_hub()
+            ray.get(hub.unregister.remote(self.name))
+            logger.info(f"[{self.name}] Deregistered from AgentHub")
+        except Exception:
+            pass  # Best-effort; hub may already be gone
 
     @abstractmethod
     def build_executor(self) -> Any:
@@ -74,17 +153,60 @@ class BaseAgent(ServiceTask):
 
     def run(self):
         """
-        The implementation of ServiceTask.run().
-        For an Agent, this is usually just keeping the Actor alive and handling async events.
+        ServiceTask.run() implementation.
+
+        For agents deployed via ``deploy()``, you typically do NOT call ``run()``
+        — the actor stays alive via ``lifetime="detached"`` and handles
+        ``ask()`` / ``notify()`` calls on-demand.
+
+        ``run()`` is kept for backward compatibility with the ``as_ray_actor()``
+        proxy pattern used by streaming ServiceTasks.
         """
         self.running = True
         self.setup()
         
         import time
-        while self.running:
-            # Main Loop: Could check a queue for 'notify' events in the future.
-            # For now, we just sleep to keep the Actor alive so it can receive remote calls.
-            time.sleep(1.0) 
+        try:
+            while self.running:
+                time.sleep(1.0)
+        finally:
+            self.on_stop()
+
+    def shutdown(self):
+        """
+        Gracefully shut down this agent.
+
+        Calls ``on_stop()`` to run cleanup hooks (deregister, close connections),
+        then terminates the Ray Actor process via ``ray.actor.exit_actor()``.
+
+        Usage::
+
+            ray.get(handle.shutdown.remote())  # Agent cleans up and exits
+        """
+        from loguru import logger
+
+        logger.info(f"[{self.name}] Shutting down...")
+        self.running = False
+        self.on_stop()
+
+        import ray
+        ray.actor.exit_actor()
+
+    def on_stop(self):
+        """
+        Lifecycle hook: called before the actor shuts down.
+
+        Override in subclass to release resources (close DB connections,
+        flush buffers, etc.). Default implementation deregisters from the
+        AgentHub.
+
+        Called automatically by ``shutdown()`` and when ``run()`` exits.
+        """
+        self._deregister_from_hub()
+
+    # =========================================================================
+    # Interaction — Request/Response and Pub/Sub
+    # =========================================================================
 
     def ask(self, payload: Any) -> Any:
         """
@@ -94,7 +216,7 @@ class BaseAgent(ServiceTask):
         from loguru import logger
         
         if not self.executor:
-            # Safety check if called before run/setup complete
+            # Safety check if called before setup() has been called
             self.setup()
             
         try:
@@ -151,6 +273,10 @@ class BaseAgent(ServiceTask):
         from loguru import logger
         logger.info(f"[{self.name}] Received: {event.get('topic')} from {event.get('sender')}")
 
+    # =========================================================================
+    # Delegation — Cross-Agent Task Routing
+    # =========================================================================
+
     def delegate(
         self, 
         capability: str, 
@@ -161,8 +287,7 @@ class BaseAgent(ServiceTask):
         """
         Delegate a task to another agent that has the required capability.
         
-        Uses the AgentRegistry for service discovery. If retry_on_failure is True,
-        will try other agents with the same capability if the first one fails.
+        Routes through the AgentHub, which handles discovery + retry.
         
         Args:
             capability: The capability needed (e.g., "analysis", "data_fetch")
@@ -179,43 +304,13 @@ class BaseAgent(ServiceTask):
         """
         import ray
         from loguru import logger
-        from etl.agents.registry import get_registry
+        from etl.agents.hub import get_hub
         
-        registry = get_registry()
-        agents = ray.get(registry.find_by_capability.remote(capability))
-        
-        if not agents:
-            raise ValueError(f"No agent found with capability: {capability}")
-        
-        # Limit retries to available agents
-        attempts = min(len(agents), max_retries) if retry_on_failure else 1
-        last_error = None
-        
-        for i in range(attempts):
-            target_name = agents[i]
-            
-            try:
-                target = ray.get(registry.get_agent.remote(target_name))
-                
-                if target is None:
-                    logger.warning(f"[{self.name}] Agent '{target_name}' not accessible, trying next...")
-                    continue
-                
-                logger.info(f"[{self.name}] Delegating '{capability}' to {target_name}")
-                return ray.get(target.ask.remote(payload))
-                
-            except Exception as e:
-                last_error = e
-                logger.warning(f"[{self.name}] Agent '{target_name}' failed: {e}")
-                
-                if not retry_on_failure:
-                    raise
-                
-                if i < attempts - 1:
-                    logger.info(f"[{self.name}] Retrying with next agent...")
-        
-        # All agents failed
-        raise RuntimeError(
-            f"All {attempts} agents with capability '{capability}' failed. "
-            f"Last error: {last_error}"
-        )
+        logger.info(f"[{self.name}] Delegating '{capability}'")
+        hub = get_hub()
+        return ray.get(hub.call_by_capability.remote(
+            capability=capability,
+            payload=payload,
+            retry_on_failure=retry_on_failure,
+            max_retries=max_retries,
+        ))
