@@ -133,8 +133,7 @@ def my_pipeline():
 
 ### `etl.agents`
 - `BaseAgent` - Base class for AI agents (Ray Actor)
-- `AgentRegistry` - Service discovery for agents
-- `MessageBus` - Pub/sub messaging between agents
+- `AgentHub` - Central coordination: discovery, routing, notifications
 - `ContextStore` - Shared state for agent coordination
 
 ---

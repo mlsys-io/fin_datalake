@@ -4,10 +4,11 @@ This framework provides a modular, platform-agnostic way to build distributed da
 
 ## 🏗 Architecture Layers
 
-1.  **Ingestion Layer (`etl.io.sources`)**: Fetches data from APIs, Streams, or Files.
-2.  **Storage Layer (`etl.io.sinks`)**: Writers for Delta Lake (History), TimescaleDB (Metrics), and Milvus (Vectors).
-3.  **Processing Layer (`etl.core`)**: Distributed Tasks (`@task`) and Stateful Services (`ServiceTask`) running on Ray.
-4.  **Intelligence Layer (`etl.agents`)**: AI Agents hosted as persistent Ray Actors that can reason over data.
+1.  **Ingestion Layer (`etl.io.sources`)**: Fetches data from APIs, Streams, Files, or Databases.
+2.  **Storage Layer (`etl.io.sinks`)**: Writers for Delta Lake (History), TimescaleDB (Metrics), Milvus (Vectors), and HTTP endpoints.
+3.  **Processing Layer (`etl.core`)**: Distributed Tasks (`BaseTask`) and Stateful Services (`ServiceTask`) running on Ray.
+4.  **Services Layer (`etl.services`)**: Long-running services for streaming, Hive registration, MinIO management, etc.
+5.  **Intelligence Layer (`etl.agents`)**: AI Agents hosted as persistent Ray Actors with coordination via AgentHub and ContextStore.
 
 ---
 
@@ -19,7 +20,8 @@ Configuration objects that define *where* data comes from.
 *   **`WebSocketSource`**: Connects to live streams and yields micro-batches.
 *   **`FileSource`**: Reads large static files (CSV, Parquet) using Ray Data.
 *   **`KafkaSource`**: Consumes events from Kafka topics with micro-batching.
-*   **`RisingWaveSource`**: Reads from the Streaming Database.
+*   **`DeltaLakeSource`** *(direct import)*: Reads from Delta Lake tables.
+*   **`RisingWaveSource`** *(direct import)*: Reads from the Streaming Database.
 
 ### 2. Data Sinks (`etl.io.sinks`)
 Configuration objects that define *where* data goes.
@@ -28,10 +30,20 @@ Configuration objects that define *where* data goes.
 *   **`MilvusSink`**: Stores vector embeddings for RAG.
 *   **`HttpSink`**: Sends data to webhooks/APIs with retry and auth support.
 
-### 3. AI Agents (`etl.agents`)
-*   **`BaseAgent`**: The "Container". Wrapped as a Ray Actor. Handles lifecycle and messaging.
+### 3. Processing & Services (`etl.core`, `etl.services`)
+*   **`BaseTask`**: Unit of distributed work. Runs on Ray workers via `@ray.remote`.
+*   **`ServiceTask`**: Long-running actor base class. Provides `deploy()`, `connect()`, and `SyncHandle`.
+*   **`StatefulProcessorService`**: Streaming service with windowed aggregations (WebSocket → TimescaleDB).
+
+### 4. AI Agents (`etl.agents`)
+*   **`BaseAgent`**: The "Container". Deploy as a Ray Actor via `deploy()`. Handles lifecycle, messaging, and coordination.
 *   **`LangChainAgent`**: A helper for Agents built with LangChain/LangGraph.
 *   **`Tools`**: Pre-built wrappers for Sinks (e.g., `TimescaleTool`, `MilvusTool`).
+
+### 5. Agent Coordination (`etl.agents`)
+*   **`AgentHub`**: Central coordination — service discovery, synchronous routing, notifications, health monitoring.
+*   **`ContextStore`**: Shared key-value state with TTL for cross-agent collaboration.
+*   **`SyncHandle`**: Proxy that removes `ray.get`/`.remote()` boilerplate. Supports `async_` prefix for fire-and-forget.
 
 ---
 
@@ -60,38 +72,55 @@ def ingest_news():
 Define the Agent logic and deploy it as a persistent service.
 
 ```python
-from etl.sample_agents.market_analyst import MarketAnalystAgent
+from sample_agents.market_analyst import MarketAnalystAgent
 
-# Deploy on the Cluster
-actor = MarketAnalystAgent.as_ray_actor(num_cpus=1).remote()
+# Deploy on the Cluster — returns SyncHandle
+agent = MarketAnalystAgent.deploy(name="MarketAnalyst", num_cpus=1)
 
-# Interact
-response = ray.get(actor.ask.remote("What is the trend for AAPL?"))
+# Interact — no ray.get/.remote() needed
+response = agent.ask("What is the trend for AAPL?")
 print(response)
+
+# Fire-and-forget (async_ prefix)
+agent.async_notify({"topic": "alert", "payload": {"msg": "New earnings data"}})
 ```
 
 ### C. Accessing Services in Pipelines
-You can connect to running services (like Agents or the Hive Metastore) from within your Prefect Tasks using Ray's actor namespace.
+Connect to running agents from within your Prefect Tasks.
 
 ```python
-import ray
-from etl.core.base_service import ServiceTask
+from etl.agents import BaseAgent
 
 @task
 def ask_analyst_agent(question: str):
-    # 1. Get the handle to the running 'MarketAnalystAgent' service
-    # Note: Ensure the service was started previously
-    try:
-        analyst = ray.get_actor("MarketAnalystAgent")
-    except ValueError:
-        raise RuntimeError("MarketAnalystAgent is not running!")
-
-    # 2. Interact with it
-    answer = ray.get(analyst.ask.remote(question))
-    return answer
+    # connect() retrieves an existing actor by name — returns SyncHandle
+    analyst = BaseAgent.connect("MarketAnalyst")
+    return analyst.ask(question)
 ```
 
-### D. Event-Driven Pipeline with Kafka
+### D. Agent Coordination
+Agents coordinate via AgentHub and ContextStore.
+
+```python
+from etl.agents import get_hub, get_context
+from etl.core.base_service import SyncHandle
+
+hub = SyncHandle(get_hub())
+ctx = SyncHandle(get_context())
+
+# Discovery + routing
+analysts = hub.find_by_capability("analysis")
+result = hub.call_by_capability("analysis", payload)
+
+# Notifications
+hub.notify_capability("analysis", event)
+
+# Shared state with TTL
+ctx.set("signal:aapl", "BUY", owner="AnalystAgent", ttl=300)
+signal = ctx.get("signal:aapl")
+```
+
+### E. Event-Driven Pipeline with Kafka
 Consume from Kafka and write to Delta Lake.
 
 ```python
@@ -113,7 +142,27 @@ def kafka_to_delta():
                 writer.write_batch(batch)
 ```
 
-### E. Sending Notifications via HTTP
+### F. Deploying a Streaming Service
+Deploy a stateful processor with monitoring.
+
+```python
+from etl.services.processing.stateful_processor import StatefulProcessorService
+
+svc = StatefulProcessorService.deploy(
+    name="CryptoProcessor",
+    config={
+        "source_config": {"url": "wss://ws.bitstamp.net"},
+        "sink_config": {"host": "localhost", "database": "mydb", "table_name": "crypto"},
+        "window_seconds": 5,
+    },
+)
+
+svc.async_run()              # Start streaming loop (fire-and-forget)
+status = svc.get_status()    # Poll metrics
+svc.stop()                   # Graceful shutdown
+```
+
+### G. Sending Notifications via HTTP
 Send processed data to a webhook endpoint.
 
 ```python
@@ -186,13 +235,22 @@ Inherit from `BaseAgent` (or `LangChainAgent`) and implement `build_executor`.
 from etl.agents import BaseAgent
 
 class SentimentAgent(BaseAgent):
+    CAPABILITIES = ["sentiment"]
+
     def build_executor(self):
         # Return any callable. Could be a pure function or a complex chain.
         def _analyze(text):
             return "Positive" if "good" in text else "Negative"
         return _analyze
 
-# Deploy
-actor = SentimentAgent.as_ray_actor().remote()
-print(ray.get(actor.ask.remote("This is good code"))) # -> "Positive"
+# Deploy — one-liner, returns SyncHandle
+agent = SentimentAgent.deploy(name="SentimentAgent")
+print(agent.ask("This is good code"))  # -> "Positive"
+
+# From another process:
+agent = SentimentAgent.connect("SentimentAgent")
+agent.ask("Market looks bad")  # -> "Negative"
+
+# Graceful shutdown
+agent.shutdown()
 ```
