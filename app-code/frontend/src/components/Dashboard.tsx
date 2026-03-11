@@ -36,18 +36,18 @@ export const Dashboard: React.FC = () => {
     }
 
     return (
-        <div className="flex h-screen bg-slate-900 text-slate-200 font-sans">
+        <div className="flex h-screen bg-white text-stone-900 font-sans">
             {/* Sidebar */}
-            <aside className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col">
-                <div className="p-6 flex items-center gap-3 border-b border-slate-700">
-                    <Database className="text-indigo-400" />
-                    <h1 className="font-bold text-lg text-slate-100">Launchpad</h1>
+            <aside className="w-64 bg-[#F7F7F5] border-r border-stone-200 flex flex-col">
+                <div className="p-6 flex items-center gap-3 border-b border-stone-200">
+                    <Database className="text-stone-900" />
+                    <h1 className="font-bold text-lg text-stone-900">Launchpad</h1>
                 </div>
 
                 <nav className="flex-1 p-4 space-y-2">
                     <button
                         onClick={() => setActiveView('data')}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeView === 'data' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-300'}`}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-colors ${activeView === 'data' ? 'bg-stone-200 text-stone-900 font-medium' : 'hover:bg-stone-200/50 text-stone-600'}`}
                     >
                         <LayoutDashboard size={20} />
                         Data Catalog
@@ -56,7 +56,7 @@ export const Dashboard: React.FC = () => {
                     {canViewCompute && (
                         <button
                             onClick={() => setActiveView('compute')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeView === 'compute' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-300'}`}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-colors ${activeView === 'compute' ? 'bg-stone-200 text-stone-900 font-medium' : 'hover:bg-stone-200/50 text-stone-600'}`}
                         >
                             <Cpu size={20} />
                             Compute & Pipelines
@@ -65,7 +65,7 @@ export const Dashboard: React.FC = () => {
 
                     <button
                         onClick={() => setActiveView('agents')}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeView === 'agents' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-300'}`}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-colors ${activeView === 'agents' ? 'bg-stone-200 text-stone-900 font-medium' : 'hover:bg-stone-200/50 text-stone-600'}`}
                     >
                         <Bot size={20} />
                         AI Agents
@@ -74,7 +74,7 @@ export const Dashboard: React.FC = () => {
                     {canViewInfra && (
                         <button
                             onClick={() => setActiveView('infra')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeView === 'infra' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-300'}`}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-colors ${activeView === 'infra' ? 'bg-stone-200 text-stone-900 font-medium' : 'hover:bg-stone-200/50 text-stone-600'}`}
                         >
                             <Settings size={20} />
                             Infrastructure
@@ -82,15 +82,15 @@ export const Dashboard: React.FC = () => {
                     )}
                 </nav>
 
-                <div className="p-4 border-t border-slate-700">
+                <div className="p-4 border-t border-stone-200">
                     <div className="mb-4 px-2">
-                        <p className="text-sm font-medium text-slate-300">Logged in as</p>
-                        <p className="text-xs text-indigo-400 font-mono mt-1">{user?.username}</p>
-                        <p className="text-xs text-slate-500 mt-1 uppercase">{user?.roles.join(', ')}</p>
+                        <p className="text-sm font-medium text-stone-500">Logged in as</p>
+                        <p className="text-sm text-stone-900 font-mono mt-1">{user?.username}</p>
+                        <p className="text-xs text-stone-400 mt-1 uppercase">{user?.roles.join(', ')}</p>
                     </div>
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-200 transition-colors"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-stone-200 hover:bg-stone-100 rounded text-sm text-stone-900 transition-colors"
                     >
                         <LogOut size={16} />
                         Sign Out
@@ -99,16 +99,17 @@ export const Dashboard: React.FC = () => {
             </aside>
 
             {/* Main Content Area */}
-            <main className="flex-1 flex flex-col overflow-hidden">
-                <header className="h-16 bg-slate-800/50 border-b border-slate-700 flex items-center px-8 backdrop-blur-sm">
-                    <h2 className="text-xl font-semibold text-slate-100 capitalize">
+            <main className="flex-1 flex flex-col overflow-hidden bg-white">
+                <header className="h-16 bg-white border-b border-stone-200 flex items-center px-8 z-10 sticky top-0">
+                    <h2 className="text-xl font-semibold text-stone-900 capitalize">
                         {activeView === 'infra' ? 'Infrastructure Overviews' : activeView}
                     </h2>
                 </header>
-                <div className="flex-1 overflow-auto p-8">
+                <div className="flex-1 overflow-auto p-8 bg-white">
                     {renderView()}
                 </div>
             </main>
+
         </div>
     )
 }
