@@ -11,7 +11,9 @@ requires-python = ">=3.11"
 
 # Core dependencies - minimal for package structure
 # Full deps are in requirements-client.txt and requirements-worker.txt
-dependencies = []
+dependencies = [
+    "redis>=7.2.0",
+]
 
 [project.optional-dependencies]
 client = [
@@ -68,3 +70,9 @@ include = ["etl*", "pipelines*", "ioutils*", "transformations*", "gateway*", "ov
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.json"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+]
