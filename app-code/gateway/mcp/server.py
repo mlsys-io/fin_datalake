@@ -56,7 +56,7 @@ from gateway.core.registry import build_default_registry
 from gateway.models.user import User
 
 
-def create_mcp_server() -> Server:
+async def create_mcp_server() -> Server:
     """
     Initialize the MCP server and register all tool handlers.
 
@@ -69,7 +69,7 @@ def create_mcp_server() -> Server:
     # Resolve the MCP client's User from env API Key.
     # MCP connections are from trusted local processes; we resolve once.
     api_key = os.environ.get("GATEWAY_API_KEY", "")
-    mcp_user = _resolve_mcp_user(api_key)
+    mcp_user = await _resolve_mcp_user(api_key)
 
     # Register tool groups — each module registers its own tools on the server
     data_tools.register(server, registry, mcp_user)
@@ -79,23 +79,25 @@ def create_mcp_server() -> Server:
     return server
 
 
-def _resolve_mcp_user(api_key: str) -> User:
+async def _resolve_mcp_user(api_key: str) -> User:
     """
-    Resolve the MCP client's identity from an API Key.
+    Resolve the MCP client's identity from an API Key via DB lookup.
+    """
+    from gateway.db.session import AsyncSessionLocal
+    from gateway.db import crud
 
-    TODO: Replace stub with real DB lookup (same as REST deps._resolve_api_key).
-    """
-    # STUB — Replace with real DB lookup
-    return User(
-        username="mcp_client",
-        hashed_password="",
-        role_names=["Analyst"],
-    )
+    # Run the database resolution just like deps.py
+    async with AsyncSessionLocal() as db:
+        user = await crud.resolve_api_key(db, api_key)
+        
+    if not user:
+        raise ValueError("Invalid GATEWAY_API_KEY. Authentication failed.")
+    return user
 
 
 async def main():
     """Entry point for running the MCP server over stdio."""
-    server = create_mcp_server()
+    server = await create_mcp_server()
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
 

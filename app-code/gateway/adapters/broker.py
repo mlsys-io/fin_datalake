@@ -33,7 +33,7 @@ class BrokerAdapter(BaseAdapter):
     def handles(self) -> str:
         return "broker"
 
-    def execute(self, user: User, intent: UserIntent) -> Any:
+    async def execute(self, user: User, intent: UserIntent) -> Any:
         dispatch = {
             "get_s3_creds": self._get_s3_creds,
             "get_psql_string": self._get_psql_string,

@@ -63,7 +63,7 @@ class BaseAdapter(ABC):
         pass
 
     @abstractmethod
-    def execute(self, user: User, intent: UserIntent) -> Any:
+    async def execute(self, user: User, intent: UserIntent) -> Any:
         """
         Execute the intent against the adapter's subsystem.
 

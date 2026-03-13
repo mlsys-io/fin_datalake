@@ -67,7 +67,7 @@ class InterfaceRegistry:
         logger.info("Registered adapter '%s' for domain '%s'", type(adapter).__name__, domain)
         return self
 
-    def route(self, user: User, intent: UserIntent) -> Any:
+    async def route(self, user: User, intent: UserIntent) -> Any:
         """
         Route an intent to the appropriate adapter and execute it.
 
@@ -88,7 +88,7 @@ class InterfaceRegistry:
             )
 
         try:
-            result = adapter.execute(user, intent)
+            result = await adapter.execute(user, intent)
             logger.debug("Intent executed | domain=%s | action=%s", intent.domain, intent.action)
             return result
         except (PermissionError, ActionNotFoundError):
@@ -121,11 +121,12 @@ def build_default_registry() -> InterfaceRegistry:
     from gateway.adapters.compute import ComputeAdapter
     from gateway.adapters.agent import AgentAdapter
     from gateway.adapters.broker import BrokerAdapter
+    from gateway.adapters.system import SystemAdapter
 
     registry = InterfaceRegistry()
     registry.register(DataAdapter())
     registry.register(ComputeAdapter())
     registry.register(AgentAdapter())
     registry.register(BrokerAdapter())
-
+    registry.register(SystemAdapter())
     return registry

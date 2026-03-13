@@ -26,18 +26,51 @@ class SystemAdapter(BaseAdapter):
     def handles(self) -> str:
         return "system"
 
-    def execute(self, user: User, intent: UserIntent) -> Any:
-        dispatch = {
-            "logs": self._query_logs,
-            "health": self._get_health,
-        }
-        handler = dispatch.get(intent.action)
-        if handler is None:
-            raise ActionNotFoundError(
-                f"SystemAdapter does not support action '{intent.action}'. "
-                f"Available: {list(dispatch.keys())}"
-            )
-        return handler(user, intent)
+    async def execute(self, user: User, intent: UserIntent) -> Any:
+        self._require_permission(user, Permission.SYSTEM_ADMIN)
+
+        if intent.action == "logs":
+            return self._query_logs(user, intent)
+        elif intent.action == "health":
+            return await self._get_health_async(user, intent)
+        
+        raise ActionNotFoundError(f"SystemAdapter action '{intent.action}' unknown.")
+
+    async def _get_health_async(self, user: User, intent: UserIntent) -> dict:
+        """Get system health summary (async)."""
+        self._require_permission(user, Permission.SYSTEM_READ)
+        from redis.asyncio import Redis
+        import json
+        import os
+
+        # Try to get health from Redis (written by Overseer MetricsStore)
+        try:
+            redis_url = os.environ.get("OVERSEER_REDIS_URL", "redis://:redis-lakehouse-pass@localhost:6379/0")
+            r = Redis.from_url(redis_url, decode_responses=True)
+            async with r:
+                snapshot_data = await r.lindex("overseer:snapshots", 0)
+            
+                if snapshot_data:
+                    snap = json.loads(snapshot_data)
+                    
+                    summary = {}
+                    all_healthy = True
+                    for name, metrics in snap.get("services", {}).items():
+                        summary[name] = {
+                            "healthy": metrics.get("healthy", False),
+                            "error": metrics.get("error", None)
+                        }
+                        if not metrics.get("healthy", False):
+                            all_healthy = False
+                    
+                    return {
+                        "source": "redis (overseer)",
+                        "status": "healthy" if all_healthy else "degraded",
+                        "components": summary,
+                        "timestamp": snap.get("timestamp")
+                    }
+        except Exception as e:
+            logger.warning("Redis health fetch failed: %s", e)
 
     def _query_logs(self, user: User, intent: UserIntent) -> dict:
         """
@@ -116,13 +149,36 @@ class SystemAdapter(BaseAdapter):
         """Get system health summary."""
         self._require_permission(user, Permission.SYSTEM_READ)
 
-        # Try to get health from Overseer's MetricsStore if available
+        # Try to get health from Redis (written by Overseer MetricsStore)
         try:
-            from overseer.store import MetricsStore
-            # The Overseer instance would need to be accessible —
-            # for now, return a basic health query from recent logs
-            pass
-        except ImportError:
+            import redis
+            import json
+            redis_url = os.environ.get("OVERSEER_REDIS_URL", "redis://:redis-lakehouse-pass@localhost:6379/0")
+            client = redis.from_url(redis_url, decode_responses=True)
+            snapshot_data = client.lindex("overseer:snapshots", 0)
+            client.close()
+            
+            if snapshot_data:
+                snap = json.loads(snapshot_data)
+                
+                summary = {}
+                all_healthy = True
+                for name, metrics in snap.get("services", {}).items():
+                    summary[name] = {
+                        "healthy": metrics.get("healthy", False),
+                        "error": metrics.get("error", None)
+                    }
+                    if not metrics.get("healthy", False):
+                        all_healthy = False
+                
+                return {
+                    "source": "redis (overseer)",
+                    "status": "healthy" if all_healthy else "degraded",
+                    "components": summary,
+                    "timestamp": snap.get("timestamp")
+                }
+        except Exception as e:
+            # Fallback to TimescaleDB
             pass
 
         # Fallback: check recent error counts per component

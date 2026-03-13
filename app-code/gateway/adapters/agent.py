@@ -25,7 +25,11 @@ class AgentAdapter(BaseAdapter):
     def handles(self) -> str:
         return "agent"
 
-    def execute(self, user: User, intent: UserIntent) -> Any:
+    async def execute(self, user: User, intent: UserIntent) -> Any:
+        self._require_permission(user, Permission.AGENT_EXECUTE)
+        import asyncio
+        loop = asyncio.get_event_loop()
+        
         dispatch = {
             "chat": self._chat,
             "notify": self._notify,
@@ -37,7 +41,9 @@ class AgentAdapter(BaseAdapter):
                 f"AgentAdapter does not support action '{intent.action}'. "
                 f"Available: {list(dispatch.keys())}"
             )
-        return handler(user, intent)
+        
+        # Ray calls like .get() are blocking; wrap in executor to not block FastAPI
+        return await loop.run_in_executor(None, lambda: handler(user, intent))
 
     def _chat(self, user: User, intent: UserIntent) -> dict:
         """Synchronous ask/response to a named Agent via AgentHub."""

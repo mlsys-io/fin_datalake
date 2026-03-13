@@ -27,6 +27,9 @@ from gateway.core.registry import InterfaceRegistry, DomainNotFoundError
 from gateway.models.intent import UserIntent
 from gateway.models.user import User
 
+import os
+from redis.asyncio import Redis
+
 router = APIRouter()
 
 
@@ -81,7 +84,7 @@ class IntentRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.post("/intent", summary="Execute a UserIntent against the Gateway")
-def execute_intent(
+async def execute_intent(
     body: IntentRequest,
     user: User = Depends(get_current_user),
     registry: InterfaceRegistry = Depends(get_registry),
@@ -105,8 +108,28 @@ def execute_intent(
         role=user.role_names[0] if user.role_names else "analyst",
     )
 
+    # -----------------------------------------------------------------------
+    # Circuit Breaker Check
+    # -----------------------------------------------------------------------
+    if intent.domain != "system":
+        redis_url = os.environ.get("OVERSEER_REDIS_URL", "redis://:redis-lakehouse-pass@localhost:6379/0")
+        r = Redis.from_url(redis_url, decode_responses=True)
+        try:
+            async with r:
+                is_open = await r.get("gateway:circuit_breaker")
+                if is_open == "open":
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="System is in maintenance mode — backpressure active."
+                    )
+        except HTTPException:
+            raise
+        except Exception:
+            # If Redis is down, we fail-open for reliability
+            pass
+
     try:
-        return registry.route(user, intent)
+        return await registry.route(user, intent)
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except DomainNotFoundError as e:
