@@ -31,18 +31,20 @@ class BaseCollector(ABC):
         """Probe the service and return structured metrics."""
         ...
 
-    async def is_healthy(self) -> bool:
+    async def is_healthy(self) -> tuple[bool, str | None]:
         """
         Quick liveness check via HTTP health endpoint.
 
-        Override this for non-HTTP services (e.g. Kafka binary protocol).
+        Returns (True, None) if healthy, or (False, error_message) if not.
         """
         if not self.endpoint.health_path:
-            return True  # No health endpoint configured — assume healthy
+            return True, None
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 url = f"http://{self.endpoint.host}:{self.endpoint.port}{self.endpoint.health_path}"
                 r = await client.get(url)
-                return r.status_code < 400
-        except Exception:
-            return False
+                if r.status_code >= 400:
+                    return False, f"HTTP {r.status_code}"
+                return True, None
+        except Exception as e:
+            return False, str(e)

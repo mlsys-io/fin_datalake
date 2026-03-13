@@ -72,6 +72,7 @@ class ActionType(str, Enum):
     SCALE_DOWN = "scale_down"
     RESPAWN = "respawn"
     ALERT = "alert"
+    CIRCUIT_BREAK = "circuit_break"
 
 
 @dataclass

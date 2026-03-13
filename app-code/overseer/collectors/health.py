@@ -14,10 +14,10 @@ from overseer.models import ServiceMetrics
 class GenericHealthCollector(BaseCollector):
 
     async def collect(self) -> ServiceMetrics:
-        healthy = await self.is_healthy()
+        healthy, error_msg = await self.is_healthy()
         return ServiceMetrics(
             service=self.endpoint.name,
             healthy=healthy,
             data={"check": "http_health", "endpoint": self.endpoint.health_path or "none"},
-            error=None if healthy else f"{self.endpoint.name} health check failed",
+            error=error_msg if not healthy else None,
         )

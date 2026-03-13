@@ -28,7 +28,8 @@ from overseer.models import (
 )
 from overseer.policies import ActorHealthPolicy, KafkaLagPolicy
 from overseer.policies.base import BasePolicy
-from overseer.actuators import AlertActuator, RayActuator
+from overseer.policies.cooldown import CooldownTracker
+from overseer.actuators import AlertActuator, RayActuator, GatewayActuator
 from overseer.actuators import BaseActuator
 from overseer.store import MetricsStore
 
@@ -41,6 +42,12 @@ _COLLECTOR_REGISTRY: dict[str, type[BaseCollector]] = {
     "ray": RayCollector,
     "kafka": KafkaCollector,
     "prefect": PrefectCollector,
+}
+
+
+_POLICY_REGISTRY: dict[str, type[BasePolicy]] = {
+    "kafka_lag": KafkaLagPolicy,
+    "actor_health": ActorHealthPolicy,
 }
 
 
@@ -78,20 +85,27 @@ class Overseer:
         self.store = MetricsStore(
             max_snapshots=overseer_cfg.get("metrics_history_size", 200),
         )
+        self.cooldown = CooldownTracker(
+            cooldown_seconds=overseer_cfg.get("cooldown_seconds", 120)
+        )
 
         # Build collectors from config
         self.collectors = [build_collector(ep) for ep in endpoints]
 
-        # Policies (can be made configurable later)
-        self.policies: list[BasePolicy] = [
-            KafkaLagPolicy(),
-            ActorHealthPolicy(),
-        ]
+        # Policies (Configurable)
+        policy_names = overseer_cfg.get("policies", ["kafka_lag", "actor_health"])
+        self.policies = []
+        for name in policy_names:
+            if name in _POLICY_REGISTRY:
+                self.policies.append(_POLICY_REGISTRY[name]())
+            else:
+                logger.warning(f"Policy '{name}' not found in registry. Skipping.")
 
         # Actuators
         self.actuators: dict[str, BaseActuator] = {
             "ray": RayActuator(),
             "alert": AlertActuator(),
+            "gateway": GatewayActuator(),
         }
 
         logger.info(
@@ -123,7 +137,7 @@ class Overseer:
                 else:
                     snapshot.services[name] = result
 
-            self.store.append_snapshot(snapshot)
+            await self.store.append_snapshot(snapshot)
 
             # Log health status
             for name, metrics in snapshot.services.items():
@@ -145,8 +159,13 @@ class Overseer:
 
             # 3. EXECUTE — perform actions
             for action in actions:
+                # Cooldown check
+                if not self.cooldown.can_fire(action.type.value, action.target):
+                    logger.info(f"  ⏳ Skipping {action.type.value} — cooldown active")
+                    continue
+
                 logger.info(f"  🔧 Executing: {action.type.value} — {action.reason}")
-                self.store.append_alert(action)
+                await self.store.append_alert(action)
 
                 # Every action also goes through the AlertActuator for logging
                 await self.actuators["alert"].execute(action)
@@ -154,9 +173,20 @@ class Overseer:
                 # Route to the appropriate actuator
                 actuator = self.actuators.get(action.target)
                 if actuator and action.target != "alert":
-                    result = await actuator.execute(action)
-                    if not result.success:
-                        logger.error(f"  Actuator failed: {result.error}")
+                    try:
+                        # Prevent rogue actuators from starving the Overseer loop
+                        result = await asyncio.wait_for(
+                            actuator.execute(action), 
+                            timeout=30.0
+                        )
+                        if result.success:
+                            self.cooldown.record(action.type.value, action.target)
+                        else:
+                            logger.error(f"  Actuator failed: {result.error}")
+                    except asyncio.TimeoutError:
+                        logger.error(f"  Actuator {action.target} timed out after 30s.")
+                    except Exception as e:
+                        logger.error(f"  Actuator {action.target} crashed: {e}")
 
             await asyncio.sleep(self.loop_interval)
 

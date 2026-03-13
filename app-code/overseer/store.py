@@ -7,49 +7,76 @@ to the React dashboard without needing an external database.
 
 from __future__ import annotations
 
-import threading
-from collections import deque
+import json
+import os
 from typing import Optional
+import redis.asyncio as redis
 
-from overseer.models import OverseerAction, SystemSnapshot
+from overseer.models import OverseerAction, SystemSnapshot, ServiceMetrics
 
 
 class MetricsStore:
     """
-    Thread-safe rolling window of SystemSnapshots and OverseerActions.
+    Redis-backed rolling window of SystemSnapshots and OverseerActions.
 
     Used by:
       - The Overseer loop (write)
       - The Gateway 'system' adapter (read)
+      
+    This decoupling allows Gateway and Overseer to run in separate pods.
     """
 
     def __init__(self, max_snapshots: int = 200, max_alerts: int = 100):
-        self._snapshots: deque[SystemSnapshot] = deque(maxlen=max_snapshots)
-        self._alerts: deque[dict] = deque(maxlen=max_alerts)
-        self._lock = threading.Lock()
+        self.max_snapshots = max_snapshots
+        self.max_alerts = max_alerts
+        redis_url = os.getenv("OVERSEER_REDIS_URL", "redis://:redis-lakehouse-pass@localhost:6379/0")
+        self.redis = redis.from_url(redis_url, decode_responses=True)
+        self._snapshot_key = "overseer:snapshots"
+        self._alert_key = "overseer:alerts"
 
-    def append_snapshot(self, snapshot: SystemSnapshot) -> None:
-        with self._lock:
-            self._snapshots.append(snapshot)
+    async def append_snapshot(self, snapshot: SystemSnapshot) -> None:
+        """Serialize the snapshot and push to the Redis list, keeping only the latest N."""
+        import dataclasses
+        data = json.dumps(dataclasses.asdict(snapshot))
+        
+        async with self.redis.pipeline(transaction=True) as pipe:
+            pipe.lpush(self._snapshot_key, data)
+            pipe.ltrim(self._snapshot_key, 0, self.max_snapshots - 1)
+            await pipe.execute()
 
-    def append_alert(self, action: OverseerAction) -> None:
-        with self._lock:
-            self._alerts.append(action.to_alert())
+    async def append_alert(self, action: OverseerAction) -> None:
+        """Push a serialized alert to Redis."""
+        data = json.dumps(action.to_alert())
+        async with self.redis.pipeline(transaction=True) as pipe:
+            pipe.lpush(self._alert_key, data)
+            pipe.ltrim(self._alert_key, 0, self.max_alerts - 1)
+            await pipe.execute()
 
-    def latest(self) -> Optional[SystemSnapshot]:
-        with self._lock:
-            return self._snapshots[-1] if self._snapshots else None
+    async def latest(self) -> Optional[SystemSnapshot]:
+        """Fetch the most recent snapshot."""
+        data = await self.redis.lindex(self._snapshot_key, 0)
+        if data:
+            raw = json.loads(data)
+            if "services" in raw:
+                raw["services"] = {k: ServiceMetrics(**v) for k, v in raw["services"].items()}
+            return SystemSnapshot(**raw)
+        return None
 
-    def recent_alerts(self, n: int = 20) -> list[dict]:
-        with self._lock:
-            return list(self._alerts)[-n:]
+    async def recent_alerts(self, n: int = 20) -> list[dict]:
+        """Fetch the recent alerts."""
+        items = await self.redis.lrange(self._alert_key, 0, n - 1)
+        return [json.loads(item) for item in items]
 
-    def history(self, n: int = 50) -> list[dict]:
+    async def history(self, n: int = 50) -> list[dict]:
         """Return the last N snapshots as serializable dicts for the dashboard."""
-        with self._lock:
-            snapshots = list(self._snapshots)[-n:]
+        items = await self.redis.lrange(self._snapshot_key, 0, n - 1)
         result = []
-        for snap in snapshots:
+        # Redis lrange returns newest first, we want chronological (oldest first)
+        for data in reversed(items):
+            raw = json.loads(data)
+            if "services" in raw:
+                raw["services"] = {k: ServiceMetrics(**v) for k, v in raw["services"].items()}
+            snap = SystemSnapshot(**raw)
             entry = {"timestamp": snap.timestamp, "services": {}}
             for svc_name, metrics in snap.services.items():
                 entry["services"][svc_name] = {
@@ -60,9 +87,9 @@ class MetricsStore:
             result.append(entry)
         return result
 
-    def get_health_summary(self) -> dict:
+    async def get_health_summary(self) -> dict:
         """Quick health overview for the dashboard header cards."""
-        snap = self.latest()
+        snap = await self.latest()
         if not snap:
             return {"status": "unknown", "services": {}}
         summary = {}
