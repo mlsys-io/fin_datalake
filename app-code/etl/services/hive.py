@@ -121,6 +121,36 @@ class HiveClient(DependencyAwareMixin):
         # Register
         self._create_table(db_name, table_name, location, schema, partition_keys, table_properties)
 
+    def get_all_tables(self, db_name: str = "default") -> List[Dict[str, str]]:
+        """
+        Returns a list of all tables in a database with their names and S3 paths.
+        """
+        self._connect()
+        try:
+            table_names = self._client.get_all_tables(db_name)
+            results = []
+            for name in table_names:
+                try:
+                    table = self._client.get_table(db_name, name)
+                    # Normalize s3a -> s3 for the Gateway's consumption
+                    location = table.sd.location
+                    if location.startswith("s3a://"):
+                        location = location.replace("s3a://", "s3://", 1)
+                    results.append({"name": name, "path": location})
+                except Exception as e:
+                    print(f"[HiveClient] Failed to get metadata for table {name}: {e}")
+            return results
+        except Exception as e:
+            print(f"[HiveClient] Failed to list tables in db {db_name}: {e}")
+            raise
+
+    def get_table(self, db_name: str, table_name: str) -> Any:
+        """
+        Returns the raw Hive Table object.
+        """
+        self._connect()
+        return self._client.get_table(db_name, table_name)
+
     def _create_database(self, db_name: str):
         HMS = self._HMS
         db = HMS.Database(
