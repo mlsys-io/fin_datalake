@@ -182,6 +182,9 @@ export PREFECT_API_URL=http://${NODE_IP}:${PREFECT_PORT:-30420}/api
 export RAY_ADDRESS=ray://${NODE_IP}:${RAY_CLIENT_PORT:-30282}
 export RAY_DASHBOARD_URL=http://${NODE_IP}:${RAY_DASHBOARD_PORT:-30742}
 
+# Redis (MetricsStore)
+export OVERSEER_REDIS_URL=redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/0
+
 # Data Paths
 export INPUT_PATH=/mnt/data
 EOF
@@ -208,6 +211,7 @@ data:
   HIVE_PORT: "9083"
   API_URL: "http://demo-api.${NS_DEMO}.svc:8000"
   WEBSOCKET_URL: "ws://websocket-server.${NS_DEMO}.svc:8765"
+  OVERSEER_REDIS_URL: "redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/0"
   CA_PATH: "/opt/certs/public.crt"
   SSL_CERT_FILE: "/opt/certs/public.crt"
 ---

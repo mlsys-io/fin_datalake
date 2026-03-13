@@ -1,0 +1,23 @@
+# ==============================================================================
+# Redis Helm Chart configuration (bitnami/redis)
+# For Gateway & Overseer Decoupled MetricsStore 
+# ==============================================================================
+
+# We use the standalone architecture for simplicity and lower resource usage
+architecture: standalone
+
+auth:
+  # The script will overwrite this during deployment
+  password: "redis-lakehouse-pass"
+
+master:
+  # No persistence needed; memory caching only
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"

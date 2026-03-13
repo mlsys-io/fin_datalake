@@ -210,6 +210,18 @@ deploy_milvus() {
     log_info "Port-forward: kubectl port-forward svc/milvus-milvus 19530:19530 -n $NS_DATA"
 }
 
+deploy_redis() {
+    log_step "Deploying Redis to $NS_STORAGE..."
+    
+    if [ -f "$SCRIPT_DIR/deps/redis/deploy.sh" ]; then
+        "$SCRIPT_DIR/deps/redis/deploy.sh" "redis-lakehouse-pass"
+    else
+        log_error "Redis deploy script not found at $SCRIPT_DIR/deps/redis/deploy.sh"
+    fi
+    
+    log_info "Redis deployed to $NS_STORAGE"
+}
+
 deploy_sources() {
     log_step "Deploying demo sources to $NS_SOURCES..."
     
@@ -250,6 +262,7 @@ deploy_all() {
     deploy_kuberay
     deploy_prefect
     # deploy_hive  # Requires MinIO creds - uncomment when ready
+    deploy_redis
     deploy_timescaledb
     deploy_risingwave
     deploy_milvus
@@ -283,6 +296,7 @@ case "$COMPONENT" in
     kuberay|ray) deploy_kuberay ;;
     prefect)     deploy_prefect ;;
     hive)        deploy_hive ;;
+    redis)       deploy_redis ;;
     timescaledb|tsdb) deploy_timescaledb ;;
     risingwave|rw)    deploy_risingwave ;;
     milvus)      deploy_milvus ;;
