@@ -112,11 +112,12 @@ async def execute_intent(
     # Circuit Breaker Check
     # -----------------------------------------------------------------------
     if intent.domain != "system":
-        redis_url = os.environ.get("OVERSEER_REDIS_URL", "redis://:redis-lakehouse-pass@localhost:6379/0")
-        r = Redis.from_url(redis_url, decode_responses=True)
-        try:
-            async with r:
-                is_open = await r.get("gateway:circuit_breaker")
+        from gateway.core.redis import get_redis_client
+        r = get_redis_client()
+        if r:
+            try:
+                async with r:
+                    is_open = await r.get("gateway:circuit_breaker")
                 if is_open == "open":
                     raise HTTPException(
                         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

@@ -45,8 +45,12 @@ class SystemAdapter(BaseAdapter):
 
         # Try to get health from Redis (written by Overseer MetricsStore)
         try:
-            redis_url = os.environ.get("OVERSEER_REDIS_URL", "redis://:redis-lakehouse-pass@localhost:6379/0")
-            r = Redis.from_url(redis_url, decode_responses=True)
+            from gateway.core.redis import get_redis_client
+            r = get_redis_client()
+            if not r:
+                logger.warning("Redis not configured. Health check fallback.")
+                return None
+            
             async with r:
                 snapshot_data = await r.lindex("overseer:snapshots", 0)
             
@@ -153,7 +157,9 @@ class SystemAdapter(BaseAdapter):
         try:
             import redis
             import json
-            redis_url = os.environ.get("OVERSEER_REDIS_URL", "redis://:redis-lakehouse-pass@localhost:6379/0")
+            redis_url = os.environ.get("OVERSEER_REDIS_URL")
+            if not redis_url:
+                return None
             client = redis.from_url(redis_url, decode_responses=True)
             snapshot_data = client.lindex("overseer:snapshots", 0)
             client.close()

@@ -89,6 +89,9 @@ class Config:
     RISINGWAVE_HOST: str = os.environ.get("RISINGWAVE_HOST")
     RISINGWAVE_PORT: int = int(os.environ.get("RISINGWAVE_PORT", "4566"))
     
+    # Redis
+    REDIS_URL: str = os.environ.get("OVERSEER_REDIS_URL")
+    
     # Data Paths
     INPUT_PATH: str = os.environ.get("INPUT_PATH", "/mnt/data")
     

@@ -112,12 +112,10 @@ class DataAdapter(BaseAdapter):
         from redis.asyncio import Redis
         
         # 1. Try Cache First
-        redis_url = os.environ.get("OVERSEER_REDIS_URL")
-        if not redis_url:
-             logger.warning("OVERSEER_REDIS_URL not set. Caching disabled.")
-             r = None
-        else:
-             r = Redis.from_url(redis_url, decode_responses=True)
+        from gateway.core.redis import get_redis_client
+        r = get_redis_client()
+        if not r:
+             logger.warning("Redis not configured. Caching disabled.")
         
         cache_key = "gateway:cache:tables"
         try:

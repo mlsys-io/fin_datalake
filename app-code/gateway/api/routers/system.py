@@ -37,10 +37,10 @@ async def set_circuit_breaker(
     ttl = body.ttl
     reason = body.reason
 
-    redis_url = os.environ.get("OVERSEER_REDIS_URL")
-    if not redis_url:
-        raise HTTPException(status_code=500, detail="OVERSEER_REDIS_URL not configured")
-    r = Redis.from_url(redis_url, decode_responses=True)
+    from gateway.core.redis import get_redis_client
+    r = get_redis_client()
+    if not r:
+        raise HTTPException(status_code=500, detail="Redis not configured")
     
     async with r:
         if state == "open":
