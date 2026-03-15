@@ -67,26 +67,26 @@ class Config:
     DELTA_ROOT: str = os.environ.get("DELTA_ROOT", "s3://delta-lake/bronze")
     
     # TimescaleDB
-    TSDB_HOST: str = os.environ.get("TSDB_HOST", "localhost")
+    TSDB_HOST: str = os.environ.get("TSDB_HOST")
     TSDB_PORT: int = int(os.environ.get("TSDB_PORT", "5432"))
     TSDB_USER: str = os.environ.get("TSDB_USER", "app")
     TSDB_PASSWORD: str = os.environ.get("TSDB_PASSWORD", "")
     TSDB_DATABASE: str = os.environ.get("TSDB_DATABASE", "app")
     
     # Kafka
-    KAFKA_BOOTSTRAP_SERVERS: str = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+    KAFKA_BOOTSTRAP_SERVERS: str = os.environ.get("KAFKA_BOOTSTRAP_SERVERS")
     
     # Demo Sources
-    API_URL: str = os.environ.get("API_URL", "http://localhost:8080")
-    WEBSOCKET_URL: str = os.environ.get("WEBSOCKET_URL", "ws://localhost:8876")
-    STATIC_URL: str = os.environ.get("STATIC_URL", "http://localhost:8880")
+    API_URL: str = os.environ.get("API_URL")
+    WEBSOCKET_URL: str = os.environ.get("WEBSOCKET_URL")
+    STATIC_URL: str = os.environ.get("STATIC_URL")
     
     # Hive Metastore
-    HIVE_HOST: str = os.environ.get("HIVE_HOST", "localhost")
+    HIVE_HOST: str = os.environ.get("HIVE_HOST")
     HIVE_PORT: int = int(os.environ.get("HIVE_PORT", "9083"))
     
     # RisingWave
-    RISINGWAVE_HOST: str = os.environ.get("RISINGWAVE_HOST", "localhost")
+    RISINGWAVE_HOST: str = os.environ.get("RISINGWAVE_HOST")
     RISINGWAVE_PORT: int = int(os.environ.get("RISINGWAVE_PORT", "4566"))
     
     # Data Paths

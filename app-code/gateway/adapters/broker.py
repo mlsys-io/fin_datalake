@@ -53,21 +53,21 @@ class BrokerAdapter(BaseAdapter):
         # TODO: Integrate with AWS STS AssumeRole for time-limited tokens.
         return {
             "service": "minio",
-            "endpoint_url": os.environ.get("MINIO_ENDPOINT", "https://minio.internal:9000"),
-            "access_key_id": os.environ.get("AWS_ACCESS_KEY_ID", ""),
-            "secret_access_key": os.environ.get("AWS_SECRET_ACCESS_KEY", ""),
-            "region": "us-east-1",
+            "endpoint_url": os.environ.get("MINIO_ENDPOINT"),
+            "access_key_id": os.environ.get("AWS_ACCESS_KEY_ID"),
+            "secret_access_key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
+            "region": os.environ.get("AWS_REGION", "us-east-1"),
             "note": "Use with any S3-compatible client (boto3, Cyberduck, etc.).",
         }
 
     def _get_psql_string(self, user: User, intent: UserIntent) -> dict:
         """Vend a TimescaleDB connection string. Requires broker:vend."""
         self._require_permission(user, Permission.BROKER_VEND)
-        host = os.environ.get("TIMESCALE_HOST", "timescaledb.internal")
+        host = os.environ.get("TIMESCALE_HOST")
         port = os.environ.get("TIMESCALE_PORT", "5432")
         db = os.environ.get("TIMESCALE_DB", "etl")
-        usr = os.environ.get("TIMESCALE_USER", "etl_user")
-        pw = os.environ.get("TIMESCALE_PASSWORD", "")
+        usr = os.environ.get("TIMESCALE_USER")
+        pw = os.environ.get("TIMESCALE_PASSWORD")
         return {
             "service": "timescaledb",
             "connection_string": f"postgresql://{usr}:{pw}@{host}:{port}/{db}",

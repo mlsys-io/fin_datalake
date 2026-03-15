@@ -37,7 +37,9 @@ async def set_circuit_breaker(
     ttl = body.ttl
     reason = body.reason
 
-    redis_url = os.environ.get("OVERSEER_REDIS_URL", "redis://:redis-lakehouse-pass@localhost:6379/0")
+    redis_url = os.environ.get("OVERSEER_REDIS_URL")
+    if not redis_url:
+        raise HTTPException(status_code=500, detail="OVERSEER_REDIS_URL not configured")
     r = Redis.from_url(redis_url, decode_responses=True)
     
     async with r:

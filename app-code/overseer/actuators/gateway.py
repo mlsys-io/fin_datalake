@@ -21,8 +21,11 @@ class GatewayActuator(BaseActuator):
     """
 
     async def execute(self, action: OverseerAction) -> ActionResult:
-        # Get Gateway internal URL (defaulting to the K8s service name)
-        gateway_url = os.getenv("GATEWAY_INTERNAL_URL", "http://gateway-api:8000")
+        # Get Gateway internal URL
+        gateway_url = os.getenv("GATEWAY_INTERNAL_URL")
+        if not gateway_url:
+            return ActionResult(success=False, error="GATEWAY_INTERNAL_URL not set")
+
         endpoint = f"{gateway_url}/api/v1/system/circuit-breaker"
         
         # Payload for the dedicated control endpoint
@@ -32,10 +35,14 @@ class GatewayActuator(BaseActuator):
             "reason": action.reason
         }
 
+        token = os.getenv("GATEWAY_INTERNAL_TOKEN")
+        if not token:
+            return ActionResult(success=False, error="GATEWAY_INTERNAL_TOKEN not set")
+
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 # Internal machine-to-machine authentication
-                headers = {"Authorization": "Bearer internal-overseer-token"}
+                headers = {"Authorization": f"Bearer {token}"}
                 response = await client.post(endpoint, json=payload, headers=headers)
                 
                 if response.status_code < 400:
