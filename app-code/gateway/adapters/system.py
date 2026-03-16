@@ -19,6 +19,7 @@ from typing import Any
 from gateway.core.adapters import BaseAdapter, ActionNotFoundError
 from gateway.models.intent import UserIntent
 from gateway.models.user import Permission, User
+from loguru import logger
 
 
 class SystemAdapter(BaseAdapter):

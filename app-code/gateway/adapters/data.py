@@ -21,7 +21,11 @@ from gateway.models.user import Permission, User
 import os
 import json
 import asyncio
+import concurrent.futures
 from loguru import logger
+
+# Single-threaded executor serializes all DuckDB calls — avoids thread-safety issues
+_duckdb_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
 
 class DataAdapter(BaseAdapter):
@@ -62,19 +66,23 @@ class DataAdapter(BaseAdapter):
         return await handler(intent)
 
     async def _run_sql(self, intent: UserIntent) -> dict:
-        """Execute a SQL query against Delta Lake via DuckDB."""
-        import duckdb
+        """Execute a SQL query against Delta Lake via DuckDB.
+        
+        Uses a dedicated single-threaded executor to serialize all DuckDB calls,
+        which avoids thread-safety issues with concurrent requests.
+        """
         sql = intent.parameters.get("sql")
         if not sql:
             raise ValueError("Parameter 'sql' is required.")
         
         def _execute_duckdb():
-            conn = duckdb.connect()
+            import duckdb
+            conn = duckdb.connect()  # in-memory, cheap and safe per-call
             return conn.execute(sql).fetchdf()
 
         try:
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, _execute_duckdb)
+            result = await loop.run_in_executor(_duckdb_executor, _execute_duckdb)
             return {
                 "success": True,
                 "columns": list(result.columns),
