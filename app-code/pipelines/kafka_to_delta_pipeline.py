@@ -107,7 +107,22 @@ def write_to_delta(df: Any, delta_uri: str, mode: str = "append"):
     print(f"[Delta] Wrote {len(df)} rows to {delta_uri}")
 
 
-@flow(name="Kafka to Delta Pipeline", task_runner=RayTaskRunner(address=config.RAY_ADDRESS))
+@flow(
+    name="Kafka to Delta Pipeline", 
+    task_runner=RayTaskRunner(
+        address=config.RAY_ADDRESS,
+        init_kwargs={
+            "runtime_env": {
+                "env_vars": {
+                    "AWS_ENDPOINT_URL": config.AWS_ENDPOINT_URL,
+                    "AWS_ACCESS_KEY_ID": config.AWS_ACCESS_KEY_ID,
+                    "AWS_SECRET_ACCESS_KEY": config.AWS_SECRET_ACCESS_KEY,
+                    "AWS_REGION": config.AWS_REGION,
+                }
+            }
+        }
+    )
+)
 def kafka_to_delta_flow(
     kafka_bootstrap: str = "",
     kafka_topic: str = "ohlc-events",
