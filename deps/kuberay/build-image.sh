@@ -25,7 +25,7 @@ echo "   Build context: ${PROJECT_ROOT}"
 echo "   Dockerfile: ${SCRIPT_DIR}/Dockerfile"
 
 # Build using project root as context so we can COPY app-code
-docker build -t "${FULL_IMAGE}" -f "${SCRIPT_DIR}/Dockerfile" "${PROJECT_ROOT}"
+docker build --no-cache -t "${FULL_IMAGE}" -f "${SCRIPT_DIR}/Dockerfile" "${PROJECT_ROOT}"
 
 echo ""
 echo "✅ Build complete: ${FULL_IMAGE}"

@@ -6,12 +6,12 @@ FROM rayproject/ray:latest-py312
 COPY app-code/etl /home/ray/etl
 
 # Add to Python path so 'import etl' works
-ENV PYTHONPATH="/home/ray:${PYTHONPATH}"
+ENV PYTHONPATH="/home/ray:${PYTHONPATH:-}"
 
 WORKDIR /home/ray
 
 # Install dependencies
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir -U \
     # Prefect (needed for task deserialization on workers)
     prefect>=2.14 \
     prefect-ray>=0.3 \
