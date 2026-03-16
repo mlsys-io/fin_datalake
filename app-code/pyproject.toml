@@ -13,6 +13,7 @@ requires-python = ">=3.11"
 # Full deps are in requirements-client.txt and requirements-worker.txt
 dependencies = [
     "redis>=7.2.0",
+    "numpy>=2.0.0",
 ]
 
 [project.optional-dependencies]

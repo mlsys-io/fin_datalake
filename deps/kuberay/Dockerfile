@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir \
     prefect>=2.14 \
     prefect-ray>=0.3 \
     # Data processing
+    numpy>=2.0.0 \
     pandas>=2.0 \
     pyarrow>=14.0 \
     deltalake>=0.14 \

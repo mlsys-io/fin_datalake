@@ -18,8 +18,9 @@ class HiveMetastore(DependencyAwareMixin):
     """
     REQUIRED_DEPENDENCIES = ["thrift"]
     
-    host: str = "localhost"
-    port: int = 9083
+    from etl.config import config
+    host: str = config.HIVE_HOST or "localhost"
+    port: int = config.HIVE_PORT or 9083
     default_db: str = "default"
     auth_mechanism: str = "PLAIN"
     timeout_ms: int = 60000
@@ -57,8 +58,8 @@ class HiveClient(DependencyAwareMixin):
         try:
             from thrift.transport import TSocket, TTransport
             from thrift.protocol import TBinaryProtocol
-            from ioutils.hms_client.hive_metastore import ThriftHiveMetastore as HMSvc
-            from ioutils.hms_client.hive_metastore import ttypes as HMS
+            from etl.vendor.hms.hive_metastore import ThriftHiveMetastore as HMSvc
+            from etl.vendor.hms.hive_metastore import ttypes as HMS
             
             self._TSocket = TSocket
             self._TTransport = TTransport

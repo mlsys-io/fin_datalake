@@ -2,6 +2,7 @@
 # These are the heavy data processing libraries
 
 # Core data processing
+numpy>=2.0.0
 pandas>=2.0
 pyarrow>=14.0
 deltalake>=0.14
