@@ -83,8 +83,28 @@ class DataAdapter(BaseAdapter):
         try:
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(_duckdb_executor, _execute_duckdb)
+            
+            # Elite Feature: Zero-Copy Fast-Path
+            # If requested, put the dataframe into Ray Plasma Store and return the ID.
+            prefer_ref = intent.parameters.get("prefer_ref", False)
+            if prefer_ref:
+                try:
+                    import ray
+                    if ray.is_initialized():
+                        ref = ray.put(result)
+                        return {
+                            "success": True,
+                            "mode": "zero_copy",
+                            "object_ref_id": ref.hex(),
+                            "row_count": len(result),
+                            "columns": list(result.columns)
+                        }
+                except (ImportError, Exception) as re:
+                     logger.warning(f"Zero-copy failed, falling back to JSON: {re}")
+
             return {
                 "success": True,
+                "mode": "json",
                 "columns": list(result.columns),
                 "rows": result.values.tolist(),
                 "row_count": len(result),

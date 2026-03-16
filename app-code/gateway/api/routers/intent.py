@@ -123,11 +123,11 @@ async def execute_intent(
                         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                         detail="System is in maintenance mode — backpressure active."
                     )
-        except HTTPException:
-            raise
-        except Exception:
-            # If Redis is down, we fail-open for reliability
-            pass
+            except HTTPException:
+                raise
+            except Exception:
+                # If Redis is down, we fail-open for reliability
+                pass
 
     try:
         return await registry.route(user, intent)

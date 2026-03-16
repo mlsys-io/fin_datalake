@@ -27,7 +27,8 @@ class SecProcessTask(BaseTask):
         from etl.io.sources.file import FileSource
         from etl.io.sinks.delta_lake import DeltaLakeSink
         from etl.services.hive import HiveMetastore
-        from ioutils import MAX_CONCURRENCY
+        from etl.config import config
+        MAX_CONCURRENCY = config.MAX_CONCURRENCY
         from transformations.sec_filings import transform_sec
         
         print(f"[{self.name}] Finding files matching {input_pattern}...")

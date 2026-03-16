@@ -85,6 +85,7 @@ async def get_current_user(
         - If it starts with 'etl_sk_' → treat as API Key, look up in DB.
         - Otherwise → decode as JWT, look up username.
     - Path B: HttpOnly cookie 'gateway_token' → decode as JWT.
+    - Path C: System Service Account → If token matches `GATEWAY_INTERNAL_TOKEN`.
 
     Raises HTTP 401 if no valid credential is found.
     """
@@ -93,6 +94,18 @@ async def get_current_user(
     # --- Path A: Bearer Token ---
     if credentials and credentials.credentials:
         token = credentials.credentials
+
+        # A.1: Internal Service Account (M2M) Fast-Path
+        internal_token = os.environ.get("GATEWAY_INTERNAL_TOKEN")
+        if internal_token and token == internal_token:
+            return User(
+                username="system:overseer",
+                hashed_password="[SERVICE_ACCOUNT]",
+                role_names=["Admin"],  # System identity has full administrative access
+                email="system@internal"
+            )
+
+        # A.2: External API Key or JWT
         if token.startswith("etl_sk_"):
             # API Key resolution (DB bcrypt match)
             user = await crud.resolve_api_key(db, token)

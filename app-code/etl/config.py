@@ -94,6 +94,9 @@ class Config:
     
     # Data Paths
     INPUT_PATH: str = os.environ.get("INPUT_PATH", "/mnt/data")
+
+    # Concurrency
+    MAX_CONCURRENCY: int = int(os.environ.get("MAX_CONCURRENCY", "10"))
     
     @classmethod
     def reload(cls):

@@ -29,7 +29,7 @@ from overseer.models import (
 from overseer.policies import ActorHealthPolicy, KafkaLagPolicy
 from overseer.policies.base import BasePolicy
 from overseer.policies.cooldown import CooldownTracker
-from overseer.actuators import AlertActuator, RayActuator, GatewayActuator
+from overseer.actuators import AlertActuator, RayActuator, GatewayActuator, StatusReporterActuator
 from overseer.actuators import BaseActuator
 from overseer.store import MetricsStore
 
@@ -106,6 +106,7 @@ class Overseer:
             "ray": RayActuator(),
             "alert": AlertActuator(),
             "gateway": GatewayActuator(),
+            "reporter": StatusReporterActuator(self.store),
         }
 
         logger.info(
@@ -187,6 +188,11 @@ class Overseer:
                         logger.error(f"  Actuator {action.target} timed out after 30s.")
                     except Exception as e:
                         logger.error(f"  Actuator {action.target} crashed: {e}")
+
+            # 4. REPORT — Generate living documentation
+            await self.actuators["reporter"].execute(
+                OverseerAction(type=ActionType.ALERT, target="reporter", reason="System status heartbeat")
+            )
 
             await asyncio.sleep(self.loop_interval)
 

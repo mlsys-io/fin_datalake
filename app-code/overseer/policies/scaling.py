@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from overseer.models import ActionType, OverseerAction, SystemSnapshot
 from overseer.policies.base import BasePolicy
+from overseer.agent_registry import get_default_agent_name
 
 
 class KafkaLagPolicy(BasePolicy):
@@ -17,13 +18,13 @@ class KafkaLagPolicy(BasePolicy):
         self,
         scale_up_threshold: int = 500,
         scale_down_idle_threshold: int = 0,
-        agent_class: str = "SentimentAgent",
+        agent_class: str | None = None,
         scale_up_count: int = 2,
         scale_down_count: int = 1,
     ):
         self.scale_up_threshold = scale_up_threshold
         self.scale_down_idle_threshold = scale_down_idle_threshold
-        self.agent_class = agent_class
+        self.agent_class = agent_class or get_default_agent_name()
         self.scale_up_count = scale_up_count
         self.scale_down_count = scale_down_count
 

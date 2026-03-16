@@ -28,7 +28,8 @@ class NewsProcessTask(BaseTask):
         from etl.io.sources.file import FileSource
         from etl.io.sinks.delta_lake import DeltaLakeSink
         from etl.services.hive import HiveMetastore
-        from ioutils import MAX_CONCURRENCY
+        from etl.config import config
+        MAX_CONCURRENCY = config.MAX_CONCURRENCY
         from transformations.news import transform_news
         
         print(f"[{self.name}] Finding files...")

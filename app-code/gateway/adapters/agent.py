@@ -26,7 +26,6 @@ class AgentAdapter(BaseAdapter):
         return "agent"
 
     async def execute(self, user: User, intent: UserIntent) -> Any:
-        self._require_permission(user, Permission.AGENT_EXECUTE)
         import asyncio
         loop = asyncio.get_event_loop()
         

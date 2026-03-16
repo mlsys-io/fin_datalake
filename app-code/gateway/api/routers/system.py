@@ -29,9 +29,11 @@ async def set_circuit_breaker(
     Requires SYSTEM_ADMIN permission.
     """
     # Authorization check
-    if not any(role.name == "admin" for role in user.roles): # Simple check for now
-         # In a real system, we'd use Permission.SYSTEM_ADMIN check against user.role_names
-         pass
+    if not user.has_permission(Permission.SYSTEM_ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: SYSTEM_ADMIN permission required.",
+        )
 
     state = body.state.lower()
     ttl = body.ttl
