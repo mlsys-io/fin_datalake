@@ -6,7 +6,7 @@ FROM rayproject/ray:latest-py312
 COPY app-code/etl /home/ray/etl
 
 # Add to Python path so 'import etl' works
-ENV PYTHONPATH="/home/ray:${PYTHONPATH:-}"
+ENV PYTHONPATH="/home/ray"
 
 WORKDIR /home/ray
 
@@ -16,9 +16,9 @@ RUN pip install --no-cache-dir -U \
     prefect>=2.14 \
     prefect-ray>=0.3 \
     # Data processing
-    numpy>=2.0.0 \
-    pandas>=2.0,<3.0.0 \
-    pyarrow>=14.0 \
+    "numpy>=2.0.0" \
+    "pandas>=2.0,<3.0.0" \
+    "pyarrow>=14.0" \
     deltalake>=0.14 \
     # Utilities
     loguru>=0.7 \
