@@ -96,19 +96,11 @@ class DeltaLakeWriter(DataWriter):
         logger.info(f"[DeltaLake] Writing Ray Dataset to {self.sink.uri} (Distributed)...")
         
         try:
-            ds.write_deltalake(
-                self.sink.uri,
-                mode=self.sink.mode,
-                storage_options=self._storage_options,
-            )
+            self._write_ray_dataset(ds)
             logger.success(f"[DeltaLake] ✅ Successfully wrote dataset to {self.sink.uri}")
         except Exception as e:
             logger.error(f"[DeltaLake] Failed to write Ray Dataset: {e}")
             raise
-
-        # Hive Registration
-        if self.sink.hive_config and self.sink.hive_table_name:
-            self._register_in_hive(ds.schema())
 
     def write_batch(self, data: Union[Any, Any, Any]):
         """
