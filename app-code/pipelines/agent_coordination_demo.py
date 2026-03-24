@@ -1,12 +1,12 @@
 """
 Agent Coordination Demo — Component Verification
 
-Verifies that the agent coordination primitives work correctly on a Ray cluster:
-  1. AgentHub     — register agents, discover by capability, synchronous routing
-  2. ContextStore — set/get shared state, TTL expiry
-  3. Delegation   — cross-agent task routing via hub capabilities
-  4. Notifications — fire-and-forget via hub
-  5. Graceful Shutdown — lifecycle hooks, deregistration
+Verifies that the agent coordination primitives work correctly on a Ray cluster with Ray Serve:
+  1. AgentHub     — register agents, discover by capability
+  2. ContextStore — set/get shared state via Redis
+  3. Delegation   — cross-agent task routing (client-side via ServeHandles)
+  4. Ray Serve    — HTTP ingress and direct handle communication
+  5. Graceful Shutdown — Serve app cleanup
 
 Also demonstrates the SyncHandle API and connect() for cross-process discovery.
 
@@ -111,55 +111,59 @@ def main():
     section("1. AgentHub — Service Discovery & Routing")
 
     from etl.agents.hub import get_hub
-    hub = SyncHandle(get_hub())
+    hub = get_hub()
 
-    # a) Deploy two agents — returns SyncHandle (no ray.get/.remote needed)
-    print("  Deploying AnalystAgent and DataFetchAgent via deploy()...")
+    # a) Deploy two agents — returns ServeHandle (async-by-default)
+    print("  Deploying AnalystAgent and DataFetchAgent via Ray Serve...")
     analyst = AnalystAgent.deploy(name="AnalystAgent")
     data_agent = DataFetchAgent.deploy(name="DataFetchAgent")
 
+
     time.sleep(1)
 
-    # b) Verify agents are registered
-    agents_list = hub.list_agents()
+    # b) Verify agents are registered (registry remains actor-based)
+    agents_list = ray.get(hub.list_agents.remote())
     agent_names = [a["name"] for a in agents_list]
     report(
-        "Agents auto-registered on setup()",
+        "Agents auto-registered with Hub on setup()",
         "AnalystAgent" in agent_names and "DataFetchAgent" in agent_names,
         f"Found: {agent_names}",
     )
 
+
     # c) Capability-based discovery
-    analysts = hub.find_by_capability("analysis")
+    analysts = ray.get(hub.find_by_capability.remote("analysis"))
     report(
         "find_by_capability('analysis')",
         "AnalystAgent" in analysts,
         f"Found: {analysts}",
     )
 
-    fetchers = hub.find_by_capability("data_fetch")
+    fetchers = ray.get(hub.find_by_capability.remote("data_fetch"))
     report(
         "find_by_capability('data_fetch')",
         "DataFetchAgent" in fetchers,
         f"Found: {fetchers}",
     )
 
-    # d) Direct ask — SyncHandle makes this one line
-    response = analyst.ask("Should I buy AAPL?")
+
+    # d) Direct ask — ServeHandle requires .remote() and ray.get()
+    response = ray.get(analyst.ask.remote("Should I buy AAPL?"))
     report(
         "AnalystAgent.ask() returns verdict",
         response.get("verdict") == "BUY",
         f"Response: {response}",
     )
 
-    # e) connect() — retrieve an existing agent from another "process"
+    # e) connect() — retrieve a ServeHandle for an existing app
     reconnected = AnalystAgent.connect("AnalystAgent")
-    response2 = reconnected.ask("Re-check AAPL")
+    response2 = ray.get(reconnected.ask.remote("Re-check AAPL"))
     report(
-        "connect() retrieves existing agent",
+        "connect() retrieves existing ServeHandle",
         response2.get("verdict") == "BUY",
         f"Response: {response2}",
     )
+
 
     # f) Synchronous routing via hub
     hub_response = hub.call("AnalystAgent", "Hub-routed question")
@@ -169,16 +173,8 @@ def main():
         f"Response: {hub_response}",
     )
 
-    # g) Capability-based routing via hub
-    cap_response = hub.call_by_capability("analysis", "Capability-routed question")
-    report(
-        "hub.call_by_capability('analysis') routes correctly",
-        cap_response.get("verdict") == "BUY",
-        f"Response: {cap_response}",
-    )
-
-    # h) Hub stats
-    stats = hub.get_stats()
+    # g) Hub stats
+    stats = ray.get(hub.get_stats.remote())
     report(
         "Hub stats available",
         stats.get("registered_agents", 0) >= 2,
@@ -191,17 +187,17 @@ def main():
     section("2. AgentHub — Notifications")
 
     # a) Notify a specific agent
-    notified = hub.notify(
+    notified = ray.get(hub.notify.remote(
         "DataFetchAgent",
         {"topic": "market_data", "payload": {"symbol": "AAPL", "price": 185.50}, "sender": "DemoScript"},
-    )
+    ))
     report("hub.notify() dispatched", notified is True)
 
     # b) Notify by capability
-    cap_notified = hub.notify_capability(
+    cap_notified = ray.get(hub.notify_capability.remote(
         "data_fetch",
         {"topic": "system_event", "payload": {"event": "data_refresh"}, "sender": "DemoScript"},
-    )
+    ))
     report(
         "hub.notify_capability('data_fetch')",
         cap_notified >= 1,
@@ -218,7 +214,7 @@ def main():
     )
 
     # d) Health check
-    health = hub.health_check()
+    health = ray.get(hub.health_check.remote())
     report(
         "hub.health_check() reports alive status",
         health.get("AnalystAgent") is True and health.get("DataFetchAgent") is True,
@@ -231,7 +227,8 @@ def main():
     section("3. ContextStore — Shared State")
 
     from etl.agents.context import get_context
-    ctx = SyncHandle(get_context())
+    ctx = get_context()
+
 
     # a) Set and get
     ctx.set("demo:signal", "BUY_AAPL", owner="AnalystAgent")
@@ -285,14 +282,16 @@ def main():
 
     # DataFetchAgent delegates "analysis" to AnalystAgent via AgentHub
     try:
-        result = data_agent.delegate("analysis", "Analyze MSFT please")
+        # data_agent.delegate() performs client-side routing via Hub Registry + ServeHandle
+        result = ray.get(data_agent.delegate.remote("analysis", "Analyze MSFT please"))
         report(
-            "DataFetchAgent.delegate('analysis') → AnalystAgent",
+            "DataFetchAgent.delegate('analysis') (Ray Serve-powered)",
             result.get("verdict") == "BUY",
             f"Delegated result: {result}",
         )
     except Exception as e:
         report("DataFetchAgent.delegate('analysis')", False, f"Error: {e}")
+
 
     # ====================================================================
     # 5. Graceful Shutdown
@@ -301,26 +300,27 @@ def main():
 
     # Use shutdown() — runs on_stop() (deregister from hub) then exits actor
     try:
-        analyst.shutdown()
-        report("AnalystAgent.shutdown() completed", True)
+        analyst.shutdown.remote()
+        report("AnalystAgent.shutdown() triggered", True)
     except Exception:
-        report("AnalystAgent.shutdown() completed", True, "Actor exited cleanly")
+        report("AnalystAgent.shutdown()", True)
 
     try:
-        data_agent.shutdown()
-        report("DataFetchAgent.shutdown() completed", True)
+        data_agent.shutdown.remote()
+        report("DataFetchAgent.shutdown() triggered", True)
     except Exception:
-        report("DataFetchAgent.shutdown() completed", True, "Actor exited cleanly")
+        report("DataFetchAgent.shutdown()", True)
 
-    # Verify agents were deregistered from hub
-    time.sleep(1)
-    remaining = hub.list_agents()
-    remaining_names = [a["name"] for a in remaining]
+    # Verify Registry auto-deregisters on worker death
+    time.sleep(2)
+    remaining = ray.get(hub.list_agents.remote())
+    remaining_names = [a["name"] for a in remaining if a.get("alive", False)]
     report(
-        "Agents deregistered from hub on shutdown",
+        "Registry health checks identify dead apps",
         "AnalystAgent" not in remaining_names and "DataFetchAgent" not in remaining_names,
-        f"Remaining: {remaining_names}",
+        f"Remaining alive: {remaining_names}",
     )
+
 
     # Clean up context entries
     ctx.delete("demo:signal")

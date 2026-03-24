@@ -1,197 +1,130 @@
 """
 Shared Context Store for agent collaboration.
-Enables agents to share state and coordinate on tasks.
+Backed by Redis for horizontal scalability and high throughput.
 """
 from typing import Dict, Any, Optional
-from dataclasses import dataclass, field
+import json
 from datetime import datetime, timedelta
-import ray
+import redis
+import os
 
-
-@dataclass
-class ContextEntry:
-    """Wrapper for context entries with TTL support."""
-    value: Any
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    expires_at: Optional[datetime] = None
-    owner: Optional[str] = None
-
-
-@ray.remote
 class ContextStore:
     """
-    Shared memory store for agent collaboration.
+    Redis-backed wrapper for agent collaboration.
     
     Enables agents to share context, state, and intermediate results.
-    Supports TTL for automatic cleanup.
-    
-    Usage:
-        context = ContextStore.remote()
-        
-        # Store context
-        ray.get(context.set.remote("research_result", data, ttl=3600))
-        
-        # Retrieve context
-        result = ray.get(context.get.remote("research_result"))
+    Supports TTL natively via Redis.
     """
     
-    def __init__(self):
+    def __init__(self, redis_url: str = None):
         from etl.utils.logging import setup_logging
         from loguru import logger
-
+        
         setup_logging(component="context")
-
-        self._store: Dict[str, ContextEntry] = {}
-        self._write_count: int = 0
-        logger.info("ContextStore initialized")
+        
+        url = redis_url or os.getenv("OVERSEER_REDIS_URL", "redis://localhost:6379/0")
+        self._client = redis.Redis.from_url(url, decode_responses=True)
+        logger.info(f"ContextStore initialized with Redis: {url}")
     
-    def set(self, key: str, value: Any, ttl: int = None, owner: str = None) -> bool:
-        """
-        Store a value in the context.
+    def set(self, key: str, value: Any, ttl: Optional[int] = None, owner: Optional[str] = None) -> bool:
+        """Store a value in the context (Atomic)."""
+        payload = json.dumps(value)
         
-        Args:
-            key: Context key
-            value: Value to store
-            ttl: Time-to-live in seconds (None = no expiry)
-            owner: Name of the agent that set this value
+        if ttl is not None:
+            ttl = int(ttl)
             
-        Returns:
-            True if stored successfully
-        """
-        expires_at = None
+        pipeline = self._client.pipeline()
+        pipeline.set(key, payload, ex=ttl)
+        
+        meta = {
+            "created_at": datetime.utcnow().isoformat(),
+            "owner": owner
+        }
         if ttl:
-            expires_at = datetime.utcnow() + timedelta(seconds=ttl)
-        
-        self._store[key] = ContextEntry(
-            value=value,
-            expires_at=expires_at,
-            owner=owner
-        )
-        
-        # Periodic cleanup: every 100 writes, purge expired entries
-        self._write_count += 1
-        if self._write_count % 100 == 0:
-            self._cleanup_expired()
-        
-        from loguru import logger
-        logger.debug(f"Context set: '{key}' (ttl={ttl}s, owner={owner})")
+            meta["expires_at"] = (datetime.utcnow() + timedelta(seconds=ttl)).isoformat()
+        pipeline.set(f"{key}:meta", json.dumps(meta), ex=ttl)
+            
+        pipeline.execute()
         return True
     
-    def append(self, key: str, item: Any, ttl: int = None, owner: str = None) -> bool:
-        """
-        Append an item to a list in the context (Atomic operation).
-        
-        Args:
-            key: Context key
-            item: Item to append
-            ttl: Update TTL if provided
-            owner: Update owner if provided
-        """
-        entry = self._store.get(key)
-        
-        if entry is None:
-            # Create new list
-            value = [item]
-        else:
-            if not isinstance(entry.value, list):
-                # Convert to list if existing value is single item (optional behavior)
-                # or raise error. For now, we assume usage is consistent.
-                from loguru import logger
-                logger.warning(f"Context key '{key}' is not a list, overwriting with list.")
-                value = [item]
-            else:
-                entry.value.append(item)
-                value = entry.value
-        
-        return self.set(key, value, ttl, owner)
+    def append(self, key: str, item: Any, ttl: Optional[int] = None, owner: Optional[str] = None) -> bool:
+        """Append an item to a list in the context."""
+        # Read-Modify-Write (for exact semantic match with old implementation)
+        # Using a Redis transaction (WATCH) to prevent race conditions
+        with self._client.pipeline() as pipe:
+            while True:
+                try:
+                    pipe.watch(key)
+                    current = pipe.get(key)
+                    if current:
+                        value = json.loads(current)
+                        if not isinstance(value, list):
+                            value = [item]
+                        else:
+                            value.append(item)
+                    else:
+                        value = [item]
+                    
+                    if ttl is not None:
+                        ttl = int(ttl)
+                    
+                    pipe.multi()
+                    pipe.set(key, json.dumps(value), ex=ttl)
+                    
+                    meta = {
+                        "created_at": datetime.utcnow().isoformat(),
+                        "owner": owner
+                    }
+                    if ttl:
+                        meta["expires_at"] = (datetime.utcnow() + timedelta(seconds=ttl)).isoformat()
+                    pipe.set(f"{key}:meta", json.dumps(meta), ex=ttl)
+                        
+                    pipe.execute()
+                    break
+                except redis.WatchError:
+                    continue # Re-try if the key was modified
+        return True
     
     def get(self, key: str, default: Any = None) -> Any:
-        """
-        Retrieve a value from the context.
-        
-        Args:
-            key: Context key
-            default: Default value if not found or expired
-            
-        Returns:
-            The stored value or default
-        """
-        entry = self._store.get(key)
-        
-        if entry is None:
+        """Retrieve a value from the context."""
+        val = self._client.get(key)
+        if val is None:
             return default
-        
-        # Check expiry
-        if entry.expires_at and datetime.utcnow() > entry.expires_at:
-            del self._store[key]
+        try:
+            return json.loads(val)
+        except json.JSONDecodeError:
             return default
-        
-        return entry.value
     
     def delete(self, key: str) -> bool:
-        """Remove a key from the context."""
-        if key in self._store:
-            del self._store[key]
-            return True
-        return False
+        """Remove a key and its meta from the context."""
+        count = self._client.delete(key, f"{key}:meta")
+        return count > 0
     
     def exists(self, key: str) -> bool:
-        """Check if a key exists and is not expired."""
-        return self.get(key) is not None
+        """Check if a key exists."""
+        return self._client.exists(key) > 0
     
     def keys(self, pattern: str = None) -> list:
-        """
-        List all keys, optionally filtered by prefix pattern.
-        
-        Args:
-            pattern: Optional prefix to filter keys
-        """
-        self._cleanup_expired()
-        
-        if pattern:
-            return [k for k in self._store.keys() if k.startswith(pattern)]
-        return list(self._store.keys())
+        """List all data keys (ignoring meta keys)."""
+        search = pattern or "*"
+        all_keys = self._client.keys(search)
+        return [k for k in all_keys if not k.endswith(":meta")]
     
     def get_info(self, key: str) -> Optional[Dict]:
         """Get metadata about a context entry."""
-        entry = self._store.get(key)
-        if entry is None:
-            return None
-        
-        return {
-            "created_at": entry.created_at.isoformat(),
-            "expires_at": entry.expires_at.isoformat() if entry.expires_at else None,
-            "owner": entry.owner
-        }
-    
-    def _cleanup_expired(self):
-        """Remove all expired entries."""
-        now = datetime.utcnow()
-        expired = [
-            k for k, v in self._store.items()
-            if v.expires_at and now > v.expires_at
-        ]
-        for k in expired:
-            del self._store[k]
+        meta = self._client.get(f"{key}:meta")
+        if meta:
+            return json.loads(meta)
+        return None
 
+# Singleton instance wrapper
+_context_store_instance = None
 
-def get_context() -> ray.actor.ActorHandle:
+def get_context() -> ContextStore:
     """
-    Get or create the singleton ContextStore actor.
-    
-    Thread-safe: handles race condition where two processes
-    try to create the store simultaneously.
-    
-    Returns:
-        Ray ActorHandle to the ContextStore
+    Get the singleton ContextStore instance.
     """
-    try:
-        return ray.get_actor("ContextStore")
-    except ValueError:
-        try:
-            return ContextStore.options(
-                name="ContextStore", lifetime="detached"
-            ).remote()
-        except ValueError:
-            # Another process created it between our check and create
-            return ray.get_actor("ContextStore")
+    global _context_store_instance
+    if _context_store_instance is None:
+        _context_store_instance = ContextStore()
+    return _context_store_instance

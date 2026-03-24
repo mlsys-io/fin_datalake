@@ -15,14 +15,8 @@ class LangChainAgent(BaseAgent):
         """
         pass
     
-    def ask(self, payload: Union[str, Dict[str, Any]]) -> Any:
+    def ask(self, payload: Union[str, Dict[str, Any]], session_id: Optional[str] = None) -> Any:
         """
-        Overridden to handle common string-to-dict conversion if needed.
+        Handle session-based context by passing it to the base class.
         """
-        input_data = payload
-        
-        # If user passes a raw string but the Chain expects a dict with a "input" key
-        # We could auto-wrap, but for V1 we stick to "Low Abstraction" per user request.
-        # We pass it through raw. 
-        
-        return super().ask(input_data)
+        return super().ask(payload, session_id=session_id)
