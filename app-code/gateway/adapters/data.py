@@ -15,8 +15,9 @@ Required Permission: data:read for all actions.
 from typing import Any
 
 from gateway.core.adapters import BaseAdapter, ActionNotFoundError
+from gateway.core.rbac import Permission
 from gateway.models.intent import UserIntent
-from gateway.models.user import Permission, User
+from gateway.models.user import User
 
 import os
 import json
@@ -200,6 +201,6 @@ class DataAdapter(BaseAdapter):
         preview_intent = UserIntent(
             domain="data", action="run_sql",
             parameters={"sql": f"SELECT * FROM delta_scan('{table_path}') LIMIT {limit}"},
-            user_id=intent.user_id, role=intent.role,
+            user_id=intent.user_id, roles=intent.roles,
         )
         return await self._run_sql(preview_intent)

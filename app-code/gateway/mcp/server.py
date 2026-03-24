@@ -50,6 +50,8 @@ from mcp.server.stdio import stdio_server
 from gateway.mcp.tools import data as data_tools
 from gateway.mcp.tools import compute as compute_tools
 from gateway.mcp.tools import agent as agent_tools
+from gateway.mcp.tools import system as system_tools
+from gateway.mcp.tools import broker as broker_tools
 
 # -- Registry & Auth --
 from gateway.core.registry import build_default_registry
@@ -64,6 +66,11 @@ async def create_mcp_server() -> Server:
         A configured mcp.Server ready to be run over stdio or SSE.
     """
     server = Server("lakehouse-gateway")
+    
+    # Load dynamic RBAC roles
+    from gateway.core.rbac import load_roles
+    await load_roles()
+    
     registry = build_default_registry()
 
     # Resolve the MCP client's User from env API Key.
@@ -75,6 +82,8 @@ async def create_mcp_server() -> Server:
     data_tools.register(server, registry, mcp_user)
     compute_tools.register(server, registry, mcp_user)
     agent_tools.register(server, registry, mcp_user)
+    system_tools.register(server, registry, mcp_user)
+    broker_tools.register(server, registry, mcp_user)
 
     return server
 

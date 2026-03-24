@@ -1,10 +1,8 @@
 """
 Database session management.
 
-Provides the SQLite engine and an async session factory.
+Provides the PostgreSQL engine and an async session factory.
 All auth-related tables (users, api_keys) live in gateway.db.
-
-The database file lives at GATEWAY_DB_PATH (default: ./gateway.db).
 """
 
 import os
@@ -16,8 +14,12 @@ from sqlalchemy.orm import DeclarativeBase
 # Config
 # ---------------------------------------------------------------------------
 
-_DB_PATH = os.environ.get("GATEWAY_DB_PATH", "./gateway.db")
-DATABASE_URL = f"sqlite+aiosqlite:///{_DB_PATH}"
+# Primary auth database. Defaults to Postgres/TimescaleDB.
+# Format: postgresql+asyncpg://user:pass@host:port/dbname
+DATABASE_URL = os.environ.get(
+    "GATEWAY_DATABASE_URL", 
+    "postgresql+asyncpg://app:app@localhost:5432/app"
+)
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
@@ -35,10 +37,6 @@ class Base(DeclarativeBase):
 async def get_db() -> AsyncSession:
     """
     Yields an async DB session for use in FastAPI endpoints via Depends(get_db).
-
-    Usage in a route:
-        async def my_route(db: AsyncSession = Depends(get_db)):
-            ...
     """
     async with AsyncSessionLocal() as session:
         yield session
@@ -51,8 +49,44 @@ async def get_db() -> AsyncSession:
 async def init_db():
     """
     Create all tables if they do not already exist.
-    Call this in the FastAPI `startup` event handler.
+    Also handles auto-provisioning of the first admin account if the DB is empty.
     """
-    from gateway.db.models import UserORM, APIKeyORM  # noqa: F401 — ensure models are registered
+    from sqlalchemy import select
+    from gateway.db.models import UserORM, APIKeyORM
+    from gateway.db import crud
+    import secrets
+    import string
+
     async with engine.begin() as conn:
+        # Create tables (idempotent)
         await conn.run_sync(Base.metadata.create_all)
+    
+    # Check for empty users table to trigger auto-provisioning
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(UserORM))
+        if not result.scalars().first():
+            print("\n" + "="*60)
+            print("FIRST RUN: Auto-provisioning Master Admin Account...")
+            
+            # Generate random password
+            alphabet = string.ascii_letters + string.digits
+            password = "".join(secrets.choice(alphabet) for _ in range(16))
+            
+            # Create user
+            # Note: We use "Admin" role which corresponds to Permission.SYSTEM_ADMIN
+            admin = await crud.create_user(
+                db, 
+                username="admin", 
+                password=password, 
+                role_names=["Admin"],
+                email="admin@internal"
+            )
+            
+            # Generate master API key
+            api_key = await crud.create_api_key(db, "admin", description="Master Admin Key")
+            
+            print(f"  > Username: {admin.username}")
+            print(f"  > Password: {password}")
+            print(f"  > API Key:  {api_key}")
+            print("\nIMPORTANT: Store these credentials safely! They are shown ONLY once.")
+            print("="*60 + "\n")

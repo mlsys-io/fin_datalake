@@ -105,7 +105,7 @@ async def execute_intent(
         action=body.action,
         parameters=body.parameters,
         user_id=user.username,
-        role=user.role_names[0] if user.role_names else "analyst",
+        roles=user.role_names if user.role_names else ["analyst"],
     )
 
     # -----------------------------------------------------------------------

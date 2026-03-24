@@ -13,11 +13,15 @@ Required Permissions:
     - notify:       agent:broadcast (system-wide impact)
 """
 
+import os
+import httpx
+import asyncio
 from typing import Any
 
 from gateway.core.adapters import BaseAdapter, ActionNotFoundError
+from gateway.core.rbac import Permission
 from gateway.models.intent import UserIntent
-from gateway.models.user import Permission, User
+from gateway.models.user import User
 
 
 class AgentAdapter(BaseAdapter):
@@ -26,9 +30,6 @@ class AgentAdapter(BaseAdapter):
         return "agent"
 
     async def execute(self, user: User, intent: UserIntent) -> Any:
-        import asyncio
-        loop = asyncio.get_event_loop()
-        
         dispatch = {
             "chat": self._chat,
             "notify": self._notify,
@@ -41,49 +42,71 @@ class AgentAdapter(BaseAdapter):
                 f"Available: {list(dispatch.keys())}"
             )
         
-        # Ray calls like .get() are blocking; wrap in executor to not block FastAPI
-        return await loop.run_in_executor(None, lambda: handler(user, intent))
+        return await handler(user, intent)
 
-    def _chat(self, user: User, intent: UserIntent) -> dict:
-        """Synchronous ask/response to a named Agent via AgentHub."""
+
+    async def _chat(self, user: User, intent: UserIntent) -> dict:
+        """Synchronous ask/response to a Ray Serve Agent via HTTP."""
         self._require_permission(user, Permission.AGENT_INTERACT)
-        import ray
-        from etl.agents.hub import get_hub
-
+        
         agent_name = intent.parameters.get("agent_name")
         message = intent.parameters.get("message")
+        session_id = intent.parameters.get("session_id")
+        
         if not agent_name or message is None:
             raise ValueError("Parameters 'agent_name' and 'message' are required.")
 
-        hub = get_hub()
-        response = ray.get(hub.call.remote(
-            name=agent_name,
-            payload={"sender": user.username, "payload": message},
-        ))
-        return {"agent": agent_name, "response": response}
+        endpoint = os.getenv("RAY_SERVE_ENDPOINT", "http://localhost:8000")
+        url = f"{endpoint}/{agent_name}/ask"
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            payload = {
+                "payload": message,
+                "session_id": session_id,
+                "metadata": {"sender": user.username}
+            }
+            response = await client.post(url, json=payload)
 
-    def _notify(self, user: User, intent: UserIntent) -> dict:
-        """Broadcast a notification to all agents via AgentHub."""
+            response.raise_for_status()
+            return {"agent": agent_name, "response": response.json()}
+
+    async def _notify(self, user: User, intent: UserIntent) -> dict:
+        """Broadcast a notification to all agents via HTTP."""
         self._require_permission(user, Permission.AGENT_BROADCAST)
+        
+        # 1. Get the list of agents from Hub
         import ray
         from etl.agents.hub import get_hub
+        hub = get_hub()
+        agents_info = await hub.list_agents.remote()
+        agent_names = [a["name"] for a in agents_info if a.get("alive", False)]
 
+        # 2. Fan-out HTTP requests
         payload = intent.parameters.get("payload")
         event = {
             "topic": "_broadcast",
             "payload": payload,
             "sender": user.username,
         }
-        hub = get_hub()
-        delivered = ray.get(hub.notify_all.remote(event))
-        return {"delivered_to": delivered}
+        
+        endpoint = os.getenv("RAY_SERVE_ENDPOINT", "http://localhost:8000")
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            tasks = [
+                client.post(f"{endpoint}/{name}/notify", json=event)
+                for name in agent_names
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+        delivered = sum(1 for r in results if isinstance(r, httpx.Response) and r.status_code == 200)
+        return {"delivered_to": delivered, "total_targets": len(agent_names)}
 
-    def _list_agents(self, user: User, intent: UserIntent) -> dict:
+    async def _list_agents(self, user: User, intent: UserIntent) -> dict:
         """List all registered agents via AgentHub."""
         self._require_permission(user, Permission.AGENT_READ)
         import ray
         from etl.agents.hub import get_hub
 
         hub = get_hub()
-        agents = ray.get(hub.list_agents.remote())
+        agents = await hub.list_agents.remote()
         return {"agents": agents}

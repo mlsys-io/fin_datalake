@@ -14,7 +14,8 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from gateway.models.intent import UserIntent
-from gateway.models.user import Permission, User
+from gateway.models.user import User
+from gateway.core.rbac import Permission, rbac_provider
 
 
 class PermissionError(Exception):
@@ -35,30 +36,12 @@ class BaseAdapter(ABC):
     Within that domain, it routes `intent.action` to specific methods.
 
     Permission checks are done per-action via `_require_permission()`.
-
-    Subclasses:
-        DataAdapter    -> domain="data"
-        ComputeAdapter -> domain="compute"
-        AgentAdapter   -> domain="agent"
-        BrokerAdapter  -> domain="broker"
-
-    Usage:
-        class ComputeAdapter(BaseAdapter):
-            def handles(self) -> str:
-                return "compute"
-
-            def execute(self, user: User, intent: UserIntent) -> Any:
-                if intent.action == "submit_job":
-                    self._require_permission(user, Permission.COMPUTE_WRITE)
-                    return self._submit_job(intent)
-                raise ActionNotFoundError(f"Unknown action: {intent.action}")
     """
 
     @abstractmethod
     def handles(self) -> str:
         """
         Returns the domain string this adapter is responsible for.
-        The InterfaceRegistry uses this to route incoming UserIntents.
         """
         pass
 
@@ -66,15 +49,6 @@ class BaseAdapter(ABC):
     async def execute(self, user: User, intent: UserIntent) -> Any:
         """
         Execute the intent against the adapter's subsystem.
-
-        Implementations should:
-        1. Call `self._require_permission(user, Permission.XXX)` for each action.
-        2. Dispatch to internal methods based on `intent.action`.
-        3. Raise `ActionNotFoundError` for unknown actions.
-
-        Args:
-            user:   The resolved User object carrying role/permission info.
-            intent: The normalized UserIntent from the registry.
         """
         pass
 
@@ -89,8 +63,7 @@ class BaseAdapter(ABC):
         Raises:
             PermissionError: If the user does not hold the required permission.
         """
-        if not user.has_permission(permission):
+        if not rbac_provider.is_authorized(user.role_names, permission):
             raise PermissionError(
                 f"User '{user.username}' lacks permission '{permission.value}'. "
-                f"Effective permissions: {[p.value for p in user.all_permissions()]}"
             )

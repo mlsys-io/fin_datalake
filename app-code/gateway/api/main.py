@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from gateway.api.routers import auth as auth_router
 from gateway.api.routers import intent as intent_router
 from gateway.api.routers import system as system_router
+from gateway.api.routers import alerts as alerts_router
 
 # -- Registry --
 from gateway.core.registry import build_default_registry
@@ -63,7 +64,9 @@ def create_app() -> FastAPI:
     # -------------------------------------------------------------------------
     @app.on_event("startup")
     async def startup():
-        await init_db()                          # Create tables if they don't exist
+        from gateway.core.rbac import load_roles
+        await load_roles()                       # Load dynamic RBAC roles FIRST
+        await init_db()                          # Create tables + auto-provision (needs roles)
         app.state.registry = build_default_registry()
 
     # -------------------------------------------------------------------------
@@ -72,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router.router,   prefix="/api/v1/auth",   tags=["Auth"])
     app.include_router(intent_router.router, prefix="/api/v1",        tags=["Intent"])
     app.include_router(system_router.router, prefix="/api/v1/system", tags=["System Control"])
+    app.include_router(alerts_router.router, prefix="/api/v1/stream", tags=["Streaming"])
 
     # -------------------------------------------------------------------------
     # Health Check (unauthenticated — used by K8s liveness probe)

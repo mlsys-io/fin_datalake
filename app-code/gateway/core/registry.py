@@ -76,8 +76,8 @@ class InterfaceRegistry:
             intent: The normalized UserIntent from any protocol translator.
         """
         logger.info(
-            "Routing intent | user=%s | role=%s | domain=%s | action=%s",
-            intent.user_id, intent.role, intent.domain, intent.action,
+            "Routing intent | user=%s | roles=%s | domain=%s | action=%s",
+            intent.user_id, intent.roles, intent.domain, intent.action,
         )
 
         adapter = self._adapters.get(intent.domain)

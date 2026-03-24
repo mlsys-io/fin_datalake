@@ -12,9 +12,10 @@ import string
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from gateway.core.config import hash_password, verify_password
+from gateway.core.security import hash_password, verify_password
 from gateway.db.models import APIKeyORM, UserORM
-from gateway.models.user import User, BUILTIN_ROLES
+from gateway.models.user import User
+from gateway.core.rbac import rbac_provider
 
 
 # ---------------------------------------------------------------------------
@@ -79,9 +80,10 @@ async def create_user(
     """
     # Validate roles
     roles = role_names or ["Analyst"]
-    for r in roles:
-        if r not in BUILTIN_ROLES:
-            raise ValueError(f"Unknown role '{r}'. Valid roles: {list(BUILTIN_ROLES.keys())}")
+    try:
+        rbac_provider.validate_roles(roles)
+    except ValueError as e:
+        raise ValueError(str(e))
 
     existing = await db.execute(select(UserORM).where(UserORM.username == username))
     if existing.scalars().first():

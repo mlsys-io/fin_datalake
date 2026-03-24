@@ -6,7 +6,6 @@ For production, set these via K8s Secrets / .env file.
 """
 
 import os
-from passlib.context import CryptContext
 
 # ---------------------------------------------------------------------------
 # JWT Settings
@@ -25,19 +24,3 @@ JWT_EXPIRE_MINUTES: int = int(os.environ.get("GATEWAY_JWT_EXPIRE_MINUTES", "480"
 # Redis Settings
 # ---------------------------------------------------------------------------
 REDIS_URL: str = os.environ.get("OVERSEER_REDIS_URL")
-
-# ---------------------------------------------------------------------------
-# Password Hashing
-# ---------------------------------------------------------------------------
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def hash_password(plain: str) -> str:
-    """Hash a plain-text password using bcrypt."""
-    return pwd_context.hash(plain)
-
-
-def verify_password(plain: str, hashed: str) -> bool:
-    """Verify a plain-text password against its bcrypt hash."""
-    return pwd_context.verify(plain, hashed)

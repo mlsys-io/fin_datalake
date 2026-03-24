@@ -12,6 +12,7 @@ Auth Flow:
   3. Resolved User is injected into the route handler.
 """
 
+import os
 from datetime import datetime, timezone, timedelta
 
 from fastapi import Cookie, Depends, HTTPException, Request, status
@@ -20,6 +21,7 @@ from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gateway.core.config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_EXPIRE_MINUTES
+from gateway.core.security import create_jwt, decode_jwt
 from gateway.core.registry import InterfaceRegistry
 from gateway.db.session import get_db
 from gateway.db import crud
@@ -40,30 +42,7 @@ def get_registry(request: Request) -> InterfaceRegistry:
     return registry
 
 
-# ---------------------------------------------------------------------------
-# 2. JWT helpers
-# ---------------------------------------------------------------------------
-
-def create_jwt(username: str) -> str:
-    """
-    Create a signed JWT for the given username.
-    The token expires after JWT_EXPIRE_MINUTES minutes.
-    """
-    expire = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRE_MINUTES)
-    payload = {"sub": username, "exp": expire}
-    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-
-
-def _decode_jwt(token: str) -> str | None:
-    """
-    Decode a JWT and return the `sub` claim (username).
-    Returns None if the token is invalid or expired.
-    """
-    try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        return payload.get("sub")
-    except JWTError:
-        return None
+# JWT helpers are now in gateway.core.security
 
 
 # ---------------------------------------------------------------------------
@@ -111,13 +90,13 @@ async def get_current_user(
             user = await crud.resolve_api_key(db, token)
         else:
             # JWT in header (e.g., from SDK that stores token in env)
-            username = _decode_jwt(token)
+            username = decode_jwt(token)
             if username:
                 user = await crud.get_user_by_username(db, username)
 
     # --- Path B: HttpOnly Cookie ---
     if user is None and gateway_token:
-        username = _decode_jwt(gateway_token)
+        username = decode_jwt(gateway_token)
         if username:
             user = await crud.get_user_by_username(db, username)
 

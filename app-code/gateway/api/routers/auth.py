@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from gateway.api.deps import create_jwt, get_current_user, get_db
 from gateway.db import crud
 from gateway.models.user import User
+from gateway.core.rbac import rbac_provider
 
 router = APIRouter()
 
@@ -106,7 +107,7 @@ def get_me(current_user: User = Depends(get_current_user)):
         username=current_user.username,
         email=current_user.email,
         roles=current_user.role_names,
-        permissions=[p.value for p in current_user.all_permissions()],
+        permissions=[p.value for p in rbac_provider.get_permissions(current_user.role_names)],
     )
 
 

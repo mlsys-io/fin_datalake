@@ -80,7 +80,7 @@ def register(server: Server, registry: InterfaceRegistry, user: User):
             action=action,
             parameters=arguments,
             user_id=user.username,
-            role=user.role_names[0] if user.role_names else "analyst",
+            roles=user.role_names if user.role_names else ["analyst"],
         )
 
         result = registry.route(user, intent)

@@ -11,7 +11,7 @@ Design Principle:
 """
 
 from pydantic import BaseModel, Field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 
 class UserIntent(BaseModel):
@@ -53,10 +53,10 @@ class UserIntent(BaseModel):
         ...,
         description="The identity of the requesting user (from Auth layer).",
     )
-    role: str = Field(
+    roles: List[str] = Field(
         ...,
-        description="The RBAC role of the requesting user: 'admin', 'engineer', 'analyst'.",
-        examples=["admin", "engineer", "analyst"],
+        description="The RBAC roles of the requesting user (e.g. ['admin', 'engineer']).",
+        examples=[["admin"], ["engineer", "analyst"]],
     )
     request_id: Optional[str] = Field(
         default=None,

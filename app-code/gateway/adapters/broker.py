@@ -24,8 +24,9 @@ import os
 from typing import Any
 
 from gateway.core.adapters import BaseAdapter, ActionNotFoundError
+from gateway.core.rbac import Permission
 from gateway.models.intent import UserIntent
-from gateway.models.user import Permission, User
+from gateway.models.user import User
 
 
 class BrokerAdapter(BaseAdapter):
