@@ -1,12 +1,10 @@
 """
-Tests for Overseer class initialization and policy loading.
+Tests for Overseer class initialization and dynamic policy loading.
 """
 
 import pytest
 from unittest.mock import patch, MagicMock
 from overseer.loop import Overseer
-from overseer.policies.scaling import KafkaLagPolicy
-from overseer.policies.healing import ActorHealthPolicy
 
 
 @pytest.fixture
@@ -20,60 +18,65 @@ def mock_overseer_deps():
         yield mock_load_config
 
 
-def test_overseer_init_default_policies(mock_overseer_deps):
+def test_overseer_init_starts_with_zero_policies(mock_overseer_deps):
+    """Since all policies come from S3, init should produce an empty list."""
     mock_load_config = mock_overseer_deps
     mock_load_config.return_value = {"overseer": {}}
-    
-    overseer = Overseer()
-    
-    # Should have both default policies
-    policy_classes = [p.__class__ for p in overseer.policies]
-    assert KafkaLagPolicy in policy_classes
-    assert ActorHealthPolicy in policy_classes
-    assert len(overseer.policies) == 2
-
-
-def test_overseer_init_custom_policies(mock_overseer_deps):
-    mock_load_config = mock_overseer_deps
-    mock_load_config.return_value = {
-        "overseer": {
-            "policies": ["actor_health"]
-        }
-    }
-    
-    overseer = Overseer()
-    
-    # Should only have ActorHealthPolicy
-    policy_classes = [p.__class__ for p in overseer.policies]
-    assert ActorHealthPolicy in policy_classes
-    assert KafkaLagPolicy not in policy_classes
-    assert len(overseer.policies) == 1
-
-
-def test_overseer_init_empty_policies(mock_overseer_deps):
-    mock_load_config = mock_overseer_deps
-    mock_load_config.return_value = {
-        "overseer": {
-            "policies": []
-        }
-    }
     
     overseer = Overseer()
     
     assert len(overseer.policies) == 0
 
 
-def test_overseer_init_invalid_policy_skips(mock_overseer_deps):
+def test_overseer_init_has_expected_actuators(mock_overseer_deps):
+    """Verify the actuator registry is populated with the known set."""
+    mock_load_config = mock_overseer_deps
+    mock_load_config.return_value = {"overseer": {}}
+    
+    overseer = Overseer()
+    
+    assert "ray" in overseer.actuators
+    assert "alert" in overseer.actuators
+    assert "gateway" in overseer.actuators
+    assert "reporter" in overseer.actuators
+    assert "webhook" in overseer.actuators
+
+
+def test_overseer_init_reads_custom_policy_config(mock_overseer_deps):
+    """Verify custom policy S3 config is read from overseer config block."""
     mock_load_config = mock_overseer_deps
     mock_load_config.return_value = {
         "overseer": {
-            "policies": ["nonexistent_policy", "kafka_lag"]
+            "custom_policies": {
+                "s3_uri": "s3://my-bucket/policies/",
+                "sync_interval_seconds": 300,
+                "local_dir": "/custom/path/",
+            }
         }
     }
     
     overseer = Overseer()
     
-    # Should only have KafkaLagPolicy
-    policy_classes = [p.__class__ for p in overseer.policies]
-    assert KafkaLagPolicy in policy_classes
-    assert len(overseer.policies) == 1
+    assert overseer.s3_uri == "s3://my-bucket/policies/"
+    assert overseer.sync_interval_seconds == 300
+    assert overseer.local_custom_dir == "/custom/path/"
+
+
+def test_overseer_init_loop_interval_default(mock_overseer_deps):
+    """Verify default loop interval is 15 seconds when not specified."""
+    mock_load_config = mock_overseer_deps
+    mock_load_config.return_value = {"overseer": {}}
+    
+    overseer = Overseer()
+    
+    assert overseer.loop_interval == 15
+
+
+def test_overseer_init_loop_interval_custom(mock_overseer_deps):
+    """Verify loop interval can be overridden from config."""
+    mock_load_config = mock_overseer_deps
+    mock_load_config.return_value = {"overseer": {"loop_interval_seconds": 30}}
+    
+    overseer = Overseer()
+    
+    assert overseer.loop_interval == 30
