@@ -14,7 +14,7 @@ export const Dashboard: React.FC = () => {
 
     const handleLogout = async () => {
         try {
-            await fetch('/api/v1/auth/logout', { method: 'POST' })
+            await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' })
             setUser(null)
         } catch (e) {
             console.error('Logout failed', e)

@@ -18,7 +18,7 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-400">
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F7F5] text-stone-500">
         <div className="animate-pulse">Loading Lakehouse Environment...</div>
       </div>
     )

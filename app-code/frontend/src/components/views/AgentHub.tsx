@@ -1,26 +1,27 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { Bot, Send } from 'lucide-react'
 import { sendIntent } from '../../api/client'
 
 export const AgentHub: React.FC = () => {
-    const [messages, setMessages] = useState<{ role: 'user' | 'agent', content: string }[]>([])
+    const [messages, setMessages] = useState<{ id: number, role: 'user' | 'agent', content: string }[]>([])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
+    const msgIdRef = useRef(0)
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!input.trim()) return
 
         const userMsg = input
-        setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+        setMessages(prev => [...prev, { id: msgIdRef.current++, role: 'user', content: userMsg }])
         setInput('')
         setLoading(true)
 
         try {
             const res = await sendIntent('agent', 'chat', { agent_name: 'Coordinator', message: userMsg })
-            setMessages(prev => [...prev, { role: 'agent', content: res.response || JSON.stringify(res) }])
+            setMessages(prev => [...prev, { id: msgIdRef.current++, role: 'agent', content: res.response || JSON.stringify(res) }])
         } catch (err: any) {
-            setMessages(prev => [...prev, { role: 'agent', content: `[Error communicating with agent]: ${err.message}` }])
+            setMessages(prev => [...prev, { id: msgIdRef.current++, role: 'agent', content: `[Error communicating with agent]: ${err.message}` }])
         } finally {
             setLoading(false)
         }
@@ -34,7 +35,7 @@ export const AgentHub: React.FC = () => {
                 </div>
                 <div>
                     <h3 className="font-bold text-stone-900">Coordinator Agent</h3>
-                    <p className="text-xs text-green-600 font-medium">● Online in Ray Cluster</p>
+                    <p className="text-xs text-stone-400 font-medium">Ray Cluster Agent</p>
                 </div>
             </div>
 
@@ -44,8 +45,8 @@ export const AgentHub: React.FC = () => {
                         Start a conversation with the Ray-backed LLM agents.
                     </div>
                 )}
-                {messages.map((m, i) => (
-                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {messages.map((m) => (
+                    <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[80%] rounded-2xl px-5 py-3 shadow-sm ${m.role === 'user' ? 'bg-stone-900 text-white rounded-br-none' : 'bg-white border border-stone-200 text-stone-900 rounded-bl-none'}`}>
                             {m.content}
                         </div>
@@ -55,8 +56,8 @@ export const AgentHub: React.FC = () => {
                     <div className="flex justify-start">
                         <div className="bg-white border border-stone-200 shadow-sm rounded-2xl rounded-bl-none px-5 py-3 h-12 w-16 flex items-center justify-center gap-1">
                             <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce"></div>
-                            <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce delay-100"></div>
-                            <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce delay-200"></div>
+                            <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                            <div className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                         </div>
                     </div>
                 )}

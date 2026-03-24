@@ -6,6 +6,7 @@ export const DataCatalog: React.FC = () => {
     const [tables, setTables] = useState<{ name: string, path: string }[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
+    const [search, setSearch] = useState('')
 
     useEffect(() => {
         const fetchTables = async () => {
@@ -20,6 +21,10 @@ export const DataCatalog: React.FC = () => {
         }
         fetchTables()
     }, [])
+
+    const filteredTables = tables.filter(t =>
+        t.name.toLowerCase().includes(search.toLowerCase())
+    )
 
     return (
         <div className="space-y-6 max-w-6xl mx-auto">
@@ -49,6 +54,8 @@ export const DataCatalog: React.FC = () => {
                             type="text"
                             placeholder="Search tables..."
                             className="pl-9 pr-4 py-2 bg-white border border-stone-200 rounded text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
                         />
                     </div>
                 </div>
@@ -63,15 +70,15 @@ export const DataCatalog: React.FC = () => {
                         </div>
                     ) : error ? (
                         <p className="text-red-500">{error}</p>
-                    ) : tables.length === 0 ? (
-                        <p className="text-stone-500 text-center py-8">No tables found in Delta Lake.</p>
+                    ) : filteredTables.length === 0 ? (
+                        <p className="text-stone-500 text-center py-8">{search ? 'No tables match your search.' : 'No tables found in Delta Lake.'}</p>
                     ) : (
                         <div className="grid grid-cols-1 gap-4">
-                            {tables.map((t, idx) => (
+                            {filteredTables.map((t, idx) => (
                                 <div key={t.name || idx} className="p-4 bg-stone-50 border border-stone-200 rounded-lg hover:border-stone-400 transition-colors cursor-pointer group">
                                     <h4 className="text-stone-900 font-medium">{t.name}</h4>
                                     <p className="text-sm text-stone-500 mt-2">Path: <span className="font-mono text-xs">{t.path}</span></p>
-                                    <p className="text-sm text-stone-500 mt-1">Format: Delta /// Last Modified: Just now</p>
+                                    <p className="text-sm text-stone-500 mt-1">Format: Delta</p>
                                 </div>
                             ))}
                         </div>
