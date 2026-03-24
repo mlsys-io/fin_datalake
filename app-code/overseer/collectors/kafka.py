@@ -68,7 +68,7 @@ class KafkaCollector(BaseCollector):
         except Exception as e:
             return ServiceMetrics(service="kafka", healthy=False, error=str(e))
 
-    async def is_healthy(self) -> bool:
+    async def is_healthy(self) -> tuple[bool, str | None]:
         """Kafka doesn't have HTTP health — try connecting via AdminClient."""
         try:
             from confluent_kafka.admin import AdminClient
@@ -77,6 +77,6 @@ class KafkaCollector(BaseCollector):
                 "socket.timeout.ms": 3000,
             })
             md = admin.list_topics(timeout=3)
-            return len(md.topics) >= 0
-        except Exception:
-            return False
+            return len(md.topics) >= 0, None
+        except Exception as e:
+            return False, str(e)

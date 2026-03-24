@@ -47,7 +47,7 @@ class GatewayActuator(BaseActuator):
                 
                 if response.status_code < 400:
                     state_msg = payload['state'].upper()
-                    return ActionResult(success=True, detail=f"Gateway circuit breaker set to {state_msg}ED")
+                    return ActionResult(success=True, detail=f"Gateway circuit breaker set to {state_msg}")
                 else:
                     return ActionResult(
                         success=False, 

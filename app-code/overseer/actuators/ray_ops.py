@@ -20,6 +20,7 @@ class RayActuator(BaseActuator):
 
     def __init__(self, ray_address: str = "auto"):
         self.ray_address = ray_address
+        self.redis = get_redis_client()
 
     async def execute(self, action: OverseerAction) -> ActionResult:
         try:
@@ -90,23 +91,20 @@ class RayActuator(BaseActuator):
 
     async def _track_actor(self, class_name: str, actor_name: str) -> None:
         """Record spawned actors for future scale-down."""
-        r = get_redis_client()
-        if not r:
+        if not self.redis:
             return
         key = f"overseer:actors:{class_name}"
-        async with r:
-            await r.lpush(key, actor_name)
-            await r.ltrim(key, 0, 999)
+        await self.redis.lpush(key, actor_name)
+        await self.redis.ltrim(key, 0, 999)
 
     async def _scale_down(self, class_name: str, count: int) -> int:
         """Scale down by killing tracked actors."""
-        r = get_redis_client()
-        if not r:
+        if not self.redis:
             logger.warning("Redis not configured - cannot scale down safely.")
             return 0
 
         key = f"overseer:actors:{class_name}"
-        async with r.pipeline(transaction=True) as pipe:
+        async with self.redis.pipeline(transaction=True) as pipe:
             for _ in range(count):
                 pipe.rpop(key)
             results = await pipe.execute()

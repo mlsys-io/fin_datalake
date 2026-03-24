@@ -83,8 +83,8 @@ class StatusReporterActuator(BaseActuator):
                 ts = datetime.datetime.fromtimestamp(a.get("timestamp", 0)).strftime("%H:%M:%S")
                 typ = a.get("type", "alert").upper()
                 target = a.get("target", "ray")
-                reason = a.get("reason", "---")
-                sections.append(f"| {ts} | `{typ}` | {target} | {reason} |")
+                alert_reason = a.get("reason", "---")
+                sections.append(f"| {ts} | `{typ}` | {target} | {alert_reason} |")
 
         sections.append("\n---")
         sections.append("*Generated automatically by the Overseer System.*")

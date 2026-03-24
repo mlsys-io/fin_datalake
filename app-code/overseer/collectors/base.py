@@ -41,7 +41,7 @@ class BaseCollector(ABC):
             return True, None
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                url = f"http://{self.endpoint.host}:{self.endpoint.port}{self.endpoint.health_path}"
+                url = f"{self.endpoint.base_url}{self.endpoint.health_path}"
                 r = await client.get(url)
                 if r.status_code >= 400:
                     return False, f"HTTP {r.status_code}"

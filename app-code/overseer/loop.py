@@ -18,20 +18,24 @@ from overseer.collectors import (
     PrefectCollector,
     RayCollector,
 )
+from overseer.collectors.delta_lake import DeltaLakeCollector
 from overseer.collectors.base import BaseCollector
 from overseer.config import load_config, load_endpoints
 from overseer.models import (
     ActionType,
+    OverseerAction,
     ServiceEndpoint,
     ServiceMetrics,
     SystemSnapshot,
 )
-from overseer.policies import ActorHealthPolicy, KafkaLagPolicy
 from overseer.policies.base import BasePolicy
 from overseer.policies.cooldown import CooldownTracker
 from overseer.actuators import AlertActuator, RayActuator, GatewayActuator, StatusReporterActuator
+from overseer.actuators.webhook import WebhookActuator
 from overseer.actuators import BaseActuator
 from overseer.store import MetricsStore
+from overseer.s3_sync import sync_policies
+from overseer.hot_reload import load_custom_policies
 
 
 # ---------------------------------------------------------------------------
@@ -42,12 +46,7 @@ _COLLECTOR_REGISTRY: dict[str, type[BaseCollector]] = {
     "ray": RayCollector,
     "kafka": KafkaCollector,
     "prefect": PrefectCollector,
-}
-
-
-_POLICY_REGISTRY: dict[str, type[BasePolicy]] = {
-    "kafka_lag": KafkaLagPolicy,
-    "actor_health": ActorHealthPolicy,
+    "delta_lake": DeltaLakeCollector,
 }
 
 
@@ -92,14 +91,18 @@ class Overseer:
         # Build collectors from config
         self.collectors = [build_collector(ep) for ep in endpoints]
 
-        # Policies (Configurable)
-        policy_names = overseer_cfg.get("policies", ["kafka_lag", "actor_health"])
-        self.policies = []
-        for name in policy_names:
-            if name in _POLICY_REGISTRY:
-                self.policies.append(_POLICY_REGISTRY[name]())
-            else:
-                logger.warning(f"Policy '{name}' not found in registry. Skipping.")
+        # ----------------------------------------------------------------------- #
+        # PURE DYNAMIC POLICIES: 0 built-in policies at startup.
+        # Everything is pulled from S3.
+        # ----------------------------------------------------------------------- #
+        self.policies: list[BasePolicy] = []
+
+        # Custom Policies Sync
+        self.custom_policy_cfg = overseer_cfg.get("custom_policies", {})
+        self.s3_uri = self.custom_policy_cfg.get("s3_uri", "s3://demo-lake/overseer-policies/")
+        self.local_custom_dir = self.custom_policy_cfg.get("local_dir", "/tmp/overseer_custom_policies/")
+        self.sync_interval_seconds = self.custom_policy_cfg.get("sync_interval_seconds", 60)
+        self.last_sync_time = 0.0
 
         # Actuators
         self.actuators: dict[str, BaseActuator] = {
@@ -107,6 +110,7 @@ class Overseer:
             "alert": AlertActuator(),
             "gateway": GatewayActuator(),
             "reporter": StatusReporterActuator(self.store),
+            "webhook": WebhookActuator(webhook_url=overseer_cfg.get("webhook_url")),
         }
 
         logger.info(
@@ -122,6 +126,19 @@ class Overseer:
         while True:
             cycle += 1
             logger.info(f"--- Cycle {cycle} ---")
+
+            # --- HOT RELOAD CUSTOM POLICIES ---
+            current_time = asyncio.get_event_loop().time()
+            if current_time - self.last_sync_time >= self.sync_interval_seconds:
+                self.last_sync_time = current_time
+                try:
+                    await asyncio.to_thread(sync_policies, self.s3_uri, self.local_custom_dir)
+                    self.policies = await asyncio.to_thread(load_custom_policies, self.local_custom_dir)
+                    
+                    if self.policies:
+                        logger.info(f"Active policies: {len(self.policies)} (100% dynamically loaded from S3).")
+                except Exception as e:
+                    logger.error(f"Failed to hot-reload custom policies: {e}")
 
             # 1. MONITOR — probe all services concurrently
             snapshot = SystemSnapshot()
@@ -170,6 +187,9 @@ class Overseer:
 
                 # Every action also goes through the AlertActuator for logging
                 await self.actuators["alert"].execute(action)
+
+                if action.type in (ActionType.RESPAWN, ActionType.SCALE_UP, ActionType.ALERT) and "webhook" in self.actuators:
+                    await self.actuators["webhook"].execute(action)
 
                 # Route to the appropriate actuator
                 actuator = self.actuators.get(action.target)
