@@ -11,8 +11,9 @@ Registered Tools:
 from mcp.server import Server
 from mcp.types import Tool, TextContent
 
-from gateway.core.registry import InterfaceRegistry
-from gateway.models.intent import UserIntent
+from gateway.core.registry import InterfaceRegistry, DomainNotFoundError
+from gateway.core.adapters import ActionNotFoundError, PermissionError
+from gateway.core.dispatch import dispatch, CircuitBreakerOpenError
 from gateway.models.user import User
 
 
@@ -55,14 +56,19 @@ def register(server: Server, registry: InterfaceRegistry, user: User):
         }
         action = action_map.get(name)
         if action is None:
-            return []
+            return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
-        intent = UserIntent(
-            domain="compute",
-            action=action,
-            parameters=arguments,
-            user_id=user.username,
-            roles=user.role_names if user.role_names else ["analyst"],
-        )
-        result = registry.route(user, intent)
-        return [TextContent(type="text", text=str(result))]
+        try:
+            result = await dispatch(
+                registry=registry,
+                user=user,
+                domain="compute",
+                action=action,
+                parameters=arguments,
+                source_protocol="mcp"
+            )
+            return [TextContent(type="text", text=str(result.data))]
+        except (CircuitBreakerOpenError, PermissionError, DomainNotFoundError, ActionNotFoundError, ValueError) as e:
+            return [TextContent(type="text", text=f"Error: {str(e)}")]
+        except Exception as e:
+            return [TextContent(type="text", text=f"Internal Error: {str(e)}")]

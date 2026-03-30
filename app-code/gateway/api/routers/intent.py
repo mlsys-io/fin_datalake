@@ -2,7 +2,7 @@
 Intent Router — /api/v1/intent
 
 The Universal Endpoint. The central REST entry point for all Gateway operations.
-Receives HTTP requests, builds a UserIntent, and delegates to the InterfaceRegistry.
+Receives HTTP requests and delegates to the unified dispatch pipeline.
 
 Design:
   This router intentionally has ONE primary endpoint (POST /intent).
@@ -24,11 +24,8 @@ from typing import Any, Dict
 from gateway.api.deps import get_current_user, get_registry
 from gateway.core.adapters import ActionNotFoundError, PermissionError
 from gateway.core.registry import InterfaceRegistry, DomainNotFoundError
-from gateway.models.intent import UserIntent
+from gateway.core.dispatch import dispatch, CircuitBreakerOpenError
 from gateway.models.user import User
-
-import os
-from redis.asyncio import Redis
 
 router = APIRouter()
 
@@ -94,43 +91,26 @@ async def execute_intent(
 
     1. Parses the HTTP request body into an IntentRequest.
     2. Injects authenticated user identity (from auth dependency).
-    3. Builds a fully qualified UserIntent.
-    4. Routes it through the InterfaceRegistry.
-    5. Returns the adapter's serializable result.
+    3. Delegates execution to the unified dispatch pipeline.
+    4. Returns the result data.
 
-    Error handling maps adapter exceptions to appropriate HTTP status codes.
+    Error handling maps dispatch exceptions to appropriate HTTP status codes.
     """
-    intent = UserIntent(
-        domain=body.domain,
-        action=body.action,
-        parameters=body.parameters,
-        user_id=user.username,
-        roles=user.role_names if user.role_names else ["analyst"],
-    )
-
-    # -----------------------------------------------------------------------
-    # Circuit Breaker Check
-    # -----------------------------------------------------------------------
-    if intent.domain != "system":
-        from gateway.core.redis import get_redis_client
-        r = get_redis_client()
-        if r:
-            try:
-                async with r:
-                    is_open = await r.get("gateway:circuit_breaker")
-                if is_open == "open":
-                    raise HTTPException(
-                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                        detail="System is in maintenance mode — backpressure active."
-                    )
-            except HTTPException:
-                raise
-            except Exception:
-                # If Redis is down, we fail-open for reliability
-                pass
-
     try:
-        return await registry.route(user, intent)
+        result = await dispatch(
+            registry=registry,
+            user=user,
+            domain=body.domain,
+            action=body.action,
+            parameters=body.parameters,
+            source_protocol="rest"
+        )
+        return result.data
+    except CircuitBreakerOpenError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e)
+        )
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except DomainNotFoundError as e:
@@ -139,6 +119,9 @@ async def execute_intent(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception:
+        # Re-raise internal errors as 500 (standard FastAPI behavior)
+        raise
 
 
 @router.get("/intent/domains", summary="List all registered capability domains")
