@@ -28,6 +28,8 @@ class DeltaLakeSink(DataSink):
     region: str = "us-east-1"
     allow_unsafe_rename: bool = True
     storage_options_extra: Dict[str, str] = field(default_factory=dict)
+    dlq_uri: Optional[str] = None  # Route failed batches to this URI instead of failing
+    
     
     # Write behaviors
     mode: str = "append"  # "append" or "overwrite"
@@ -64,7 +66,7 @@ class DeltaLakeWriter(DataWriter):
             opts["AWS_S3_FORCE_PATH_STYLE"] = "true"
             
         opts.update(self.sink.storage_options_extra)
-        return opts
+        return {k: str(v) for k, v in opts.items() if v is not None}
 
     def _ensure_ssl_cert(self):
         """Set SSL_CERT_FILE for Rust object_store if certificate exists."""
@@ -183,19 +185,29 @@ class DeltaLakeWriter(DataWriter):
         
         logger.info(f"[DeltaLake] Writing {data.num_rows} rows to {self.sink.uri}...")
         
-        write_deltalake(
-            table_or_uri=self.sink.uri,
-            data=data,
-            mode=self.sink.mode,
-            partition_by=self.sink.partition_by,
-            storage_options=self._storage_options,
-            schema_mode=self.sink.schema_mode or ("overwrite" if self.sink.mode == "overwrite" else "merge")
-        )
-        
-        logger.success(f"[DeltaLake] ✅ Successfully wrote {data.num_rows} rows to {self.sink.uri}")
-        
-        if self.sink.hive_config and self.sink.hive_table_name:
-            self._register_in_hive(data.schema)
+        try:
+            write_deltalake(
+                table_or_uri=self.sink.uri,
+                data=data,
+                mode=self.sink.mode,
+                partition_by=self.sink.partition_by,
+                storage_options=self._storage_options,
+                schema_mode=self.sink.schema_mode or ("overwrite" if self.sink.mode == "overwrite" else "merge")
+            )
+            logger.success(f"[DeltaLake] ✅ Successfully wrote {data.num_rows} rows to {self.sink.uri}")
+            
+            if self.sink.hive_config and self.sink.hive_table_name:
+                self._register_in_hive(data.schema)
+                
+        except Exception as write_err:
+            if self.sink.dlq_uri:
+                logger.warning(f"[DeltaLake] Write failed: {write_err}. Routing to DLQ ({self.sink.dlq_uri}).")
+                from etl.io.sinks.dlq import DeadLetterQueue
+                dlq = DeadLetterQueue(self.sink.dlq_uri, self._storage_options)
+                dlq.send(data, str(write_err))
+            else:
+                logger.error(f"[DeltaLake] Write failed and no DLQ configured: {write_err}")
+                raise
 
     def _register_in_hive(self, schema):
         """Register Delta table in Hive Metastore."""

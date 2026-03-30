@@ -11,6 +11,14 @@ if TYPE_CHECKING:
     import pyarrow as pa
 
 
+def _get_default_hive_host():
+    from etl.config import config
+    return config.HIVE_HOST or "localhost"
+
+def _get_default_hive_port():
+    from etl.config import config
+    return config.HIVE_PORT or 9083
+
 @dataclass
 class HiveMetastore(DependencyAwareMixin):
     """
@@ -18,9 +26,8 @@ class HiveMetastore(DependencyAwareMixin):
     """
     REQUIRED_DEPENDENCIES = ["thrift"]
     
-    from etl.config import config
-    host: str = config.HIVE_HOST or "localhost"
-    port: int = config.HIVE_PORT or 9083
+    host: str = field(default_factory=_get_default_hive_host)
+    port: int = field(default_factory=_get_default_hive_port)
     default_db: str = "default"
     auth_mechanism: str = "PLAIN"
     timeout_ms: int = 60000
@@ -97,12 +104,13 @@ class HiveClient(DependencyAwareMixin):
         table_name: str,
         location: str,
         schema: Any,  # pyarrow.Schema
-        partition_keys: List[str] = [],
+        partition_keys: Optional[List[str]] = None,
         table_properties: Optional[Dict[str, str]] = None
     ):
         """
         Registers an external Delta Lake table in Hive.
         """
+        partition_keys = partition_keys or []
         self._connect()
         HMS = self._HMS
         

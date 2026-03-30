@@ -10,10 +10,10 @@ class WebSocketIngestorService(ServiceTask):
     """
     REQUIRED_DEPENDENCIES = ["websocket-client", "psycopg2"]
 
-    def __init__(self, name: str, source_config: Dict, sink_config: Dict):
-        super().__init__(name)
-        self.source_config = source_config
-        self.sink_config = sink_config
+    def __init__(self, name: str = None, config: Dict = None, **kwargs):
+        super().__init__(name, config=config, **kwargs)
+        self.source_config = self.config.get("source", {})
+        self.sink_config = self.config.get("sink", {})
         self.running = False
 
     def run(self):
@@ -49,8 +49,9 @@ class WebSocketIngestorService(ServiceTask):
                     # 4. Write to Sink
                     writer.write_batch(batch)
                     
+                    from loguru import logger
                     # Update status (Ray Actor state)
-                    self.update_status(f"Ingested {len(batch)} messages")
+                    logger.info(f"[{self.name}] Ingested {len(batch)} messages")
                     
                 except Exception as e:
                     print(f"[{self.name}] Error in batch loop: {e}")

@@ -46,7 +46,7 @@ class DeltaLakeReader(DataReader):
             opts["AWS_S3_FORCE_PATH_STYLE"] = "true"
             
         opts.update(self.source.storage_options_extra)
-        return opts
+        return {k: str(v) for k, v in opts.items() if v is not None}
 
     def read_batch(self) -> Iterator[List[Dict[str, Any]]]:
         """

@@ -115,8 +115,11 @@ class RestApiReader(DataReader):
             page_param = self.source.pagination.page_param
             page = 1
             while True:
-                params[page_param] = page
-                data = self._fetch_one(params)
+                # Use a fresh copy for each request to avoid mutating state
+                current_params = params.copy()
+                current_params[page_param] = page
+                
+                data = self._fetch_one(current_params)
                 
                 if not data:
                     break
@@ -131,6 +134,7 @@ class RestApiReader(DataReader):
             yield self._fetch_one(params)
 
     def _fetch_one(self, params: Dict) -> List[Dict]:
+        from loguru import logger
         try:
             resp = self._session.request(
                 method=self.source.method,
