@@ -9,7 +9,7 @@ from etl.core.base_service import SyncHandle
 from etl.agents.mixins import ConversationManagerMixin
 
 
-from etl.core.constants import OVERSEER_REDIS_URL
+
 
 if TYPE_CHECKING:
     import ray
@@ -40,6 +40,11 @@ class BaseAgent(ABC, ConversationManagerMixin):
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.name = self.__class__.__name__
+        # `app_name` is the Ray Serve application name (set by deploy()).
+        # It may differ from `self.name` (class name) when a custom name is passed.
+        # AgentHub registration and delegation both use `app_name` so that
+        # serve.get_app_handle(app_name) resolves correctly.
+        self.app_name: Optional[str] = None
         self.config = config or {}
         self.executor = None
         self.running = False
@@ -64,6 +69,12 @@ class BaseAgent(ABC, ConversationManagerMixin):
     ):
         """
         Deploy this agent as a Ray Serve application.
+
+        The ``name`` parameter (or the class name if omitted) becomes the Ray
+        Serve *application name*.  It is stored on each replica instance as
+        ``self.app_name`` so that AgentHub registration can use it instead of
+        the bare class name — ensuring that delegation via
+        ``serve.get_app_handle(app_name)`` resolves to the correct deployment.
         """
         import ray.serve as serve
         from fastapi import FastAPI
@@ -72,8 +83,7 @@ class BaseAgent(ABC, ConversationManagerMixin):
         actor_name = name or cls.__name__
         app = FastAPI(title=f"Agent: {actor_name}")
         
-        # Define the Ingress class
-        # We use a bit of Ray Serve magic here to wrap the class
+        # Wrap the class with a Ray Serve ingress and deploy it
         deployment_cls = serve.deployment(
             name=actor_name,
             num_replicas=num_replicas,
@@ -85,8 +95,9 @@ class BaseAgent(ABC, ConversationManagerMixin):
         
         logger.info(f"Deployed Agent '{actor_name}' to Ray Serve")
         
-        # We call setup() via the handle to ensure it's ready
-        # In Ray Serve, handles are async by default
+        # setup() is blocking (via ray.get) so it completes before deploy() returns.
+        # Inside setup(), _register_with_hub() is called with the correct app_name.
+        ray.get(handle.set_app_name.remote(actor_name))
         ray.get(handle.setup.remote())
         
         return handle
@@ -129,6 +140,17 @@ class BaseAgent(ABC, ConversationManagerMixin):
     # Lifecycle
     # =========================================================================
 
+    def set_app_name(self, app_name: str):
+        """
+        Set the Ray Serve application name on the replica.
+
+        Called by ``deploy()`` immediately after ``serve.run()`` returns so
+        that ``self.app_name`` reflects the deployed application name (which
+        may differ from the class name).  AgentHub registration uses this
+        value so that ``serve.get_app_handle(registered_name)`` works.
+        """
+        self.app_name = app_name
+
     def setup(self):
         """
         Called once when the Actor starts.
@@ -148,26 +170,40 @@ class BaseAgent(ABC, ConversationManagerMixin):
         logger.info(f"[{self.name}] Setting up Agent Intelligence...")
         self.executor = self.build_executor()
         
-        # Auto-register with AgentHub if capabilities defined
+        # Auto-register with AgentHub if capabilities defined.
+        # Use self.app_name (the Serve app name) so that delegation via
+        # serve.get_app_handle() resolves to the correct deployment.
         if self.CAPABILITIES:
             self._register_with_hub()
         
         logger.info(f"[{self.name}] Ready.")
     
     def _register_with_hub(self):
-        """Register this agent with the AgentHub."""
+        """
+        Register this agent with the AgentHub.
+
+        Registration uses ``self.app_name`` (the Ray Serve application name)
+        rather than ``self.name`` (the Python class name).  This is critical:
+        ``delegate()`` and the demo scripts look up agents by capability and
+        then call ``serve.get_app_handle(registered_name)``.  If the class
+        name is registered instead of the app name, that handle lookup fails.
+        """
         import ray
         from loguru import logger
         
+        # Prefer the Serve app name; fall back to class name if set_app_name()
+        # was not called (e.g. when an agent is instantiated locally for testing).
+        registered_name = self.app_name or self.name
+
         try:
             from etl.agents.hub import get_hub
             hub = get_hub()
             ray.get(hub.register.remote(
-                name=self.name,
+                name=registered_name,
                 capabilities=self.CAPABILITIES,
-                metadata={"class": self.__class__.__name__}
+                metadata={"class": self.__class__.__name__, "app_name": registered_name}
             ))
-            logger.info(f"[{self.name}] Registered with AgentHub (capabilities: {self.CAPABILITIES})")
+            logger.info(f"[{self.name}] Registered as '{registered_name}' in AgentHub (capabilities: {self.CAPABILITIES})")
         except Exception as e:
             logger.warning(f"[{self.name}] Failed to register with AgentHub: {e}")
 
@@ -176,11 +212,12 @@ class BaseAgent(ABC, ConversationManagerMixin):
         import ray
         from loguru import logger
 
+        registered_name = self.app_name or self.name
         try:
             from etl.agents.hub import get_hub
             hub = get_hub()
-            ray.get(hub.unregister.remote(self.name))
-            logger.info(f"[{self.name}] Deregistered from AgentHub")
+            ray.get(hub.unregister.remote(registered_name))
+            logger.info(f"[{self.name}] Deregistered '{registered_name}' from AgentHub")
         except Exception:
             pass  # Best-effort; hub may already be gone
 

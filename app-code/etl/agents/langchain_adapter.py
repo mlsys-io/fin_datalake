@@ -1,22 +1,41 @@
-from typing import Any, Dict, Union
-from abc import abstractmethod
+from typing import Any, Dict, Union, Optional
+import os
+from loguru import logger
 from .base import BaseAgent
 
-class LangChainAgent(BaseAgent):
+class LangChainMixin:
     """
-    A specialized Agent for LangChain workloads.
-    Enforces that the executor follows the `Runnable` protocol.
+    A mixin that provides LangChain utilities to any class.
+    
+    This avoids forcing a specific execution flow or inheritance 
+    on the agent, allowing for cleaner Ray orchestration.
     """
 
-    @abstractmethod
-    def build_executor(self):
+    def _get_llm(self, model_name: str = "gpt-3.5-turbo", temperature: float = 0.0, json_mode: bool = False) -> Any:
         """
-        Must return a LangChain Runnable (Chain, AgentExecutor, etc).
+        Dynamically initializes a LangChain ChatModel.
         """
-        pass
-    
-    def ask(self, payload: Union[str, Dict[str, Any]], session_id: Optional[str] = None) -> Any:
-        """
-        Handle session-based context by passing it to the base class.
-        """
-        return super().ask(payload, session_id=session_id)
+        try:
+            from langchain_openai import ChatOpenAI
+            api_key = os.environ.get("OPENAI_API_KEY")
+            
+            if api_key and api_key.lower() not in ["dummy", "test", "demo"]:
+                kwargs = {
+                    "api_key": api_key,
+                    "model": model_name,
+                    "temperature": temperature
+                }
+                if json_mode:
+                    kwargs["model_kwargs"] = {"response_format": {"type": "json_object"}}
+                return ChatOpenAI(**kwargs)
+        except ImportError:
+            logger.warning("[LangChainMixin] Could not import langchain_openai.")
+            
+        return None
+
+class LangChainAgent(BaseAgent, LangChainMixin):
+    """
+    Convenience class that combines BaseAgent and LangChainMixin.
+    Preserves existing inheritance structure for standard LangChain agents.
+    """
+    pass
