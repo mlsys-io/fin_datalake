@@ -63,7 +63,9 @@ get_nodeport() {
     kubectl get svc "$svc" -n "$ns" -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo ""
 }
 
+# Discovery
 API_PORT=$(get_nodeport "$NS_DEMO" "demo-api")
+GATEWAY_PORT=$(get_nodeport "$NS_COMPUTE" "etl-gateway-svc")
 WS_PORT=$(get_nodeport "$NS_DEMO" "demo-websocket")
 KAFKA_PORT=$(get_nodeport "$NS_DEMO" "kafka")
 STATIC_PORT=$(get_nodeport "$NS_DEMO" "static-server")
@@ -104,7 +106,7 @@ echo -e "${YELLOW}[6/6] Generating configuration files...${NC}"
 cat > "$ENV_FILE" << EOF
 # Auto-generated on $(date)
 export GATEWAY_INTERNAL_TOKEN=${INTERNAL_TOKEN}
-export GATEWAY_INTERNAL_URL=http://${NODE_IP}:30800
+export GATEWAY_INTERNAL_URL=http://${NODE_IP}:${GATEWAY_PORT:-30801}
 export NODE_IP=${NODE_IP}
 export AWS_ACCESS_KEY_ID=${MINIO_ACCESS}
 export AWS_SECRET_ACCESS_KEY=${MINIO_SECRET}
@@ -118,7 +120,7 @@ export TSDB_USER=app
 export TSDB_PASSWORD='${TSDB_PASSWORD}'
 export TSDB_DATABASE=app
 export KAFKA_BOOTSTRAP_SERVERS=${NODE_IP}:${KAFKA_PORT:-30909}
-export API_URL=http://${NODE_IP}:${API_PORT:-30800}
+export API_URL=http://${NODE_IP}:${GATEWAY_PORT:-30801}
 export WEBSOCKET_URL=ws://${NODE_IP}:${WS_PORT:-30876}
 export STATIC_URL=http://${NODE_IP}:${STATIC_PORT:-30880}
 export HIVE_HOST=${NODE_IP}
@@ -138,6 +140,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etl-config
+  namespace: "${NS_COMPUTE}"
 data:
   NODE_IP: "${NODE_IP}"
   KAFKA_BOOTSTRAP_SERVERS: "kafka.${NS_DEMO}.svc:9092"
@@ -148,6 +151,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: etl-secrets
+  namespace: "${NS_COMPUTE}"
 type: Opaque
 stringData:
   AWS_ACCESS_KEY_ID: "${MINIO_ACCESS}"
