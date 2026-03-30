@@ -30,6 +30,8 @@ from overseer.models import (
 )
 from overseer.policies.base import BasePolicy
 from overseer.policies.cooldown import CooldownTracker
+from overseer.policies.healing import ActorHealthPolicy
+from overseer.policies.scaling import KafkaLagPolicy
 from overseer.actuators import AlertActuator, RayActuator, GatewayActuator, StatusReporterActuator
 from overseer.actuators.webhook import WebhookActuator
 from overseer.actuators import BaseActuator
@@ -92,10 +94,12 @@ class Overseer:
         self.collectors = [build_collector(ep) for ep in endpoints]
 
         # ----------------------------------------------------------------------- #
-        # PURE DYNAMIC POLICIES: 0 built-in policies at startup.
-        # Everything is pulled from S3.
+        # Built-in Policies
+        # These provide a demo-safe baseline so self-healing and scaling can work
+        # even when S3-backed custom policy sync is not available.
         # ----------------------------------------------------------------------- #
-        self.policies: list[BasePolicy] = []
+        self.builtin_policies = self._build_builtin_policies(overseer_cfg)
+        self.policies: list[BasePolicy] = list(self.builtin_policies)
 
         # Custom Policies Sync
         self.custom_policy_cfg = overseer_cfg.get("custom_policies", {})
@@ -133,10 +137,14 @@ class Overseer:
                 self.last_sync_time = current_time
                 try:
                     await asyncio.to_thread(sync_policies, self.s3_uri, self.local_custom_dir)
-                    self.policies = await asyncio.to_thread(load_custom_policies, self.local_custom_dir)
-                    
-                    if self.policies:
-                        logger.info(f"Active policies: {len(self.policies)} (100% dynamically loaded from S3).")
+                    custom_policies = await asyncio.to_thread(load_custom_policies, self.local_custom_dir)
+                    self.policies = [*self.builtin_policies, *custom_policies]
+
+                    if custom_policies:
+                        logger.info(
+                            f"Active policies: {len(self.policies)} total "
+                            f"({len(self.builtin_policies)} built-in, {len(custom_policies)} custom)."
+                        )
                 except Exception as e:
                     logger.error(f"Failed to hot-reload custom policies: {e}")
 
@@ -215,6 +223,35 @@ class Overseer:
             )
 
             await asyncio.sleep(self.loop_interval)
+
+    def _build_builtin_policies(self, overseer_cfg: dict) -> list[BasePolicy]:
+        """
+        Build a minimal built-in policy set that keeps the Overseer useful for
+        local demos and fallback operation when S3-backed custom policies are
+        not present.
+        """
+        builtin_cfg = overseer_cfg.get("builtin_policies", {})
+        enabled = builtin_cfg.get("enabled", True)
+        if not enabled:
+            return []
+
+        policies: list[BasePolicy] = []
+
+        if builtin_cfg.get("actor_health_enabled", True):
+            policies.append(ActorHealthPolicy())
+
+        if builtin_cfg.get("kafka_lag_enabled", True):
+            policies.append(
+                KafkaLagPolicy(
+                    scale_up_threshold=builtin_cfg.get("kafka_scale_up_threshold", 500),
+                    scale_up_count=builtin_cfg.get("kafka_scale_up_count", 1),
+                    scale_down_idle_threshold=builtin_cfg.get("kafka_scale_down_idle_threshold", 0),
+                    scale_down_count=builtin_cfg.get("kafka_scale_down_count", 1),
+                    agent_class=builtin_cfg.get("kafka_agent_class", "SentimentAgent"),
+                )
+            )
+
+        return policies
 
     async def _safe_collect(self, collector: BaseCollector) -> ServiceMetrics:
         """Run a single collector with error handling."""
