@@ -10,7 +10,8 @@ import os
 from redis.asyncio import Redis
 
 from gateway.api.deps import get_current_user
-from gateway.models.user import User, Permission
+from gateway.models.user import User
+from gateway.core.rbac import Permission, rbac_provider
 
 router = APIRouter()
 
@@ -29,7 +30,7 @@ async def set_circuit_breaker(
     Requires SYSTEM_ADMIN permission.
     """
     # Authorization check
-    if not user.has_permission(Permission.SYSTEM_ADMIN):
+    if not rbac_provider.is_authorized(user.role_names, Permission.SYSTEM_ADMIN):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: SYSTEM_ADMIN permission required.",
