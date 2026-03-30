@@ -6,7 +6,7 @@ from etl.io.sinks.delta_lake import DeltaLakeSink, DeltaLakeWriter
 
 @pytest.fixture
 def mock_write_deltalake():
-    with patch("etl.io.sinks.delta_lake.write_deltalake") as mock:
+    with patch("deltalake.write_deltalake") as mock:
         yield mock
 
 def test_sink_config():
@@ -41,21 +41,31 @@ def test_write_batch_calls_deltalake(mock_write_deltalake):
 
 def test_foolproof_hive_registration(mock_write_deltalake):
     # Mock Hive
-    mock_hive = MagicMock()
-    mock_hive_ctx = MagicMock()
-    mock_hive.open.return_value.__enter__.return_value = mock_hive_ctx
-    
-    sink = DeltaLakeSink(
-        uri="s3://test",
-        hive_metastore=mock_hive,
-        hive_table_name="db.table"
-    )
-    
-    df = pd.DataFrame({"col": [1]})
-    
-    with sink.open() as writer:
-        writer.write_batch(df)
+    with patch("etl.services.hive.HiveMetastore") as mock_hms_class:
+        mock_hms = mock_hms_class.return_value
+        mock_client = MagicMock()
+        mock_hms.open.return_value.__enter__.return_value = mock_client
         
-    # Verify Hive was called
-    mock_hive_ctx.register_delta_table.assert_called_once()
-    assert mock_hive_ctx.register_delta_table.call_args[1]["table_name"] == "table"
+        sink = DeltaLakeSink(
+            uri="s3://test",
+            hive_config={"host": "localhost", "port": 9083},
+            hive_table_name="db.table"
+        )
+        
+        df = pd.DataFrame({"col": [1]})
+        
+        with sink.open() as writer:
+            writer.write_batch(df)
+            
+        # Verify Hive was called
+        mock_client.register_delta_table.assert_called_once()
+        assert mock_client.register_delta_table.call_args[1]["table_name"] == "table"
+
+def test_writer_filters_none_storage_options():
+    """Verify Bug 5: None values are removed from storage_options."""
+    sink = DeltaLakeSink(uri="s3://test", aws_access_key_id=None)
+    writer = DeltaLakeWriter(sink)
+    opts = writer._storage_options
+    assert "AWS_ACCESS_KEY_ID" not in opts
+    # Check that other keys are still there
+    assert "AWS_REGION" in opts

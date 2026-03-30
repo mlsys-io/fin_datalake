@@ -63,3 +63,18 @@ def test_reader_pagination(mock_requests):
     call_args_list = session.request.call_args_list
     assert call_args_list[0][1]['params']['p'] == 1
     assert call_args_list[1][1]['params']['p'] == 2
+
+def test_reader_fetch_one_error_logging(mock_requests):
+    """Verify Bug 3: _fetch_one uses logger correctly on error."""
+    session = mock_requests.return_value
+    session.request.side_effect = Exception("HTTP Error")
+    
+    source = RestApiSource(url="http://test.com")
+    reader = RestApiReader(source)
+    reader._session = session
+    
+    with pytest.raises(Exception) as excinfo:
+        reader._fetch_one({})
+    
+    assert "HTTP Error" in str(excinfo.value)
+    # If logger was missing, it would raise NameError instead of the original Exception.

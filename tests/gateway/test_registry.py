@@ -6,7 +6,8 @@ import pytest
 from gateway.core.registry import InterfaceRegistry, DomainNotFoundError
 from gateway.core.adapters import BaseAdapter, ActionNotFoundError, PermissionError
 from gateway.models.intent import UserIntent
-from gateway.models.user import Permission, User
+from gateway.models.user import User
+from gateway.core.rbac import Permission, Role
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +43,7 @@ def make_intent(domain: str, action: str, **params) -> UserIntent:
         action=action,
         parameters=params,
         user_id="test-user",
-        role="admin",
+        roles=["admin"],
     )
 
 
@@ -83,29 +84,34 @@ class TestRouting:
         self.reg.register(StubDataAdapter())
         self.reg.register(StubComputeAdapter())
 
-    def test_route_to_data_adapter(self):
+    @pytest.mark.asyncio
+    async def test_route_to_data_adapter(self):
         intent = make_intent("data", "list_tables")
-        result = self.reg.route(ADMIN, intent)
+        result = await self.reg.route(ADMIN, intent)
         assert result == {"tables": ["market_data"]}
 
-    def test_route_unknown_domain_raises(self):
+    @pytest.mark.asyncio
+    async def test_route_unknown_domain_raises(self):
         intent = make_intent("unknown_domain", "foo")
         with pytest.raises(DomainNotFoundError):
-            self.reg.route(ADMIN, intent)
+            await self.reg.route(ADMIN, intent)
 
-    def test_route_unknown_action_raises(self):
+    @pytest.mark.asyncio
+    async def test_route_unknown_action_raises(self):
         intent = make_intent("data", "nonexistent_action")
         with pytest.raises(ActionNotFoundError):
-            self.reg.route(ADMIN, intent)
+            await self.reg.route(ADMIN, intent)
 
-    def test_route_permission_denied(self):
+    @pytest.mark.asyncio
+    async def test_route_permission_denied(self):
         """Analyst should NOT have compute:write."""
         intent = make_intent("compute", "submit_job")
         with pytest.raises(PermissionError):
-            self.reg.route(ANALYST, intent)
+            await self.reg.route(ANALYST, intent)
 
-    def test_route_permission_allowed(self):
+    @pytest.mark.asyncio
+    async def test_route_permission_allowed(self):
         """Admin has compute:write."""
         intent = make_intent("compute", "submit_job")
-        result = self.reg.route(ADMIN, intent)
+        result = await self.reg.route(ADMIN, intent)
         assert result["status"] == "submitted"

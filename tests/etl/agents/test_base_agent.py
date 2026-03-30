@@ -42,6 +42,13 @@ def test_base_agent_ask_invoke_protocol():
         assert result == "InvokeResult"
         mock_ex.invoke.assert_called_with("input2")
 
+def test_base_agent_no_overseer_import():
+    """Verify Bug 1: BaseAgent no longer imports non-existent core.constants."""
+    # If the import was still there, this test file wouldn't even load or
+    # we can check the module's globals if we are sneaky.
+    import etl.agents.base
+    assert not hasattr(etl.agents.base, "OVERSEER_REDIS_URL")
+
 # --- LangChainAgent Tests ---
 
 class MockLCAgent(LangChainAgent):
@@ -61,6 +68,11 @@ def test_langchain_agent_pass_through():
     # Test Str
     res2 = agent.ask("raw string")
     assert res2 == {"output": "AgentAnswer"}
+
+def test_langchain_agent_optional_import():
+    """Verify Bug 2: LangChainAgent has Optional in its namespace."""
+    from etl.agents.langchain_adapter import Optional
+    assert Optional is not None
 
 # --- Tool Tests ---
 
