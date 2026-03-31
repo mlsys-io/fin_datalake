@@ -39,3 +39,27 @@ export async function fetchMe() {
     if (!res.ok) return null
     return res.json()
 }
+
+/**
+ * Fetch historical heartbeat snapshots from the Overseer.
+ */
+export async function fetchOverseerSnapshots(n: number = 50) {
+    const res = await fetch(`/api/v1/system/overseer/snapshots?n=${n}`, { credentials: 'include' })
+    if (!res.ok) {
+        const data = await res.json()
+        throw new APIError(res.status, data.detail || 'Failed to fetch snapshots')
+    }
+    return res.json()
+}
+
+/**
+ * Fetch recent alert logs from the Overseer.
+ */
+export async function fetchOverseerAlerts(n: number = 20) {
+    const res = await fetch(`/api/v1/system/overseer/alerts?n=${n}`, { credentials: 'include' })
+    if (!res.ok) {
+        const data = await res.json()
+        throw new APIError(res.status, data.detail || 'Failed to fetch alerts')
+    }
+    return res.json()
+}

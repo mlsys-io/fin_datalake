@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
-import { Database, Cpu, Bot, Settings, LogOut, LayoutDashboard } from 'lucide-react'
+import { Database, Cpu, Bot, Settings, LogOut, LayoutDashboard, Shield } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { DataCatalog } from './views/DataCatalog'
 import { ComputePipelines } from './views/ComputePipelines'
 import { AgentHub } from './views/AgentHub'
 import { InfraIframes } from './views/InfraIframes'
+import { SystemOverseer } from './views/SystemOverseer'
 
-type ViewType = 'data' | 'compute' | 'agents' | 'infra'
+type ViewType = 'data' | 'compute' | 'agents' | 'infra' | 'overseer'
 
 export const Dashboard: React.FC = () => {
     const { user, setUser } = useAuthStore()
@@ -31,6 +32,7 @@ export const Dashboard: React.FC = () => {
             case 'compute': return <ComputePipelines />
             case 'agents': return <AgentHub />
             case 'infra': return <InfraIframes />
+            case 'overseer': return <SystemOverseer />
             default: return <DataCatalog />
         }
     }
@@ -71,6 +73,14 @@ export const Dashboard: React.FC = () => {
                         AI Agents
                     </button>
 
+                    <button
+                        onClick={() => setActiveView('overseer')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded transition-colors ${activeView === 'overseer' ? 'bg-stone-200 text-stone-900 font-medium' : 'hover:bg-stone-200/50 text-stone-600'}`}
+                    >
+                        <Shield size={20} />
+                        System Overseer
+                    </button>
+
                     {canViewInfra && (
                         <button
                             onClick={() => setActiveView('infra')}
@@ -102,7 +112,7 @@ export const Dashboard: React.FC = () => {
             <main className="flex-1 flex flex-col overflow-hidden bg-white">
                 <header className="h-16 bg-white border-b border-stone-200 flex items-center px-8 z-10 sticky top-0">
                     <h2 className="text-xl font-semibold text-stone-900 capitalize">
-                        {activeView === 'infra' ? 'Infrastructure Overviews' : activeView}
+                        {activeView === 'infra' ? 'Infrastructure Overviews' : (activeView === 'overseer' ? 'Autonomic Controller' : activeView)}
                     </h2>
                 </header>
                 <div className="flex-1 overflow-auto p-8 bg-white">
