@@ -39,6 +39,24 @@ spec:
                   name: etl-secrets
                   key: GATEWAY_INTERNAL_TOKEN
             
+            # External Storage / Lakehouse Connection
+            - name: MINIO_ENDPOINT
+              value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: AWS_SECRET_ACCESS_KEY
+            
+            # Redis Connection (Required for RBAC Policies)
+            - name: OVERSEER_REDIS_URL
+              value: "redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/0"
+
             # Application Settings
             - name: LOG_LEVEL
               value: "info"

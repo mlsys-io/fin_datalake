@@ -27,12 +27,14 @@ spec:
             # 1. Core Service Discovery (Internal K8s DNS)
             - name: OVERSEER_RAY_HOST
               value: "etl-ray-head.etl-compute.svc.cluster.local"
-            - name: OVERSEER_KAFKA_HOST
-              value: "kafka.demo-sources.svc.cluster.local"
             - name: OVERSEER_PREFECT_HOST
               value: "prefect-server.etl-orchestrate.svc.cluster.local"
             - name: OVERSEER_MINIO_HOST
-              value: "minio.etl-storage.svc.cluster.local"
+              value: "luyao-storage-head.ddns.comp.nus.edu.sg"
+            - name: OVERSEER_MINIO_PORT
+              value: "4000"
+            - name: OVERSEER_MINIO_PROTOCOL
+              value: "https"
             - name: OVERSEER_GATEWAY_HOST
               value: "etl-gateway-svc.etl-compute.svc.cluster.local"
             - name: OVERSEER_GATEWAY_PORT
@@ -40,11 +42,11 @@ spec:
 
             # 2. Redis State Store (Partition 1)
             - name: OVERSEER_REDIS_URL
-              value: "redis://redis-svc.etl-storage.svc.cluster.local:6379/1"
+              value: "redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/1"
 
             # 3. S3 / MinIO Configuration
             - name: AWS_ENDPOINT_URL
-              value: "http://minio.etl-storage.svc.cluster.local:9000"
+              value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
