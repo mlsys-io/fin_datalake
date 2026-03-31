@@ -77,10 +77,6 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
-      volumes:
-        - name: minio-ca
-          configMap:
-            name: minio-ca
           readinessProbe:
             httpGet:
               path: /healthz
@@ -93,6 +89,10 @@ spec:
               port: 8000
             initialDelaySeconds: 15
             periodSeconds: 20
+      volumes:
+        - name: minio-ca
+          configMap:
+            name: minio-ca
 ---
 apiVersion: v1
 kind: Service
