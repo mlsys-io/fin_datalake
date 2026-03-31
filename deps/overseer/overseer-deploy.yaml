@@ -1,0 +1,75 @@
+# =============================================================================
+# AI Lakehouse Overseer - Autonomic Controller Deployment
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etl-overseer
+  namespace: etl-compute
+  labels:
+    app: etl-overseer
+    component: autonomic-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: etl-overseer
+  template:
+    metadata:
+      labels:
+        app: etl-overseer
+    spec:
+      containers:
+        - name: overseer
+          image: etl-overseer:latest
+          imagePullPolicy: Never
+          env:
+            # 1. Core Service Discovery (Internal K8s DNS)
+            - name: OVERSEER_RAY_HOST
+              value: "etl-ray-head.etl-compute.svc.cluster.local"
+            - name: OVERSEER_KAFKA_HOST
+              value: "kafka.demo-sources.svc.cluster.local"
+            - name: OVERSEER_PREFECT_HOST
+              value: "prefect-server.etl-orchestrate.svc.cluster.local"
+            - name: OVERSEER_MINIO_HOST
+              value: "minio.etl-storage.svc.cluster.local"
+            - name: OVERSEER_GATEWAY_HOST
+              value: "etl-gateway-svc.etl-compute.svc.cluster.local"
+            - name: OVERSEER_GATEWAY_PORT
+              value: "8000"
+
+            # 2. Redis State Store (Partition 1)
+            - name: OVERSEER_REDIS_URL
+              value: "redis://redis-svc.etl-storage.svc.cluster.local:6379/1"
+
+            # 3. S3 / MinIO Configuration
+            - name: AWS_ENDPOINT_URL
+              value: "http://minio.etl-storage.svc.cluster.local:9000"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: AWS_SECRET_ACCESS_KEY
+            
+            # 4. Security Token for Gateway Auth
+            - name: GATEWAY_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: GATEWAY_INTERNAL_TOKEN
+
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+# Note: The Overseer does not require a Service/NodePort as it is 
+# a purely internal worker that pulls metrics and pushes to Redis.
