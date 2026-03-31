@@ -46,6 +46,20 @@ spec:
                 value: "/opt/certs/public.crt"
               - name: AWS_EC2_METADATA_DISABLED
                 value: "true"
+              - name: AWS_ENDPOINT_URL
+                value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
+              - name: AWS_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: etl-secrets
+                    key: AWS_ACCESS_KEY_ID
+              - name: AWS_SECRET_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: etl-secrets
+                    key: AWS_SECRET_ACCESS_KEY
+              - name: OVERSEER_REDIS_URL
+                value: "redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/0"
             volumeMounts:
               - mountPath: /tmp/ray
                 name: ray-logs
@@ -89,6 +103,20 @@ spec:
                   value: "/opt/certs/public.crt"
                 - name: AWS_EC2_METADATA_DISABLED
                   value: "true"
+                - name: AWS_ENDPOINT_URL
+                  value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: etl-secrets
+                      key: AWS_ACCESS_KEY_ID
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: etl-secrets
+                      key: AWS_SECRET_ACCESS_KEY
+                - name: OVERSEER_REDIS_URL
+                  value: "redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/0"
               volumeMounts:
                 - mountPath: /tmp/ray
                   name: ray-logs

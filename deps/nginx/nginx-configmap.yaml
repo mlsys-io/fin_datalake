@@ -1,0 +1,114 @@
+# =============================================================================
+# Lakehouse Nginx Ingress Config - Production Mode
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: etl-compute
+data:
+  nginx.conf: |
+    worker_processes 1;
+    events { worker_connections 1024; }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+        sendfile        on;
+        keepalive_timeout  65;
+
+        # Internal service hostnames (K8s DNS)
+        upstream gateway_backend {
+            server etl-gateway-svc.etl-compute.svc.cluster.local:8000;
+        }
+
+        upstream prefect_backend {
+            server prefect-server.etl-orchestrate.svc.cluster.local:4200;
+        }
+
+        upstream ray_backend {
+            server etl-ray-head-svc.etl-compute.svc.cluster.local:8265;
+        }
+
+        # For MinIO we use the external DDNS hostname
+        upstream minio_backend {
+            server luyao-storage-head.ddns.comp.nus.edu.sg:9001;
+        }
+
+        server {
+            listen 80;
+            server_name localhost;
+
+            # Increase proxy buffer sizes for large UIs (Prefect / Ray)
+            proxy_buffer_size           128k;
+            proxy_buffers               4 256k;
+            proxy_busy_buffers_size     256k;
+
+            # Forwarding headers
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # WebSockets support
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+
+            # 1. Auth Verify
+            location = /auth-verify {
+                internal;
+                proxy_pass              http://gateway_backend/api/v1/auth/verify;
+                proxy_pass_request_body off;
+                proxy_set_header        Content-Length "";
+                proxy_set_header        X-Original-URI $request_uri;
+            }
+
+            # 2. Gateway API
+            location /api/ {
+                proxy_pass http://gateway_backend;
+            }
+
+            # 3. Prefect
+            location /prefect/ {
+                auth_request /auth-verify;
+                auth_request_set $auth_user $upstream_http_x_remote_user;
+                proxy_set_header X-Remote-User $auth_user;
+                error_page 401 = @login_redirect;
+                rewrite ^/prefect/(.*)$ /$1 break;
+                proxy_pass http://prefect_backend;
+            }
+
+            # 4. Ray Dashboard
+            location /ray/ {
+                auth_request /auth-verify;
+                auth_request_set $auth_user $upstream_http_x_remote_user;
+                proxy_set_header X-Remote-User $auth_user;
+                error_page 401 = @login_redirect;
+                rewrite ^/ray/(.*)$ /$1 break;
+                proxy_pass http://ray_backend;
+            }
+
+            # 5. MinIO Console
+            location /minio/ {
+                auth_request /auth-verify;
+                auth_request_set $auth_user $upstream_http_x_remote_user;
+                proxy_set_header X-Remote-User $auth_user;
+                error_page 401 = @login_redirect;
+                rewrite ^/minio/(.*)$ /$1 break;
+                proxy_pass http://minio_backend;
+            }
+
+            # 6. React App (Built from Front-end package)
+            location / {
+                root /usr/share/nginx/html;
+                index index.html index.htm;
+                try_files $uri $uri/ /index.html;
+            }
+
+            # Catch-all for auth failures (redirect back to login)
+            location @login_redirect {
+                return 302 /?redirect=$request_uri;
+            }
+        }
+    }
