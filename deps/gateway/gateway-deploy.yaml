@@ -32,12 +32,17 @@ spec:
                   name: etl-gateway-secret
                   key: GATEWAY_DATABASE_URL
 
-            # Security Token (Sync with other services)
             - name: GATEWAY_INTERNAL_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: etl-secrets
                   key: GATEWAY_INTERNAL_TOKEN
+            
+            - name: GATEWAY_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: GATEWAY_JWT_SECRET
             
             # External Storage / Lakehouse Connection
             - name: MINIO_ENDPOINT

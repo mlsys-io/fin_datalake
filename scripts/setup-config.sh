@@ -90,22 +90,31 @@ if kubectl get secret "$TSDB_SECRET_NAME" -n "$NS_TSDB" &>/dev/null; then
     TSDB_PASSWORD=$(kubectl get secret "$TSDB_SECRET_NAME" -n "$NS_TSDB" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
 fi
 
-# 5. Internal Gateway Security (M2M)
-echo -e "${YELLOW}[5/6] Configuring internal security...${NC}"
-# Use existing token if present in .env, otherwise generate
+# 5. Internal Gateway Security (M2M) and JWT Signing
+echo -e "${YELLOW}[5/6] Configuring security keys...${NC}"
+# Use existing tokens if present in .env, otherwise generate
 if [ -f "$ENV_FILE" ]; then
     INTERNAL_TOKEN=$(grep "GATEWAY_INTERNAL_TOKEN=" "$ENV_FILE" | cut -d'=' -f2 || echo "")
+    JWT_SECRET=$(grep "GATEWAY_JWT_SECRET=" "$ENV_FILE" | cut -d'=' -f2 || echo "")
 fi
+
 if [ -z "${INTERNAL_TOKEN:-}" ]; then
     INTERNAL_TOKEN=$(openssl rand -hex 16 2>/dev/null || echo "system-sk-$(date +%s)")
 fi
-echo -e "${GREEN}✅ Internal token configured${NC}"
+
+if [ -z "${JWT_SECRET:-}" ]; then
+    # Generate a secure 32-byte hex string for JWT signing
+    JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || echo "jwt-secret-$(date +%s)")
+fi
+
+echo -e "${GREEN}✅ Internal token and JWT secret configured${NC}"
 
 # 6. Generate .env
 echo -e "${YELLOW}[6/6] Generating configuration files...${NC}"
 cat > "$ENV_FILE" << EOF
 # Auto-generated on $(date)
 export GATEWAY_INTERNAL_TOKEN=${INTERNAL_TOKEN}
+export GATEWAY_JWT_SECRET=${JWT_SECRET}
 export GATEWAY_INTERNAL_URL=http://${NODE_IP}:${GATEWAY_PORT:-30801}
 export NODE_IP=${NODE_IP}
 export AWS_ACCESS_KEY_ID=${MINIO_ACCESS}
@@ -158,6 +167,7 @@ stringData:
   AWS_SECRET_ACCESS_KEY: "${MINIO_SECRET}"
   TSDB_PASSWORD: "${TSDB_PASSWORD}"
   GATEWAY_INTERNAL_TOKEN: "${INTERNAL_TOKEN}"
+  GATEWAY_JWT_SECRET: "${JWT_SECRET}"
 EOF
 
 echo -e "${GREEN}✅ Generated: ${ENV_FILE}${NC}"
