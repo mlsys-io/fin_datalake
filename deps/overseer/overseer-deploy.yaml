@@ -58,12 +58,21 @@ spec:
                   name: etl-secrets
                   key: AWS_SECRET_ACCESS_KEY
             
-            # 4. Security Token for Gateway Auth
+            # Security Token for Gateway Auth
             - name: GATEWAY_INTERNAL_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: etl-secrets
                   key: GATEWAY_INTERNAL_TOKEN
+            - name: SSL_CERT_FILE
+              value: "/opt/certs/public.crt"
+            - name: CA_PATH
+              value: "/opt/certs/public.crt"
+
+          volumeMounts:
+            - mountPath: /opt/certs
+              name: minio-ca
+              readOnly: true
 
           resources:
             requests:
@@ -72,6 +81,10 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
+      volumes:
+        - name: minio-ca
+          configMap:
+            name: minio-ca
 ---
 # Note: The Overseer does not require a Service/NodePort as it is 
 # a purely internal worker that pulls metrics and pushes to Redis.
