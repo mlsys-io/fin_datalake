@@ -89,14 +89,19 @@ data:
                 rewrite ^/prefect/(.*)$ /$1 break;
                 proxy_pass http://prefect_backend;
 
-                # Targeted asset rewriting only — avoids breaking API hrefs
-                proxy_set_header Accept-Encoding "";
+                # HTML Rewriting: Fix absolute paths for assets
+                # Disable compression so Nginx can filter the content
+                proxy_set_header Accept-Encoding ""; 
                 sub_filter_once off;
-                sub_filter_types text/html;
-                sub_filter '"/assets/'  '"/prefect/assets/';
-                sub_filter "'/assets/"  "'/prefect/assets/";
-                sub_filter '"/static/'  '"/prefect/static/';
-                sub_filter "'/static/"  "'/prefect/static/";
+                # Note: text/html is included by default. Adding it here causes a warning.
+                sub_filter_types text/css application/javascript application/json;
+                
+                # Double quotes
+                sub_filter '"/assets/' '"/prefect/assets/';
+                sub_filter '"/static/' '"/prefect/static/';
+                # Single quotes
+                sub_filter "'/assets/" "'/prefect/assets/";
+                sub_filter "'/static/" "'/prefect/static/";
             }
 
             # 4a. Ray API — handles runtime JS fetch() and WebSocket calls
@@ -131,7 +136,8 @@ data:
                 # Targeted asset rewriting only
                 proxy_set_header Accept-Encoding "";
                 sub_filter_once off;
-                sub_filter_types text/html;
+                sub_filter_types text/css application/javascript application/json;
+
                 sub_filter '"/assets/'  '"/ray/assets/';
                 sub_filter "'/assets/"  "'/ray/assets/";
                 sub_filter '"/static/'  '"/ray/static/';

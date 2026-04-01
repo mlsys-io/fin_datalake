@@ -73,6 +73,8 @@ spec:
               value: "/opt/certs/public.crt"
             - name: CA_PATH
               value: "/opt/certs/public.crt"
+            - name: OVERSEER_SSL_VERIFY
+              value: "false"
 
           volumeMounts:
             - mountPath: /opt/certs
