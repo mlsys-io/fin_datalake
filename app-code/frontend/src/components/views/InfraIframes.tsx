@@ -1,12 +1,11 @@
 import React, { useState } from 'react'
-import { Server, MonitorPlay, Database } from 'lucide-react'
+import { Server, MonitorPlay } from 'lucide-react'
 
 // In production (via Nginx on port 8080): iframes load through the auth bouncer.
 // In local dev (no Nginx): open localUrl directly in a separate tab.
 const IFRAMES = [
     { id: 'prefect', name: 'Prefect Dashboard', icon: MonitorPlay, url: '/prefect/', localUrl: 'http://localhost:4200' },
     { id: 'ray', name: 'Ray Cluster UI', icon: Server, url: '/ray/', localUrl: 'http://localhost:8265' },
-    { id: 'minio', name: 'MinIO Console', icon: Database, url: '/minio/', localUrl: 'http://localhost:9001' },
 ]
 
 export const InfraIframes: React.FC = () => {
