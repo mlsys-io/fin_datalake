@@ -55,6 +55,7 @@ deploy_prefect() {
     helm repo update
     helm upgrade --install prefect-server prefect/prefect-server \
         -n "$NS_ORCHESTRATE" \
+        --reset-values \
         -f "$PREFECT_VALUES_FILE"
 }
 

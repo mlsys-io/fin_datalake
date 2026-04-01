@@ -37,10 +37,12 @@ echo "🚀 Deploying Milvus via Helm..."
 if [ -f "$VALUES_FILE" ]; then
     helm upgrade --install "$RELEASE_NAME" "$CHART_REPO_NAME/milvus" \
         --namespace "$NAMESPACE" \
+        --reset-values \
         -f "$VALUES_FILE"
 else
     helm upgrade --install "$RELEASE_NAME" "$CHART_REPO_NAME/milvus" \
-        --namespace "$NAMESPACE"
+        --namespace "$NAMESPACE" \
+        --reset-values
 fi
 
 echo "⏳ Waiting for Milvus pods to be ready..."

@@ -23,6 +23,7 @@ helm repo update
 # Install Redis referencing the values.yaml in the same directory
 helm upgrade --install redis bitnami/redis \
   --namespace $NAMESPACE \
+  --reset-values \
   -f "$SCRIPT_DIR/values.yaml" \
   --set auth.password=$REDIS_PASSWORD
 

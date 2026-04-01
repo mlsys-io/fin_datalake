@@ -24,6 +24,7 @@ kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "
 echo "🚀 Installing KubeRay operator..."
 helm upgrade --install kuberay-operator kuberay/kuberay-operator \
     --namespace "$NAMESPACE" \
+    --reset-values \
     --set watchNamespace="" \
     --wait
 
