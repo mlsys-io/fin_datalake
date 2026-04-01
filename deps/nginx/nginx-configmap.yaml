@@ -32,7 +32,7 @@ data:
 
         # For MinIO we use the external DDNS hostname
         upstream minio_backend {
-            server luyao-storage-head.ddns.comp.nus.edu.sg:9001;
+            server luyao-storage-head.ddns.comp.nus.edu.sg:4000;
         }
 
         server {
@@ -136,7 +136,10 @@ data:
                 proxy_set_header X-Remote-User $auth_user;
                 error_page 401 = @login_redirect;
                 rewrite ^/minio/(.*)$ /$1 break;
-                proxy_pass http://minio_backend;
+                proxy_pass https://minio_backend;
+                proxy_ssl_server_name on;
+                proxy_ssl_trusted_certificate /etc/nginx/certs/public.crt;
+                proxy_ssl_verify on;
             }
 
             # 6. Dynamic Asset Fallback (Fixes MIME type errors)

@@ -29,6 +29,9 @@ spec:
               mountPath: /etc/nginx/nginx.conf
               subPath: nginx.conf
               readOnly: true
+            - name: minio-ca
+              mountPath: /etc/nginx/certs
+              readOnly: true
           resources:
             requests:
               cpu: "100m"
@@ -40,6 +43,9 @@ spec:
         - name: nginx-conf-volume
           configMap:
             name: nginx-config
+        - name: minio-ca
+          configMap:
+            name: minio-ca
 ---
 apiVersion: v1
 kind: Service
