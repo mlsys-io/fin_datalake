@@ -9,6 +9,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 DEPS_DIR="${PROJECT_ROOT}/deps"
+PREFECT_VALUES_FILE="${DEPS_DIR}/prefect/values.yaml"
 
 # Colors
 RED='\033[0;31m'
@@ -26,6 +27,14 @@ NS_SOURCES="demo-sources"
 log_step()  { echo -e "${BLUE}[STEP]${NC} $1"; }
 log_info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
 
+ensure_helm_repo() {
+    local name="$1"
+    local url="$2"
+    if ! helm repo list | awk '{print $1}' | grep -qx "$name"; then
+        helm repo add "$name" "$url"
+    fi
+}
+
 deploy_namespaces() {
     log_step "Creating namespaces..."
     for ns in "$NS_COMPUTE" "$NS_ORCHESTRATE" "$NS_STORAGE" "$NS_DATA" "$NS_SOURCES"; do
@@ -35,12 +44,18 @@ deploy_namespaces() {
 
 deploy_kuberay() {
     log_step "Deploying KubeRay..."
+    ensure_helm_repo "kuberay" "https://ray-project.github.io/kuberay-helm"
+    helm repo update
     helm upgrade --install kuberay-operator kuberay/kuberay-operator -n "$NS_COMPUTE"
 }
 
 deploy_prefect() {
     log_step "Deploying Prefect..."
-    helm upgrade --install prefect-server prefect/prefect-server -n "$NS_ORCHESTRATE"
+    ensure_helm_repo "prefect" "https://prefecthq.github.io/prefect-helm"
+    helm repo update
+    helm upgrade --install prefect-server prefect/prefect-server \
+        -n "$NS_ORCHESTRATE" \
+        -f "$PREFECT_VALUES_FILE"
 }
 
 deploy_redis() {

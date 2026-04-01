@@ -47,13 +47,10 @@ echo "Waiting for Prefect pods to be ready..."
 kubectl wait --for=condition=available --timeout=600s deployment --all -n "$NAMESPACE" || true
 kubectl get pods -n "$NAMESPACE"
 
-echo "Port-forwarding UI to localhost:4200 (Ctrl+C to stop)..."
-kubectl port-forward svc/${RELEASE_NAME}-ui 4200:4200 -n "$NAMESPACE" &
-sleep 5
-
 echo "✅ Prefect Server deployed successfully!"
 echo
-echo "To open the Prefect UI: http://localhost:4200"
+echo "Prefect UI is configured to run behind the Nginx single entry point."
+echo "Open it via: http://<node-ip>:30800/prefect/"
 echo "To check deployment status:"
 echo "  kubectl get pods -n $NAMESPACE"
 echo
