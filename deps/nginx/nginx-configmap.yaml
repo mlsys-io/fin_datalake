@@ -85,22 +85,7 @@ data:
                 proxy_set_header X-Remote-User $auth_user;
                 error_page 401 = @login_redirect;
 
-                # Strip /prefect prefix before passing to backend
-                rewrite ^/prefect/(.*)$ /$1 break;
                 proxy_pass http://prefect_backend;
-
-                # HTML Rewriting: Prefix ANY absolute path with /prefect/
-                proxy_set_header Accept-Encoding ""; 
-                sub_filter_once off;
-                sub_filter_types *;
-                
-                # Catch both double and single quote attribute styles
-                sub_filter '="/' '="/prefect/';
-                sub_filter "='/" "='/prefect/";
-                
-                # Backup: Catch common asset strings if not in attributes
-                sub_filter '"/assets/' '"/prefect/assets/';
-                sub_filter "'/assets/"  "'/prefect/assets/";
             }
 
             # 4a. Ray API — handles runtime JS fetch() and WebSocket calls
