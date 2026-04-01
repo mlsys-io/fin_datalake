@@ -32,6 +32,14 @@ export async function sendIntent(domain: string, action: string, parameters: Rec
 }
 
 /**
+ * List registered agents exposed by the gateway.
+ */
+export async function fetchAgents() {
+    const data = await sendIntent('agent', 'list')
+    return data.agents ?? []
+}
+
+/**
  * Verify current session and fetch user details.
  */
 export async function fetchMe() {

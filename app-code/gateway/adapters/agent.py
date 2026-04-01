@@ -41,24 +41,24 @@ class AgentAdapter(BaseAdapter):
                 f"AgentAdapter does not support action '{intent.action}'. "
                 f"Available: {list(dispatch.keys())}"
             )
-        
+
         return await handler(user, intent)
 
 
     async def _chat(self, user: User, intent: UserIntent) -> dict:
         """Synchronous ask/response to a Ray Serve Agent via HTTP."""
         self._require_permission(user, Permission.AGENT_INTERACT)
-        
+
         agent_name = intent.parameters.get("agent_name")
         message = intent.parameters.get("message")
         session_id = intent.parameters.get("session_id")
-        
+
         if not agent_name or message is None:
             raise ValueError("Parameters 'agent_name' and 'message' are required.")
 
         endpoint = os.getenv("RAY_SERVE_ENDPOINT", "http://localhost:8000")
         url = f"{endpoint}/{agent_name}/ask"
-        
+
         async with httpx.AsyncClient(timeout=60.0) as client:
             payload = {
                 "payload": message,
@@ -66,38 +66,35 @@ class AgentAdapter(BaseAdapter):
                 "metadata": {"sender": user.username}
             }
             response = await client.post(url, json=payload)
-
             response.raise_for_status()
             return {"agent": agent_name, "response": response.json()}
 
     async def _notify(self, user: User, intent: UserIntent) -> dict:
         """Broadcast a notification to all agents via HTTP."""
         self._require_permission(user, Permission.AGENT_BROADCAST)
-        
-        # 1. Get the list of agents from Hub
+
         import ray
         from etl.agents.hub import get_hub
         hub = get_hub()
         agents_info = await hub.list_agents.remote()
         agent_names = [a["name"] for a in agents_info if a.get("alive", False)]
 
-        # 2. Fan-out HTTP requests
         payload = intent.parameters.get("payload")
         event = {
             "topic": "_broadcast",
             "payload": payload,
             "sender": user.username,
         }
-        
+
         endpoint = os.getenv("RAY_SERVE_ENDPOINT", "http://localhost:8000")
-        
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             tasks = [
                 client.post(f"{endpoint}/{name}/notify", json=event)
                 for name in agent_names
             ]
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
         delivered = sum(1 for r in results if isinstance(r, httpx.Response) and r.status_code == 200)
         return {"delivered_to": delivered, "total_targets": len(agent_names)}
 
