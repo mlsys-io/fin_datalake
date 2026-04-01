@@ -69,24 +69,45 @@ data:
                 proxy_pass http://gateway_backend;
             }
 
-            # 3. Prefect
+            # 3. Prefect UI (Sub-path Proxying)
             location /prefect/ {
                 auth_request /auth-verify;
                 auth_request_set $auth_user $upstream_http_x_remote_user;
                 proxy_set_header X-Remote-User $auth_user;
                 error_page 401 = @login_redirect;
+                
+                # Strip prefix for the backend
                 rewrite ^/prefect/(.*)$ /$1 break;
                 proxy_pass http://prefect_backend;
+                
+                # HTML Rewriting: Fix absolute paths for assets
+                # Disable compression so Nginx can filter the content
+                proxy_set_header Accept-Encoding ""; 
+                sub_filter 'href="/' 'href="/prefect/';
+                sub_filter 'src="/'  'src="/prefect/';
+                sub_filter '"/assets/' '"/prefect/assets/';
+                sub_filter_once off;
+                sub_filter_types text/html text/css application/javascript;
             }
 
-            # 4. Ray Dashboard
+            # 4. Ray Dashboard (Sub-path Proxying)
             location /ray/ {
                 auth_request /auth-verify;
                 auth_request_set $auth_user $upstream_http_x_remote_user;
                 proxy_set_header X-Remote-User $auth_user;
                 error_page 401 = @login_redirect;
+                
+                # Strip prefix for the backend
                 rewrite ^/ray/(.*)$ /$1 break;
                 proxy_pass http://ray_backend;
+                
+                # HTML Rewriting: Ray often uses absolute paths for its internal API
+                proxy_set_header Accept-Encoding "";
+                sub_filter 'href="/' 'href="/ray/';
+                sub_filter 'src="/'  'src="/ray/';
+                sub_filter '"/assets/' '"/ray/assets/';
+                sub_filter_once off;
+                sub_filter_types text/html text/css application/javascript;
             }
 
             # 5. MinIO Console
