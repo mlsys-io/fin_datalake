@@ -56,10 +56,15 @@ async def authenticate_user(db: AsyncSession, username: str, password: str) -> U
     )
     row = result.scalars().first()
 
-    # Run bcrypt check regardless to prevent timing attacks
-    dummy_hash = "$2b$12$invalidhashpadding000000000000000000000000000000000000"
+    # Run bcrypt check regardless to prevent timing attacks using a valid dummy hash
+    dummy_hash = "$2b$12$WG8v0b2N2wS9Lz7/y8/O0.e9c5WdJ1zW7/QO/0W.w6W.k8u.K8oOW"  # Hash of 'invalid'
     actual_hash = row.hashed_password if row else dummy_hash
-    if not verify_password(password, actual_hash):
+    
+    try:
+        if not verify_password(password, actual_hash):
+            return None
+    except ValueError:
+        # If the DB has an old plain-text password or corrupted hash, fail safely
         return None
 
     return _orm_to_user(row) if row else None
