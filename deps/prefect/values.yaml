@@ -8,8 +8,8 @@ service:
   nodePort: 30420
 
 server:
+  uiConfig:
+    prefectUiApiUrl: /prefect/api
   env:
     - name: PREFECT_UI_SERVE_BASE
       value: /prefect/
-    - name: PREFECT_UI_API_URL
-      value: /prefect/api
