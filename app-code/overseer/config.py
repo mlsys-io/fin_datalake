@@ -36,12 +36,13 @@ def load_endpoints(path: str | Path | None = None) -> list[ServiceEndpoint]:
         env_prefix = f"OVERSEER_{name.upper()}_"
         host = os.environ.get(f"{env_prefix}HOST", cfg.get("host", "localhost"))
         port = int(os.environ.get(f"{env_prefix}PORT", cfg.get("port", 8080)))
+        protocol = os.environ.get(f"{env_prefix}PROTOCOL", cfg.get("protocol", "http"))
 
         endpoints.append(ServiceEndpoint(
             name=name,
             host=host,
             port=port,
-            protocol=cfg.get("protocol", "http"),
+            protocol=protocol,
             health_path=cfg.get("health_path"),
             extra=cfg.get("extra", {}),
         ))
