@@ -32,7 +32,7 @@ spec:
             - name: OVERSEER_MINIO_HOST
               value: "luyao-storage-head.ddns.comp.nus.edu.sg"
             - name: OVERSEER_MINIO_PORT
-              value: "4000"
+              value: "9000"
             - name: OVERSEER_MINIO_PROTOCOL
               value: "https"
             - name: OVERSEER_GATEWAY_HOST

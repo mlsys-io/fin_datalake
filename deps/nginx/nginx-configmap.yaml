@@ -32,7 +32,7 @@ data:
 
         # For MinIO we use the external DDNS hostname
         upstream minio_backend {
-            server luyao-storage-head.ddns.comp.nus.edu.sg:9001;
+            server luyao-storage-head.ddns.comp.nus.edu.sg:9000;
         }
 
         server {
@@ -93,15 +93,16 @@ data:
                 # Disable compression so Nginx can filter the content
                 proxy_set_header Accept-Encoding ""; 
                 sub_filter_once off;
-                # Note: text/html is included by default. Adding it here causes a warning.
-                sub_filter_types text/css application/javascript application/json;
+                # Force filtering on all types to be absolutely sure
+                sub_filter_types *;
                 
-                # Double quotes
+                # Match /assets/ and /static/ regardless of quotes around them
                 sub_filter '"/assets/' '"/prefect/assets/';
+                sub_filter "'/assets/"  "'/prefect/assets/";
                 sub_filter '"/static/' '"/prefect/static/';
-                # Single quotes
-                sub_filter "'/assets/" "'/prefect/assets/";
-                sub_filter "'/static/" "'/prefect/static/";
+                sub_filter "'/static/"  "'/prefect/static/";
+                sub_filter '="/assets/' '="/prefect/assets/';
+                sub_filter "='/assets/" "='/prefect/assets/";
             }
 
             # 4a. Ray API — handles runtime JS fetch() and WebSocket calls
@@ -136,12 +137,14 @@ data:
                 # Targeted asset rewriting only
                 proxy_set_header Accept-Encoding "";
                 sub_filter_once off;
-                sub_filter_types text/css application/javascript application/json;
+                sub_filter_types *;
 
                 sub_filter '"/assets/'  '"/ray/assets/';
                 sub_filter "'/assets/"  "'/ray/assets/";
                 sub_filter '"/static/'  '"/ray/static/';
                 sub_filter "'/static/"  "'/ray/static/";
+                sub_filter '="/assets/' '="/ray/assets/';
+                sub_filter "='/assets/" "='/ray/assets/";
             }
 
             # 5. MinIO Console
