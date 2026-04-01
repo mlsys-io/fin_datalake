@@ -138,6 +138,8 @@ data:
                 rewrite ^/minio/(.*)$ /$1 break;
                 proxy_pass https://minio_backend;
                 proxy_ssl_server_name on;
+                proxy_ssl_name luyao-storage-head.ddns.comp.nus.edu.sg;
+                proxy_set_header Host luyao-storage-head.ddns.comp.nus.edu.sg;
                 proxy_ssl_trusted_certificate /etc/nginx/certs/public.crt;
                 proxy_ssl_verify on;
             }
