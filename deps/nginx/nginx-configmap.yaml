@@ -89,20 +89,18 @@ data:
                 rewrite ^/prefect/(.*)$ /$1 break;
                 proxy_pass http://prefect_backend;
 
-                # HTML Rewriting: Fix absolute paths for assets
-                # Disable compression so Nginx can filter the content
+                # HTML Rewriting: Prefix ANY absolute path with /prefect/
                 proxy_set_header Accept-Encoding ""; 
                 sub_filter_once off;
-                # Force filtering on all types to be absolutely sure
                 sub_filter_types *;
                 
-                # Match /assets/ and /static/ regardless of quotes around them
+                # Catch both double and single quote attribute styles
+                sub_filter '="/' '="/prefect/';
+                sub_filter "='/" "='/prefect/";
+                
+                # Backup: Catch common asset strings if not in attributes
                 sub_filter '"/assets/' '"/prefect/assets/';
                 sub_filter "'/assets/"  "'/prefect/assets/";
-                sub_filter '"/static/' '"/prefect/static/';
-                sub_filter "'/static/"  "'/prefect/static/";
-                sub_filter '="/assets/' '="/prefect/assets/';
-                sub_filter "='/assets/" "='/prefect/assets/";
             }
 
             # 4a. Ray API — handles runtime JS fetch() and WebSocket calls
@@ -134,17 +132,16 @@ data:
                 rewrite ^/ray/(.*)$ /$1 break;
                 proxy_pass http://ray_backend;
 
-                # Targeted asset rewriting only
+                # Global root prefixing for Ray
                 proxy_set_header Accept-Encoding "";
                 sub_filter_once off;
                 sub_filter_types *;
 
+                sub_filter '="/' '="/ray/';
+                sub_filter "='/" "='/ray/";
+
                 sub_filter '"/assets/'  '"/ray/assets/';
                 sub_filter "'/assets/"  "'/ray/assets/";
-                sub_filter '"/static/'  '"/ray/static/';
-                sub_filter "'/static/"  "'/ray/static/";
-                sub_filter '="/assets/' '="/ray/assets/';
-                sub_filter "='/assets/" "='/ray/assets/";
             }
 
             # 5. MinIO Console
