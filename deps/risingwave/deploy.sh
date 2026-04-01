@@ -6,6 +6,7 @@ set -euo pipefail
 NAMESPACE="etl-data"
 RELEASE_NAME="risingwave"
 VALUES_FILE="risingwave-values.yaml"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "🚀 Starting RisingWave bundled deployment..."
 
@@ -28,7 +29,9 @@ helm repo update
 
 #--- Deploy RisingWave bundle ---
 echo "Installing RisingWave bundle with PostgreSQL + MinIO..."
-helm install -n $NAMESPACE $RELEASE_NAME risingwavelabs/risingwave -f $VALUES_FILE
+helm upgrade --install -n $NAMESPACE $RELEASE_NAME risingwavelabs/risingwave \
+  --reset-values \
+  -f "$SCRIPT_DIR/$VALUES_FILE"
 
 echo "✅ RisingWave bundle deployed successfully!"
 
