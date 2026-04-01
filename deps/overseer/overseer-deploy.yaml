@@ -26,7 +26,7 @@ spec:
           env:
             # 1. Core Service Discovery (Internal K8s DNS)
             - name: OVERSEER_RAY_HOST
-              value: "etl-ray-head.etl-compute.svc.cluster.local"
+              value: "etl-ray-head-svc.etl-compute.svc.cluster.local"
             - name: OVERSEER_PREFECT_HOST
               value: "prefect-server.etl-orchestrate.svc.cluster.local"
             - name: OVERSEER_MINIO_HOST
@@ -58,12 +58,17 @@ spec:
                   name: etl-secrets
                   key: AWS_SECRET_ACCESS_KEY
             
-            # Security Token for Gateway Auth
             - name: GATEWAY_INTERNAL_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: etl-secrets
                   key: GATEWAY_INTERNAL_TOKEN
+            
+            # Trust the local MinIO certificate
+            - name: AWS_CA_BUNDLE
+              value: "/opt/certs/public.crt"
+            - name: REQUESTS_CA_BUNDLE
+              value: "/opt/certs/public.crt"
             - name: SSL_CERT_FILE
               value: "/opt/certs/public.crt"
             - name: CA_PATH
