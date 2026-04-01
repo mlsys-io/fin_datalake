@@ -156,16 +156,13 @@ data:
 
             # 6. Dynamic Asset Fallback (Fixes MIME type errors)
             # Vite apps (Prefect/Ray) dynamically fetch modules from root (/assets/...). 
-            # This catches those requests and routes them perfectly based on the Referer.
-            location ~ ^/(assets|ico|static|vite\.svg)/ {
-                error_page 418 = @prefect_assets;
-                error_page 419 = @ray_assets;
-                
-                if ($http_referer ~* "/prefect/") {
-                    return 418;
+            # This catches those requests and routes them back to the correct location block.
+            location ~ ^/(assets/|ico/|static/|vite\.svg) {
+                if ($http_referer ~* "prefect") {
+                    rewrite ^/(.*)$ /prefect/$1 last;
                 }
-                if ($http_referer ~* "/ray/") {
-                    return 419;
+                if ($http_referer ~* "ray") {
+                    rewrite ^/(.*)$ /ray/$1 last;
                 }
                 
                 # If the Gateway React App (or normal page) requests it, serve locally.
@@ -173,15 +170,8 @@ data:
                 try_files $uri =404;
             }
 
-            location @prefect_assets {
-                proxy_pass http://prefect_backend;
-            }
-
-            location @ray_assets {
-                proxy_pass http://ray_backend;
-            }
-
             # 7. React App (Built from Front-end package)
+
             location / {
                 root /usr/share/nginx/html;
                 index index.html index.htm;
