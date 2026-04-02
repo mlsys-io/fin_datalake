@@ -62,12 +62,12 @@ try {
     $allOk = $false
 }
 
-# 3. Ray Dashboard (head node exposes port 8265)
+# 3. Ray Dashboard (KubeRay NodePort exposed on 32382)
 try {
-    $ray_resp = Invoke-WebRequest -Uri "http://localhost:8265" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
-    Write-Host "  ✅ Ray Cluster   : ONLINE (dashboard port 8265)" -ForegroundColor Green
+    $ray_resp = Invoke-WebRequest -Uri "http://localhost:32382" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+    Write-Host "  ✅ Ray Cluster   : ONLINE (dashboard port 32382)" -ForegroundColor Green
 } catch {
-    Write-Host "  ⚠️  Ray Cluster   : Not reachable on port 8265 (may still be starting)" -ForegroundColor Yellow
+    Write-Host "  ⚠️  Ray Cluster   : Not reachable on port 32382 (may still be starting)" -ForegroundColor Yellow
 }
 
 # 4. Overseer process
@@ -98,4 +98,3 @@ Write-Host "2. Run Full Demo: uv run python -m pipelines.market_pulse_demo"
 Write-Host "3. Self-Healing:  uv run python -m pipelines.self_healing_demo"
 Write-Host "4. Benchmarks:    uv run python -m pipelines.benchmark_market_pulse"
 Write-Host "`nPress Ctrl+C to terminate background processes (or use Task Manager)."
-
