@@ -13,12 +13,12 @@ import {
     WifiOff,
 } from 'lucide-react'
 import {
-    AgentSummary,
     broadcastAgentEvent,
     chatWithAgent,
     fetchAgents,
     invokeAgent,
 } from '../../api/client'
+import type { AgentSummary } from '../../api/client'
 
 const POLL_INTERVAL_MS = 15_000
 
@@ -545,7 +545,7 @@ export const AgentHub: React.FC = () => {
                                 </div>
                             </div>
 
-                            {(actionError || actionResult) && (
+                            {Boolean(actionError || actionResult) && (
                                 <div>
                                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400">
                                         {actionLabel ?? 'Result'}
