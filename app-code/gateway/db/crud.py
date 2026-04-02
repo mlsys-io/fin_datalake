@@ -248,7 +248,7 @@ def _agent_definition_to_dict(row: AgentDefinitionORM) -> dict:
         "name": row.name,
         "capabilities": _parse_json_text(row.capabilities, []),
         "capability_specs": _parse_json_text(row.capability_specs, []),
-        "metadata": _parse_json_text(row.metadata, {}),
+        "metadata": _parse_json_text(row.metadata_json, {}),
         "registered_at": row.registered_at.isoformat() if row.registered_at else None,
         "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else None,
         "alive": False,
@@ -290,7 +290,7 @@ async def upsert_agent_definition(
 
     row.capabilities = json.dumps(agent.get("capabilities") or [])
     row.capability_specs = json.dumps(agent.get("capability_specs") or [])
-    row.metadata = json.dumps(agent.get("metadata") or {})
+    row.metadata_json = json.dumps(agent.get("metadata") or {})
     if registered_at is not None:
         row.registered_at = registered_at
     if mark_seen:

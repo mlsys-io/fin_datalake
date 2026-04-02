@@ -95,7 +95,7 @@ class AgentDefinitionORM(Base):
     name = Column(String, unique=True, nullable=False, index=True)
     capabilities = Column(Text, nullable=False, default="[]")
     capability_specs = Column(Text, nullable=False, default="[]")
-    metadata = Column(Text, nullable=False, default="{}")
+    metadata_json = Column("metadata", Text, nullable=False, default="{}")
     registered_at = Column(DateTime(timezone=True), nullable=True)
     last_seen_at = Column(DateTime(timezone=True), nullable=True)
     is_enabled = Column(Boolean, nullable=False, default=True)
