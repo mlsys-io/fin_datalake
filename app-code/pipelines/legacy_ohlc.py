@@ -4,6 +4,7 @@ Legacy OHLC Pipeline
 Reads OHLC data from files, applies legacy transformation, and writes to Delta Lake.
 Imports are inside task methods for remote Ray execution.
 """
+import os
 from typing import Dict, Any
 from prefect import flow
 from prefect_ray.task_runners import RayTaskRunner
@@ -93,7 +94,7 @@ def ohlc_pipeline(
     
     # Task
     task_instance = OhlcProcessTask(name="OHLC Processor")
-    task_instance.as_task().submit(input_pattern, output_uri, hive_conf)
+    task_instance.submit(input_pattern, output_uri, hive_conf)
 
 
 if __name__ == "__main__":

@@ -174,7 +174,7 @@ def kafka_to_delta_flow(
     # Execute: Write using Ray Data (Distributed)
     # Now uses distributed execution thanks to Ray Data integration
     write_task = DeltaLakeWriteTask(uri=delta_uri)
-    write_future = write_task(df)
+    write_future = write_task.submit(df)
     result = write_future.result()
     
     print(f"[flow] Pipeline complete: {result}")

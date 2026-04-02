@@ -75,7 +75,7 @@ def static_join_pipeline(
     hive_conf = {"host": hive_host}
     
     task_instance = JoinProcessTask(name="Join Processor")
-    task_instance.as_task().submit(orders_path, customers_path, output_uri, hive_conf)
+    task_instance.submit(orders_path, customers_path, output_uri, hive_conf)
 
 
 if __name__ == "__main__":

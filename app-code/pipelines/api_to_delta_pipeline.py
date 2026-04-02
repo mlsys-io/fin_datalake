@@ -2,7 +2,7 @@
 API to Delta Lake Pipeline
 
 Demonstrates fetching data from a REST API and writing to Delta Lake.
-Uses new clean BaseTask API with DeltaLakeWriteTask for proper conflict handling.
+Uses the explicit BaseTask submit/local API with DeltaLakeWriteTask for proper conflict handling.
 """
 from typing import List, Dict, Any
 from prefect import flow
@@ -66,7 +66,7 @@ def api_to_delta_flow(
     )
     
     # Execute: Ingest on Ray (distributed)
-    raw_data = ingest_task(api_url)
+    raw_data = ingest_task.submit(api_url)
     
     # Get data (wait for Ray)
     data = raw_data.result()
@@ -74,7 +74,7 @@ def api_to_delta_flow(
     
     # Execute: Write using Ray Data (Distributed)
     # Now uses distributed execution thanks to Ray Data integration
-    write_future = write_task(data)
+    write_future = write_task.submit(data)
     result = write_future.result()
     
     print(f"[flow] Pipeline complete: {result}")

@@ -4,6 +4,7 @@ Legacy SEC Pipeline
 Reads SEC Filings (Text), processes them, and writes to Delta Lake.
 Imports are inside task methods for remote Ray execution.
 """
+import os
 from typing import Dict, Any
 from prefect import flow
 from prefect_ray.task_runners import RayTaskRunner
@@ -84,7 +85,7 @@ def sec_pipeline(
     hive_conf = {"host": hive_host}
     
     task_instance = SecProcessTask(name="SEC Processor")
-    task_instance.as_task().submit(input_pattern, output_uri, hive_conf)
+    task_instance.submit(input_pattern, output_uri, hive_conf)
 
 
 if __name__ == "__main__":

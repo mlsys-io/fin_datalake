@@ -4,6 +4,7 @@ Legacy News Pipeline
 Reads News data (JSON metadata + HTML content), joins them, and writes to Delta Lake.
 Imports are inside task methods for remote Ray execution.
 """
+import os
 from typing import Dict, Any
 from prefect import flow
 from prefect_ray.task_runners import RayTaskRunner
@@ -113,7 +114,7 @@ def news_pipeline(
     hive_conf = {"host": hive_host}
     
     task_instance = NewsProcessTask(name="News Processor")
-    task_instance.as_task().submit(json_pattern, html_pattern, output_uri, hive_conf)
+    task_instance.submit(json_pattern, html_pattern, output_uri, hive_conf)
 
 
 if __name__ == "__main__":

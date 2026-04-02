@@ -29,6 +29,9 @@ client = [
     "pandas>=2.0,<3.0.0",
     "pyarrow>=14.0",
     "deltalake>=0.14",
+    # LLM integrations
+    "langchain-core>=0.3.0",
+    "langchain-google-genai>=2.0.0",
 ]
 worker = [
     "pandas>=2.0,<3.0.0",
@@ -89,7 +92,7 @@ overseer = "overseer.main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["etl*", "pipelines*", "transformations*", "gateway*", "overseer*"]
+include = ["agents*", "etl*", "pipelines*", "transformations*", "gateway*", "overseer*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.json"]

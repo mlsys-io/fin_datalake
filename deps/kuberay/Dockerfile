@@ -25,6 +25,9 @@ RUN pip install --no-cache-dir -U \
     requests>=2.28 \
     websocket-client>=1.6 \
     python-dotenv>=1.0 \
+    # LLM integrations
+    langchain-core>=0.3.0 \
+    langchain-google-genai>=2.0.0 \
     # Connectors
     confluent-kafka>=2.3 \
     psycopg2-binary>=2.9 \
