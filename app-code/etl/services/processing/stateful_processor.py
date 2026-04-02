@@ -30,24 +30,29 @@ class StatefulProcessorService(ServiceTask):
         self.running = False
 
     def run(self):
+        if not self._begin_run_loop():
+            return
+
         print(f"[{self.name}] Stateful Processor Starting (Window: {self.window_seconds}s)...")
-        self.running = True
 
         source = WebSocketSource(**self.source_config)
         sink = TimescaleDBSink(**self.sink_config)
 
-        with source.open() as reader, sink.open() as writer:
-            for batch in reader.read_batch():
-                if not self.running:
-                    break
-                
-                # 1. Update State (Process Micro-batch)
-                if batch:
-                    self._update_state(batch)
-                
-                # 2. Check Window Flush
-                if time.time() - self.last_flush_time >= self.window_seconds:
-                    self._flush_window(writer)
+        try:
+            with source.open() as reader, sink.open() as writer:
+                for batch in reader.read_batch():
+                    if not self.running:
+                        break
+
+                    # 1. Update State (Process Micro-batch)
+                    if batch:
+                        self._update_state(batch)
+
+                    # 2. Check Window Flush
+                    if time.time() - self.last_flush_time >= self.window_seconds:
+                        self._flush_window(writer)
+        finally:
+            self._end_run_loop()
 
     def _update_state(self, batch):
         """
@@ -105,4 +110,4 @@ class StatefulProcessorService(ServiceTask):
         }
 
     def stop(self):
-        self.running = False
+        super().stop()

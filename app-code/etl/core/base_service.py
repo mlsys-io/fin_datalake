@@ -1,7 +1,9 @@
-from typing import Any, Dict, Optional, Type, TYPE_CHECKING
-from abc import abstractmethod
+from typing import Any, Dict, Optional, TYPE_CHECKING, Union
+from abc import ABC, abstractmethod
+
 import ray
-from etl.core.base_task import BaseTask
+
+from etl.core.utils.dependency_aware_mixin import DependencyAwareMixin
 
 if TYPE_CHECKING:
     import ray as ray_typing
@@ -11,43 +13,20 @@ class SyncHandle:
     """
     Synchronous wrapper around a Ray ActorHandle.
 
-    Translates ``proxy.method(args)`` into ``ray.get(handle.method.remote(args))``,
-    removing boilerplate for the common synchronous call pattern.
-
-    Usage::
-
-        proxy = SyncHandle(handle)
-
-        # Synchronous (blocks until result):
-        result = proxy.ask("question")
-        status = proxy.get_status()
-
-        # Fire-and-forget (returns ObjectRef immediately):
-        ref = proxy.async_notify(event)     # async_ prefix = no ray.get
-
-        # Raw handle for advanced usage:
-        proxy.handle.notify.remote(event)
+    Translates ``proxy.method(args)`` into ``ray.get(handle.method.remote(args))``
+    for the common synchronous actor call pattern.
     """
 
     def __init__(self, handle: "ray_typing.actor.ActorHandle"):
-        # Use object.__setattr__ to avoid triggering our __getattr__
         object.__setattr__(self, "_handle", handle)
 
     @property
     def handle(self) -> "ray_typing.actor.ActorHandle":
-        """Access the raw Ray ActorHandle for advanced async patterns."""
         return self._handle
 
     def __getattr__(self, name: str):
-        """
-        Intercept method calls and route them through Ray.
-
-        - ``proxy.ask(...)``         → ``ray.get(handle.ask.remote(...))``   (sync)
-        - ``proxy.async_ask(...)``   → ``handle.ask.remote(...)``            (fire-and-forget)
-        """
-        # Fire-and-forget: async_ prefix returns ObjectRef without blocking
         if name.startswith("async_"):
-            actual_name = name[6:]  # Strip "async_" prefix
+            actual_name = name[6:]
             remote_method = getattr(self._handle, actual_name)
 
             def async_call(*args, **kwargs):
@@ -55,7 +34,6 @@ class SyncHandle:
 
             return async_call
 
-        # Default: synchronous call with ray.get
         remote_method = getattr(self._handle, name)
 
         def sync_call(*args, **kwargs):
@@ -67,74 +45,66 @@ class SyncHandle:
         return f"SyncHandle({self._handle})"
 
 
-class ServiceTask(BaseTask):
+class ServiceTask(ABC, DependencyAwareMixin):
     """
-    A Task designed to run indefinitely as a Service (e.g., Kafka Consumer, AI Agent).
-    Intended to be deployed as a Ray Actor.
+    Base class for persistent Ray actor services.
 
-    Quick start::
-
-        # Deploy (creates actor on cluster)
-        svc = MyService.deploy(name="MyService")
-        svc.run()                                # sync call
-        svc.get_status()                         # sync call
-
-        # Connect from another process
-        svc = MyService.connect("MyService")     # returns SyncHandle
-        svc.get_status()                         # no ray.get/.remote needed
-
-        # Fire-and-forget
-        svc.async_run()                          # returns immediately
-
-        # Raw handle for advanced patterns
-        svc.handle.run.remote()                  # non-blocking
+    ServiceTask is intentionally separate from BaseTask:
+    - BaseTask models finite units of work for orchestration.
+    - ServiceTask models long-lived actors with a single main loop.
     """
-    
+
+    def __init__(self, name: Optional[str] = None, config: Optional[Dict[str, Any]] = None, **_: Any):
+        self.name = name or self.__class__.__name__
+        self.config = config or {}
+        self.running = False
+
     @abstractmethod
     def run(self, *args, **kwargs) -> Any:
         """
-        The main loop of the service. 
-        Should typically be an infinite loop.
+        Main service loop.
+
+        Implementations should treat this as the single persistent loop of the
+        actor and use _begin_run_loop() / _end_run_loop() for lifecycle safety.
         """
         pass
 
-    # =========================================================================
-    # Deployment & Discovery
-    # =========================================================================
+    def _begin_run_loop(self) -> bool:
+        """
+        Enter the main loop exactly once.
+
+        Returns False when the service is already running.
+        """
+        from loguru import logger
+
+        if self.running:
+            logger.warning(f"[{self.name}] run() ignored because the service loop is already active.")
+            return False
+
+        self.running = True
+        return True
+
+    def _end_run_loop(self):
+        self.running = False
 
     @classmethod
     def deploy(
         cls,
         name: Optional[str] = None,
         num_cpus: float = 0,
-        max_concurrency: int = 10,
+        max_concurrency: int = 1,
         lifetime: str = "detached",
-        config: Dict[str, Any] = None,
+        config: Optional[Dict[str, Any]] = None,
+        return_handle: bool = False,
         **ray_options,
-    ) -> SyncHandle:
+    ) -> Union[SyncHandle, "ray_typing.actor.ActorHandle"]:
         """
-        Deploy this service as a named Ray Actor with full remote method access.
+        Deploy this service as a named Ray Actor.
 
-        Applies ``@ray.remote`` directly to the class, so ALL public methods
-        are callable remotely via the returned ``SyncHandle``.
-
-        Returns a ``SyncHandle`` for ergonomic usage::
-
-            svc = MyService.deploy(name="MySvc")
-            svc.get_status()                   # sync, no boilerplate
-            svc.async_run()                    # fire-and-forget
-            svc.handle.run.remote()            # raw async when needed
-
-        Args:
-            name:              Actor name for discovery (defaults to class name).
-            num_cpus:          CPU reservation per actor (0 = fractional scheduling).
-            max_concurrency:   How many remote calls the actor can handle at once.
-            lifetime:          Ray actor lifetime ("detached" survives driver exit).
-            config:            Optional config dict passed to __init__.
-            **ray_options:     Extra options forwarded to ray.remote().
-
-        Returns:
-            A SyncHandle wrapping the Ray ActorHandle.
+        max_concurrency defaults to 1 because services are expected to maintain
+        mutable actor state around a single main loop.
+        By default this returns a SyncHandle for SDK ergonomics. Set
+        return_handle=True to receive the raw Ray ActorHandle instead.
         """
         from loguru import logger
 
@@ -149,39 +119,29 @@ class ServiceTask(BaseTask):
         handle = RemoteCls.options(
             name=actor_name,
             lifetime=lifetime,
-        ).remote(config=config)
+        ).remote(name=actor_name, config=config)
 
-        logger.info(f"Deployed '{actor_name}' (class={cls.__name__})")
+        logger.info(f"Deployed service '{actor_name}' (class={cls.__name__})")
+        if return_handle:
+            return handle
         return SyncHandle(handle)
 
     @classmethod
-    def connect(cls, name: str) -> SyncHandle:
-        """
-        Connect to an existing deployed actor by name.
-
-        Returns a ``SyncHandle`` for ergonomic synchronous calls.
-        Raises ``ValueError`` if the actor is not found.
-
-        Usage::
-
-            # From any process connected to the same Ray cluster
-            svc = MyService.connect("MyService")
-            result = svc.get_status()
-
-        Args:
-            name: The actor name used during deploy().
-
-        Returns:
-            A SyncHandle wrapping the Ray ActorHandle.
-        """
+    def connect(
+        cls,
+        name: str,
+        return_handle: bool = False,
+    ) -> Union[SyncHandle, "ray_typing.actor.ActorHandle"]:
         handle = ray.get_actor(name)
+        if return_handle:
+            return handle
         return SyncHandle(handle)
 
+    def stop(self):
+        """
+        Default cooperative stop implementation.
+        """
+        self.running = False
+
     def get_status(self) -> Dict[str, Any]:
-        """
-        Default status implementation. Can be overridden.
-        """
-        return {"running": getattr(self, "running", False)}
-
-
-
+        return {"running": self.running}
