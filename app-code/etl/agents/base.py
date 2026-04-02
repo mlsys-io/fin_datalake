@@ -1,62 +1,37 @@
 """
-Base Agent class for AI Agents running as Ray Actors.
-Heavy imports (ray, loguru) are deferred to runtime methods.
+Base Agent class for request-driven AI agents deployed with Ray Serve.
 """
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from abc import ABC, abstractmethod
 
-from etl.core.base_service import SyncHandle
 from etl.agents.mixins import ConversationManagerMixin
 
 
-
-
 if TYPE_CHECKING:
-    import ray
-    import ray.serve as serve
     from fastapi import FastAPI
 
 
 class BaseAgent(ABC, ConversationManagerMixin):
-
     """
-    The 'Container' for an AI Agent, now powered by Ray Serve.
-    
-    This class handles the infrastructure (Ray Serve lifecycle, HTTP ingress),
-    while the subclass defines the intelligence (LLM, Chain, etc.) via `build_executor`.
-    
-    Deployment:
-        Use ``deploy()`` to create a Ray Serve application.
-        
-        >>> handle = MyAgent.deploy(name="MyAgent")
-        >>> await handle.ask.remote("question")
+    The base runtime container for Ray Serve-deployed agents.
 
-    HTTP API:
-        - POST /ask
-        - POST /notify
+    Agents are request-driven services. The primary execution path is `invoke()`
+    and the asynchronous event path is `handle_event()`.
     """
-    
-    CAPABILITIES: list = []  # Override in subclass with agent's capabilities
-    
+
+    CAPABILITIES: list = []
+    CAPABILITY_SPECS: list = []
+
     def __init__(self, config: Optional[Dict[str, Any]] = None):
+        from fastapi import FastAPI
+
         self.name = self.__class__.__name__
-        # `app_name` is the Ray Serve application name (set by deploy()).
-        # It may differ from `self.name` (class name) when a custom name is passed.
-        # AgentHub registration and delegation both use `app_name` so that
-        # serve.get_app_handle(app_name) resolves correctly.
         self.app_name: Optional[str] = None
         self.config = config or {}
         self.executor = None
-        self.running = False
 
-        # If this instance is created by Ray Serve's ingress, self.app will be set.
-        # We bind the FastAPI endpoints here.
-        if hasattr(self, 'app') and isinstance(self.app, FastAPI):
+        if hasattr(self, "app") and isinstance(self.app, FastAPI):
             self._bind_endpoints(self.app)
-
-    # =========================================================================
-    # Deployment & Connection (Ray Serve)
-    # =========================================================================
 
     @classmethod
     def deploy(
@@ -67,360 +42,300 @@ class BaseAgent(ABC, ConversationManagerMixin):
         config: Optional[Dict[str, Any]] = None,
         **serve_options,
     ):
-        """
-        Deploy this agent as a Ray Serve application.
-
-        The ``name`` parameter (or the class name if omitted) becomes the Ray
-        Serve *application name*.  It is stored on each replica instance as
-        ``self.app_name`` so that AgentHub registration can use it instead of
-        the bare class name — ensuring that delegation via
-        ``serve.get_app_handle(app_name)`` resolves to the correct deployment.
-        """
+        import ray
         import ray.serve as serve
         from fastapi import FastAPI
         from loguru import logger
 
         actor_name = name or cls.__name__
         app = FastAPI(title=f"Agent: {actor_name}")
-        
-        # Wrap the class with a Ray Serve ingress and deploy it
+
         deployment_cls = serve.deployment(
             name=actor_name,
             num_replicas=num_replicas,
             ray_actor_options={"num_cpus": num_cpus},
-            **serve_options
+            **serve_options,
         )(serve.ingress(app)(cls))
 
         handle = serve.run(deployment_cls.bind(config=config), name=actor_name)
-        
         logger.info(f"Deployed Agent '{actor_name}' to Ray Serve")
-        
-        # setup() is blocking (via ray.get) so it completes before deploy() returns.
-        # Inside setup(), _register_with_hub() is called with the correct app_name.
+
         ray.get(handle.set_app_name.remote(actor_name))
         ray.get(handle.setup.remote())
-        
+
         return handle
 
     @classmethod
     def connect(cls, name: str):
-        """Connect to an existing Ray Serve agent."""
         import ray.serve as serve
         return serve.get_app_handle(name)
 
-    # =========================================================================
-    # HTTP Endpoints (FastAPI)
-    # =========================================================================
-
-    # Note: These are defined on the class but activated via @serve.ingress(app)
-    # inside the deploy() method. For subclasses to have these endpoints,
-    # they must be present when the FastAPI app is bound.
-    
-    # Since we can't easily use @app.post inside an abstract class without 
-    # the app instance, we'll rely on Ray Serve's ability to expose methods.
-    # To keep it standard, we'll add a helper to bind the app.
-    
     def _bind_endpoints(self, app: "FastAPI"):
-        @app.post("/ask")
-        async def ask_endpoint(request: Dict[str, Any]):
+        @app.post("/invoke")
+        async def invoke_endpoint(request: Dict[str, Any]):
             payload = request.get("payload")
             session_id = request.get("session_id")
-            return self.ask(payload, session_id=session_id)
+            return self.invoke(payload, session_id=session_id)
 
+        @app.post("/events")
+        async def event_endpoint(event: Dict[str, Any]):
+            return self.handle_event(event)
 
-        @app.post("/notify")
-        async def notify_endpoint(payload: Dict[str, Any]):
-            return self.notify(payload)
-            
         @app.get("/health")
         async def health_check():
-            return {"status": "ok", "agent": self.name}
-
-    # =========================================================================
-    # Lifecycle
-    # =========================================================================
+            return {"status": "ok", "agent": self.app_name or self.name}
 
     def set_app_name(self, app_name: str):
-        """
-        Set the Ray Serve application name on the replica.
-
-        Called by ``deploy()`` immediately after ``serve.run()`` returns so
-        that ``self.app_name`` reflects the deployed application name (which
-        may differ from the class name).  AgentHub registration uses this
-        value so that ``serve.get_app_handle(registered_name)`` works.
-        """
         self.app_name = app_name
 
     def setup(self):
-        """
-        Called once when the Actor starts.
-        Builds the heavy logic (LLM, Tools) to ensure they live on the Cluster Node.
-        Also auto-registers with the AgentHub if CAPABILITIES are defined.
-
-        Idempotent — safe to call multiple times; only runs once.
-        """
         if self.executor is not None:
-            return  # Already set up
+            return
 
         from etl.utils.logging import setup_logging
         from loguru import logger
 
         setup_logging(component="agent")
-        
-        logger.info(f"[{self.name}] Setting up Agent Intelligence...")
+        logger.info(f"[{self.name}] Setting up agent runtime...")
         self.executor = self.build_executor()
-        
-        # Auto-register with AgentHub if capabilities defined.
-        # Use self.app_name (the Serve app name) so that delegation via
-        # serve.get_app_handle() resolves to the correct deployment.
-        if self.CAPABILITIES:
-            self._register_with_hub()
-        
-        logger.info(f"[{self.name}] Ready.")
-    
-    def _register_with_hub(self):
-        """
-        Register this agent with the AgentHub.
 
-        Registration uses ``self.app_name`` (the Ray Serve application name)
-        rather than ``self.name`` (the Python class name).  This is critical:
-        ``delegate()`` and the demo scripts look up agents by capability and
-        then call ``serve.get_app_handle(registered_name)``.  If the class
-        name is registered instead of the app name, that handle lookup fails.
-        """
+        if self.get_capability_specs():
+            self._register_with_hub()
+
+        logger.info(f"[{self.name}] Ready.")
+
+    def _register_with_hub(self):
         import ray
         from loguru import logger
-        
-        # Prefer the Serve app name; fall back to class name if set_app_name()
-        # was not called (e.g. when an agent is instantiated locally for testing).
+
         registered_name = self.app_name or self.name
 
         try:
             from etl.agents.hub import get_hub
+
             hub = get_hub()
-            ray.get(hub.register.remote(
-                name=registered_name,
-                capabilities=self.CAPABILITIES,
-                metadata={"class": self.__class__.__name__, "app_name": registered_name}
-            ))
-            logger.info(f"[{self.name}] Registered as '{registered_name}' in AgentHub (capabilities: {self.CAPABILITIES})")
+            ray.get(
+                hub.register.remote(
+                    name=registered_name,
+                    capabilities=self.get_capability_specs(),
+                    metadata={
+                        "class": self.__class__.__name__,
+                        "app_name": registered_name,
+                        "interaction_modes": self.get_interaction_modes(),
+                    },
+                )
+            )
+            logger.info(
+                f"[{self.name}] Registered as '{registered_name}' in AgentHub "
+                f"(capabilities: {self.get_capability_specs()})"
+            )
         except Exception as e:
             logger.warning(f"[{self.name}] Failed to register with AgentHub: {e}")
 
-    def _deregister_from_hub(self):
-        """Remove this agent from the AgentHub on shutdown."""
-        import ray
-        from loguru import logger
+    @classmethod
+    def get_capability_specs(cls) -> List[Dict[str, Any]]:
+        if getattr(cls, "CAPABILITY_SPECS", None):
+            return list(cls.CAPABILITY_SPECS)
+        return list(getattr(cls, "CAPABILITIES", []))
 
-        registered_name = self.app_name or self.name
-        try:
-            from etl.agents.hub import get_hub
-            hub = get_hub()
-            ray.get(hub.unregister.remote(registered_name))
-            logger.info(f"[{self.name}] Deregistered '{registered_name}' from AgentHub")
-        except Exception:
-            pass  # Best-effort; hub may already be gone
-
-    @abstractmethod
-    def build_executor(self) -> Any:
-        """
-        USER IMPLEMENTATION REQUIRED.
-        Must return a callable object (e.g. LangChain AgentExecutor, Function, or Runnable).
-        
-        The returned object must support `invoke(input)` OR `__call__(input)`.
-        """
-        pass
-
-    def run(self):
-        """
-        ServiceTask.run() implementation.
-
-        For agents deployed via ``deploy()``, you typically do NOT call ``run()``
-        — the actor stays alive via ``lifetime="detached"`` and handles
-        ``ask()`` / ``notify()`` calls on-demand.
-
-        ``run()`` is kept for backward compatibility with the ``as_ray_actor()``
-        proxy pattern used by streaming ServiceTasks.
-        """
-        self.running = True
-        self.setup()
-        
-        import time
-        try:
-            while self.running:
-                time.sleep(1.0)
-        finally:
-            self.on_stop()
+    @classmethod
+    def get_interaction_modes(cls) -> List[str]:
+        modes = []
+        for entry in cls.get_capability_specs():
+            if isinstance(entry, dict):
+                mode = str(entry.get("interaction_mode") or "").strip()
+                if mode and mode not in modes:
+                    modes.append(mode)
+        if not modes and getattr(cls, "CAPABILITIES", None):
+            modes.append("invoke")
+        return modes
 
     def shutdown(self):
         """
-        Shut down this Ray Serve agent.
+        Remove the Ray Serve deployment and run final cleanup.
         """
         import ray.serve as serve
-        serve.delete(self.name)
+
+        serve.delete(self.app_name or self.name)
         self.on_stop()
 
     def on_stop(self):
         """
-        Lifecycle hook: called before the actor shuts down.
-
-        Override in subclass to release resources (close DB connections,
-        flush buffers, etc.). Default implementation deregisters from the
-        AgentHub.
-
-        Called automatically by ``shutdown()`` and when ``run()`` exits.
+        Lifecycle cleanup hook for agent-specific resource release.
         """
         self._deregister_from_hub()
 
-    # =========================================================================
-    # Interaction — Request/Response and Pub/Sub
-    # =========================================================================
+    def _deregister_from_hub(self):
+        import ray
+        from loguru import logger
 
-    def ask(self, payload: Any, session_id: Optional[str] = None) -> Any:
+        registered_name = self.app_name or self.name
+        try:
+            from etl.agents.hub import get_hub
+
+            hub = get_hub()
+            ray.get(hub.unregister.remote(registered_name))
+            logger.info(f"[{self.name}] Deregistered '{registered_name}' from AgentHub")
+        except Exception:
+            pass
+
+    @abstractmethod
+    def build_executor(self) -> Any:
+        pass
+
+    def invoke(self, payload: Any, session_id: Optional[str] = None) -> Any:
         """
-        Synchronous Request/Response Interaction.
-        
-        Args:
-            payload: The input for the agent
-            session_id: Optional session/thread ID for conversation context
+        Primary synchronous request/response interaction for agents.
         """
         from loguru import logger
-        
+
         if not self.executor:
             self.setup()
-            
-        history = []
-        if session_id:
-            logger.debug(f"[{self.name}] Loading history for session: {session_id}")
+
+        input_data = payload
+        history = None
+
+        if session_id is not None:
             history = self.load_conversation_state(session_id)
-            
-            # Formulate the message for the LLM/Executor
-            # If payload is just a string, we assume it's the next user message
-            if isinstance(payload, str):
-                history.append({"role": "user", "content": payload})
-            elif isinstance(payload, dict) and "content" in payload:
-                history.append(payload)
-            else:
-                # Fallback: stringify whatever is in payload
-                history.append({"role": "user", "content": str(payload)})
-                
-            # Trim to prevent context overflow
-            history = self.trim_history(history)
-            input_data = history
-        else:
-            input_data = payload
-            
+            user_entry = self._coerce_conversation_entry(payload)
+            if user_entry is not None:
+                history.append(user_entry)
+                history = self.trim_history(history)
+                input_data = history
+
         try:
-            # Support LangChain 'invoke' protocol
             if hasattr(self.executor, "invoke"):
                 result = self.executor.invoke(input_data)
-            # Support standard Callable
             elif callable(self.executor):
                 result = self.executor(input_data)
             else:
                 raise TypeError(f"Executor {type(self.executor)} is not callable and has no 'invoke' method.")
-                
-            # If session-based, save the response to history
-            if session_id:
-                # Extract content from result if it's an object (common in LangChain)
-                content = result.content if hasattr(result, "content") else str(result)
-                history.append({"role": "assistant", "content": content})
+
+            if session_id is not None and history is not None:
+                history.append({"role": "assistant", "content": self._extract_response_text(result)})
                 self.save_conversation_state(session_id, history)
-                
+
             return result
         except Exception as e:
-            logger.error(f"[{self.name}] Error during ask(): {e}")
+            logger.error(f"[{self.name}] Error during invoke(): {e}")
             raise
 
-
-    def notify(self, event: Dict[str, Any]):
+    def chat(self, message: str, session_id: Optional[str] = None) -> Any:
         """
-        Handle incoming messages from the MessageBus.
-        
-        Routes messages to topic-specific handlers if they exist:
-        - Topic "market_data" → calls self.handle_market_data(payload)
-        - Topic "alert" → calls self.handle_alert(payload)
-        - Otherwise → calls self.on_message(event)
-        
-        Subclasses should override handle_<topic>() or on_message() to process.
+        Convenience wrapper for chat-capable agents.
+        """
+        return self.invoke(message, session_id=session_id)
+
+    def handle_event(self, event: Dict[str, Any]):
+        """
+        Handle an asynchronous event envelope.
         """
         from loguru import logger
-        
+
         try:
-            topic = event.get("topic", "")
+            event_type = str(event.get("type") or event.get("topic") or "").strip()
             payload = event.get("payload", {})
-            
-            # Look for topic-specific handler: handle_<topic>()
-            handler_name = f"handle_{topic.replace('-', '_').replace('.', '_')}"
-            handler = getattr(self, handler_name, None)
-            
-            if handler and callable(handler):
-                logger.debug(f"[{self.name}] Routing to {handler_name}")
-                handler(payload, event)
-            else:
-                # Default handler
-                self.on_message(event)
-                
-        except Exception as e:
-            logger.error(f"[{self.name}] Error processing notification: {e}")
-    
-    def on_message(self, event: Dict[str, Any]):
-        """
-        Default message handler. Override in subclass to process unhandled topics.
-        
-        Args:
-            event: Full message dict with topic, payload, sender, timestamp
-        """
-        from loguru import logger
-        logger.info(f"[{self.name}] Received: {event.get('topic')} from {event.get('sender')}")
 
-    # =========================================================================
-    # Delegation — Cross-Agent Task Routing
-    # =========================================================================
+            if event_type:
+                handler_name = f"handle_{event_type.replace('-', '_').replace('.', '_')}"
+                handler = getattr(self, handler_name, None)
+                if handler and callable(handler):
+                    logger.debug(f"[{self.name}] Routing event to {handler_name}")
+                    return handler(payload, event)
+
+            return self.on_event(event)
+        except Exception as e:
+            logger.error(f"[{self.name}] Error processing event: {e}")
+            raise
+
+    def on_event(self, event: Dict[str, Any]):
+        from loguru import logger
+
+        logger.info(f"[{self.name}] Received event: {event.get('type') or event.get('topic')} from {event.get('sender')}")
+        return {"accepted": True}
 
     def delegate(
-        self, 
-        capability: str, 
+        self,
+        capability: str,
         payload: Any,
         retry_on_failure: bool = True,
-        max_retries: int = 3
+        max_retries: int = 3,
+        required_tags: Optional[List[str]] = None,
+        interaction_mode: Optional[str] = None,
+        input_type: Optional[str] = None,
+        output_type: Optional[str] = None,
+        selection_strategy: str = "random",
     ) -> Any:
-        """
-        Delegate a task to another agent with the required capability.
-        
-        Now performs "client-side" routing:
-        1. Query AgentHub for agents with the capability.
-        2. Pick one (round-robin or random).
-        3. Call its Ray Serve handle directly.
-        """
         import ray
         import random
         from loguru import logger
         from etl.agents.hub import get_hub
-        import ray.serve as serve
-        
-        logger.info(f"[{self.name}] Delegating '{capability}'")
+
+        logger.info(f"[{self.name}] Delegating capability '{capability}'")
         hub = get_hub()
-        agent_names = ray.get(hub.find_by_capability.remote(capability))
-        
-        if not agent_names:
+
+        candidates = ray.get(
+            hub.query_agents.remote(
+                capability=capability,
+                required_tags=required_tags,
+                interaction_mode=interaction_mode,
+                input_type=input_type,
+                output_type=output_type,
+                alive_only=True,
+            )
+        )
+
+        if not candidates:
             raise ValueError(f"No agent found with capability: {capability}")
-            
-        # For simplicity in this refactor, we pick a random one
-        # Micro-Plan 3.5 could add more sophisticated RR here if needed
-        attempts = min(len(agent_names), max_retries) if retry_on_failure else 1
-        random.shuffle(agent_names)
-        
+
+        self_name = self.app_name or self.name
+        agent_names = [candidate["name"] for candidate in candidates if candidate["name"] != self_name]
+        if not agent_names:
+            raise ValueError(f"No peer agent available for capability: {capability}")
+
+        if selection_strategy == "first":
+            ordered_targets = agent_names
+        else:
+            ordered_targets = list(agent_names)
+            random.shuffle(ordered_targets)
+
+        attempts = min(len(ordered_targets), max_retries) if retry_on_failure else 1
         last_error = None
         for i in range(attempts):
-            target_name = agent_names[i]
+            target_name = ordered_targets[i]
             try:
-                handle = serve.get_app_handle(target_name)
-                # Serve handles are async-by-default, we wrap in ray.get for parity with old delegate()
-                return ray.get(handle.ask.remote(payload))
+                return self.delegate_to(target_name, payload)
             except Exception as e:
                 logger.warning(f"[{self.name}] Delegation to {target_name} failed: {e}")
                 last_error = e
-                
+
         raise RuntimeError(f"All agents for capability '{capability}' failed. Last error: {last_error}")
 
+    def delegate_to(self, agent_name: str, payload: Any) -> Any:
+        import ray
+        import ray.serve as serve
+
+        handle = serve.get_app_handle(agent_name)
+        return ray.get(handle.invoke.remote(payload))
+
+    def _coerce_conversation_entry(self, payload: Any) -> Optional[Dict[str, str]]:
+        if isinstance(payload, str):
+            return {"role": "user", "content": payload}
+        if isinstance(payload, dict):
+            if "content" in payload:
+                return {"role": "user", "content": str(payload["content"])}
+            if "message" in payload:
+                return {"role": "user", "content": str(payload["message"])}
+            if "question" in payload:
+                return {"role": "user", "content": str(payload["question"])}
+        return None
+
+    def _extract_response_text(self, result: Any) -> str:
+        if hasattr(result, "content"):
+            return str(result.content)
+        if isinstance(result, dict):
+            if "content" in result:
+                return str(result["content"])
+            if "message" in result:
+                return str(result["message"])
+        return str(result)

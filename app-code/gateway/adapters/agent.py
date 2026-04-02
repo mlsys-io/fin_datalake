@@ -4,7 +4,8 @@ AgentAdapter: Domain "agent"
 Handles the Intelligence Plane: interacting with Ray-based Agent Actors.
 
 Supported Actions:
-    - chat:      Synchronous request-response to a named Agent (via AgentHub).
+    - chat:      Synchronous request-response to a named chat-capable Agent.
+    - invoke:    Generic invoke-response to a named agent with arbitrary payload.
     - notify:    Fire-and-forget notification to all agents.
     - list:      List all registered agents and their capabilities.
 
@@ -32,6 +33,7 @@ class AgentAdapter(BaseAdapter):
     async def execute(self, user: User, intent: UserIntent) -> Any:
         dispatch = {
             "chat": self._chat,
+            "invoke": self._invoke,
             "notify": self._notify,
             "list": self._list_agents,
         }
@@ -46,7 +48,7 @@ class AgentAdapter(BaseAdapter):
 
 
     async def _chat(self, user: User, intent: UserIntent) -> dict:
-        """Synchronous ask/response to a Ray Serve Agent via HTTP."""
+        """Synchronous chat-style interaction with a named agent."""
         self._require_permission(user, Permission.AGENT_INTERACT)
 
         agent_name = intent.parameters.get("agent_name")
@@ -56,21 +58,37 @@ class AgentAdapter(BaseAdapter):
         if not agent_name or message is None:
             raise ValueError("Parameters 'agent_name' and 'message' are required.")
 
+        return await self._invoke_http(user, agent_name=agent_name, payload=message, session_id=session_id)
+
+    async def _invoke(self, user: User, intent: UserIntent) -> dict:
+        """Generic invoke against a named agent with arbitrary payload."""
+        self._require_permission(user, Permission.AGENT_INTERACT)
+
+        agent_name = intent.parameters.get("agent_name")
+        payload = intent.parameters.get("payload")
+        session_id = intent.parameters.get("session_id")
+
+        if not agent_name or payload is None:
+            raise ValueError("Parameters 'agent_name' and 'payload' are required.")
+
+        return await self._invoke_http(user, agent_name=agent_name, payload=payload, session_id=session_id)
+
+    async def _invoke_http(self, user: User, agent_name: str, payload: Any, session_id: str | None = None) -> dict:
         endpoint = os.getenv("RAY_SERVE_ENDPOINT", "http://localhost:8000")
-        url = f"{endpoint}/{agent_name}/ask"
+        url = f"{endpoint}/{agent_name}/invoke"
 
         async with httpx.AsyncClient(timeout=60.0) as client:
-            payload = {
-                "payload": message,
+            request_body = {
+                "payload": payload,
                 "session_id": session_id,
                 "metadata": {"sender": user.username}
             }
-            response = await client.post(url, json=payload)
+            response = await client.post(url, json=request_body)
             response.raise_for_status()
             return {"agent": agent_name, "response": response.json()}
 
     async def _notify(self, user: User, intent: UserIntent) -> dict:
-        """Broadcast a notification to all agents via HTTP."""
+        """Broadcast an event to all agents via HTTP."""
         self._require_permission(user, Permission.AGENT_BROADCAST)
 
         import ray
@@ -81,7 +99,7 @@ class AgentAdapter(BaseAdapter):
 
         payload = intent.parameters.get("payload")
         event = {
-            "topic": "_broadcast",
+            "type": "_broadcast",
             "payload": payload,
             "sender": user.username,
         }
@@ -90,7 +108,7 @@ class AgentAdapter(BaseAdapter):
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             tasks = [
-                client.post(f"{endpoint}/{name}/notify", json=event)
+                client.post(f"{endpoint}/{name}/events", json=event)
                 for name in agent_names
             ]
             results = await asyncio.gather(*tasks, return_exceptions=True)

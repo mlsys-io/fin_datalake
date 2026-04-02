@@ -1,19 +1,72 @@
 """
-AgentHub — Central service discovery registry for all agents.
+AgentHub - Central service discovery registry for all agents.
 
-Consolidates agent registration and capability-based discovery into one detached singleton.
-Routing is now handled by Ray Serve directly.
-
-Features:
-- Agent registration and capability-based discovery
-- Health monitoring and stats of the agent ecosystem
-- Auto-cleanup of stale registration records
+The Hub remains the control-plane registry for agent discovery, but now supports
+both legacy string capabilities and richer typed capability specifications.
 """
-from typing import Dict, List, Optional, Any
+
+from typing import Dict, List, Any
 from dataclasses import dataclass, field
 from datetime import datetime
 from collections import defaultdict
 import ray
+
+
+def _normalize_text_list(values: Any) -> List[str]:
+    if values is None:
+        return []
+    if isinstance(values, str):
+        values = [values]
+    result = []
+    for value in values:
+        text = str(value).strip()
+        if text:
+            result.append(text.lower())
+    return result
+
+
+def _normalize_capability_spec(entry: Any) -> Dict[str, Any]:
+    if isinstance(entry, str):
+        capability_id = entry.strip()
+        return {
+            "id": capability_id,
+            "description": capability_id,
+            "tags": [],
+            "aliases": [],
+            "input_type": None,
+            "output_type": None,
+            "interaction_mode": "invoke",
+        }
+
+    if not isinstance(entry, dict):
+        raise TypeError(f"Unsupported capability entry: {type(entry)}")
+
+    capability_id = str(entry.get("id") or entry.get("name") or "").strip()
+    if not capability_id:
+        raise ValueError("Capability spec requires a non-empty 'id'.")
+
+    return {
+        "id": capability_id,
+        "description": str(entry.get("description") or capability_id),
+        "tags": _normalize_text_list(entry.get("tags")),
+        "aliases": _normalize_text_list(entry.get("aliases")),
+        "input_type": entry.get("input_type"),
+        "output_type": entry.get("output_type"),
+        "interaction_mode": str(entry.get("interaction_mode") or "invoke"),
+    }
+
+
+def _normalize_capability_specs(capabilities: List[Any]) -> List[Dict[str, Any]]:
+    normalized = []
+    seen = set()
+    for entry in capabilities or []:
+        spec = _normalize_capability_spec(entry)
+        key = spec["id"].lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(spec)
+    return normalized
 
 
 @dataclass
@@ -22,6 +75,7 @@ class AgentInfo:
 
     name: str
     capabilities: List[str]
+    capability_specs: List[Dict[str, Any]]
     registered_at: datetime = field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -31,16 +85,8 @@ class AgentHub:
     """
     Central discovery registry for the multi-agent system.
 
-    Handles registration and capability-based lookups.
-    Interaction is now handled via Ray Serve handles or HTTP.
-
-    Usage via SyncHandle::
-
-        hub = SyncHandle(get_hub())
-
-        # Discovery
-        hub.register("AnalystAgent", capabilities=["analysis"])
-        agents = hub.find_by_capability("analysis")
+    Handles registration plus typed capability discovery. Interaction is still
+    performed through Ray Serve handles or HTTP.
     """
 
     def __init__(self):
@@ -54,65 +100,44 @@ class AgentHub:
         self._stats = {
             "total_registrations": 0,
         }
-        logger.info("AgentHub (Pure Registry) initialized")
-
-    # =========================================================================
-    # Discovery
-    # =========================================================================
+        logger.info("AgentHub initialized")
 
     def register(
         self,
         name: str,
-        capabilities: List[str],
+        capabilities: List[Any],
         metadata: Dict = None,
     ) -> bool:
         """
-        Register an agent with its capabilities.
-
-        Called automatically by BaseAgent.setup() when CAPABILITIES are defined.
-
-        Args:
-            name: Unique agent name (must match the Ray actor name)
-            capabilities: List of capabilities this agent provides
-            metadata: Optional additional metadata
-
-        Returns:
-            True if registered successfully
+        Register an agent with legacy string capabilities or richer capability specs.
         """
         from loguru import logger
 
         if name in self._agents:
-            # Re-registration: clean up old capability index entries
             self._remove_from_capability_index(name)
             logger.info(f"Agent '{name}' re-registering (updating capabilities)")
 
+        capability_specs = _normalize_capability_specs(capabilities)
+        legacy_capabilities = [spec["id"] for spec in capability_specs]
+
         self._agents[name] = AgentInfo(
             name=name,
-            capabilities=capabilities,
+            capabilities=legacy_capabilities,
+            capability_specs=capability_specs,
             metadata=metadata or {},
         )
 
-        # Update capability index
-        for cap in capabilities:
-            if name not in self._capability_index[cap]:
-                self._capability_index[cap].append(name)
+        for spec in capability_specs:
+            for token in [spec["id"], *spec.get("aliases", [])]:
+                token_key = str(token).strip().lower()
+                if token_key and name not in self._capability_index[token_key]:
+                    self._capability_index[token_key].append(name)
 
-        logger.info(f"Registered '{name}' with capabilities: {capabilities}")
+        logger.info(f"Registered '{name}' with capabilities: {legacy_capabilities}")
         self._stats["total_registrations"] += 1
         return True
 
     def unregister(self, name: str) -> bool:
-        """
-        Remove an agent from the hub.
-
-        Cleans up capability index. Called by BaseAgent.on_stop() during shutdown.
-
-        Args:
-            name: Agent name to remove
-
-        Returns:
-            True if found and removed, False if not found
-        """
         if name not in self._agents:
             return False
 
@@ -125,29 +150,83 @@ class AgentHub:
         return True
 
     def _remove_from_capability_index(self, name: str):
-        """Remove an agent name from all capability index entries."""
-        for cap, agents in self._capability_index.items():
+        for _, agents in self._capability_index.items():
             if name in agents:
                 agents.remove(name)
 
     def find_by_capability(self, capability: str) -> List[str]:
-        """
-        Find all agents that provide a specific capability.
+        """Find all agents matching a capability id or alias."""
+        return list(self._capability_index.get(str(capability).strip().lower(), []))
 
-        Args:
-            capability: The capability to search for
-
-        Returns:
-            List of agent names that have this capability
+    def query_agents(
+        self,
+        capability: str = None,
+        required_tags: List[str] = None,
+        interaction_mode: str = None,
+        input_type: str = None,
+        output_type: str = None,
+        alive_only: bool = True,
+    ) -> List[Dict[str, Any]]:
         """
-        return list(self._capability_index.get(capability, []))
+        Query agents using exact-match constraints over typed capability specs.
+        """
+        required_tags_normalized = set(_normalize_text_list(required_tags))
+        capability_key = str(capability).strip().lower() if capability else None
+        interaction_mode_key = str(interaction_mode).strip().lower() if interaction_mode else None
+        input_type_key = str(input_type).strip().lower() if input_type else None
+        output_type_key = str(output_type).strip().lower() if output_type else None
+
+        matches = []
+        for info in self._agents.values():
+            alive = self._is_alive(info.name)
+            if alive_only and not alive:
+                continue
+
+            matching_specs = []
+            for spec in info.capability_specs:
+                candidate_tokens = {spec["id"].lower(), *spec.get("aliases", [])}
+                if capability_key and capability_key not in candidate_tokens:
+                    continue
+                if interaction_mode_key and str(spec.get("interaction_mode") or "").lower() != interaction_mode_key:
+                    continue
+                if input_type_key and str(spec.get("input_type") or "").lower() != input_type_key:
+                    continue
+                if output_type_key and str(spec.get("output_type") or "").lower() != output_type_key:
+                    continue
+                if required_tags_normalized and not required_tags_normalized.issubset(set(spec.get("tags", []))):
+                    continue
+                matching_specs.append(spec)
+
+            if capability_key and not matching_specs:
+                continue
+            if required_tags_normalized and not matching_specs:
+                continue
+            if interaction_mode_key and not matching_specs:
+                continue
+            if input_type_key and not matching_specs:
+                continue
+            if output_type_key and not matching_specs:
+                continue
+
+            matches.append(
+                {
+                    "name": info.name,
+                    "capabilities": info.capabilities,
+                    "capability_specs": matching_specs or info.capability_specs,
+                    "registered_at": info.registered_at.isoformat(),
+                    "metadata": info.metadata,
+                    "alive": alive,
+                }
+            )
+
+        return matches
 
     def list_agents(self) -> List[Dict]:
-        """List all registered agents with their metadata."""
         return [
             {
                 "name": info.name,
                 "capabilities": info.capabilities,
+                "capability_specs": info.capability_specs,
                 "registered_at": info.registered_at.isoformat(),
                 "metadata": info.metadata,
                 "alive": self._is_alive(info.name),
@@ -156,51 +235,83 @@ class AgentHub:
         ]
 
     def get_capabilities(self) -> List[str]:
-        """Get all known capabilities across all agents."""
         return [
             cap
             for cap, agents in self._capability_index.items()
-            if agents  # Only return capabilities that have at least one agent
+            if agents
         ]
 
-    # =========================================================================
-    # Routing is now handled by Ray Serve directly.
-    # Legacy methods call()/notify() are removed.
-    # =========================================================================
+    def call(self, name: str, payload: Any) -> Any:
+        handle = self._get_handle(name)
+        if handle is None:
+            raise ValueError(f"Agent '{name}' is not registered or not alive")
+        return ray.get(handle.invoke.remote(payload))
 
-    # =========================================================================
-    # Lifecycle & Health
-    # =========================================================================
+    def call_by_capability(
+        self,
+        capability: str,
+        payload: Any,
+        required_tags: List[str] = None,
+        interaction_mode: str = None,
+        input_type: str = None,
+        output_type: str = None,
+    ) -> Any:
+        matches = self.query_agents(
+            capability=capability,
+            required_tags=required_tags,
+            interaction_mode=interaction_mode,
+            input_type=input_type,
+            output_type=output_type,
+            alive_only=True,
+        )
+        if not matches:
+            raise ValueError(f"No agent found with capability: {capability}")
+        return self.call(matches[0]["name"], payload)
+
+    def notify(self, name: str, event: Dict[str, Any]) -> bool:
+        handle = self._get_handle(name)
+        if handle is None:
+            return False
+        handle.handle_event.remote(event)
+        return True
+
+    def notify_capability(
+        self,
+        capability: str,
+        event: Dict[str, Any],
+        required_tags: List[str] = None,
+        interaction_mode: str = None,
+        input_type: str = None,
+        output_type: str = None,
+    ) -> int:
+        matches = self.query_agents(
+            capability=capability,
+            required_tags=required_tags,
+            interaction_mode=interaction_mode,
+            input_type=input_type,
+            output_type=output_type,
+            alive_only=True,
+        )
+        delivered = 0
+        for match in matches:
+            if self.notify(match["name"], event):
+                delivered += 1
+        return delivered
 
     def is_alive(self, name: str) -> bool:
-        """Check if an agent is alive."""
         return self._is_alive(name)
 
     def health_check(self) -> Dict[str, bool]:
-        """
-        Check health of all registered agents.
-
-        Returns:
-            Dict mapping agent name → alive status
-        """
         return {name: self._is_alive(name) for name in self._agents}
 
     def get_stats(self) -> Dict:
-        """Get hub statistics."""
         return {
             "registered_agents": len(self._agents),
-            "capabilities": len(
-                [c for c, a in self._capability_index.items() if a]
-            ),
+            "capabilities": len([c for c, a in self._capability_index.items() if a]),
             **self._stats,
         }
 
-    # =========================================================================
-    # Internal Helpers
-    # =========================================================================
-
     def _get_handle(self, name: str):
-        """Get the ServeHandle for an agent."""
         import ray.serve as serve
         try:
             return serve.get_app_handle(name)
@@ -209,10 +320,8 @@ class AgentHub:
             return None
 
     def _is_alive(self, name: str) -> bool:
-        """Check if a Ray Serve app is alive."""
         import ray.serve as serve
         try:
-            # serve.get_app_handle raises if app doesn't exist
             serve.get_app_handle(name)
             return True
         except (ValueError, KeyError, RuntimeError):
@@ -220,22 +329,10 @@ class AgentHub:
 
 
 def get_hub() -> ray.actor.ActorHandle:
-    """
-    Get or create the singleton AgentHub actor.
-
-    Thread-safe: handles race condition where two processes
-    try to create the hub simultaneously.
-
-    Returns:
-        Ray ActorHandle to the AgentHub
-    """
     try:
         return ray.get_actor("AgentHub")
     except ValueError:
         try:
-            return AgentHub.options(
-                name="AgentHub", lifetime="detached"
-            ).remote()
+            return AgentHub.options(name="AgentHub", lifetime="detached").remote()
         except ValueError:
-            # Another process created it between our check and create
             return ray.get_actor("AgentHub")

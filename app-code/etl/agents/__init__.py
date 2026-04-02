@@ -1,4 +1,5 @@
 from .base import BaseAgent
+from .gemini_agent import GeminiAgent
 from .langchain_adapter import LangChainAgent
 from .sentiment_agent import SentimentAgent
 from .tools import TimescaleTool, MilvusTool
@@ -7,6 +8,7 @@ from .context import ContextStore, get_context
 
 __all__ = [
     "BaseAgent",
+    "GeminiAgent",
     "LangChainAgent",
     "SentimentAgent",
     "TimescaleTool",
