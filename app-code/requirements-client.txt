@@ -2,6 +2,7 @@
 # These are lightweight - no heavy data processing libraries needed
 
 # Core orchestration
+ray[default]==2.54.0
 prefect>=2.14
 prefect-ray>=0.3
 

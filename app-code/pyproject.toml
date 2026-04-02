@@ -19,6 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 client = [
     # Orchestration
+    "ray[default]==2.54.0",
     "prefect>=2.14",
     "prefect-ray>=0.3",
     "python-dotenv>=1.0",
@@ -67,7 +68,7 @@ gateway = [
     "deltalake>=0.14",
     "pandas>=2.0,<3.0.0",
     "pyarrow>=14.0",
-    "ray[default]>=2.9.0",
+    "ray[default]==2.54.0",
     "thrift>=0.16",
 ]
 overseer = [

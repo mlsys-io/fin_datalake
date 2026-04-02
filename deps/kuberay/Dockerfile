@@ -1,6 +1,6 @@
 # Custom Ray image with ETL dependencies + etl package
-# Using latest Ray with Python 3.12
-FROM rayproject/ray:latest-py312
+# Pin Ray so the cluster runtime matches local client environments.
+FROM rayproject/ray:2.54.0-py312
 
 # Copy only the etl package (from build context = project root)
 COPY app-code/etl /home/ray/etl
