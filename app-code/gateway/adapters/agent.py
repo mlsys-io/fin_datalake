@@ -17,12 +17,17 @@ Required Permissions:
 import os
 import httpx
 import asyncio
+import logging
 from typing import Any
 
 from gateway.core.adapters import BaseAdapter, ActionNotFoundError
 from gateway.core.rbac import Permission
+from gateway.db import crud
+from gateway.db.session import AsyncSessionLocal
 from gateway.models.intent import UserIntent
 from gateway.models.user import User
+
+logger = logging.getLogger(__name__)
 
 
 class AgentAdapter(BaseAdapter):
@@ -91,10 +96,7 @@ class AgentAdapter(BaseAdapter):
         """Broadcast an event to all agents via HTTP."""
         self._require_permission(user, Permission.AGENT_BROADCAST)
 
-        import ray
-        from etl.agents.hub import get_hub
-        hub = get_hub()
-        agents_info = await hub.list_agents.remote()
+        agents_info = await self._fetch_agents_from_hub()
         agent_names = [a["name"] for a in agents_info if a.get("alive", False)]
 
         payload = intent.parameters.get("payload")
@@ -117,11 +119,87 @@ class AgentAdapter(BaseAdapter):
         return {"delivered_to": delivered, "total_targets": len(agent_names)}
 
     async def _list_agents(self, user: User, intent: UserIntent) -> dict:
-        """List all registered agents via AgentHub."""
+        """List agents from the durable catalog, enriched with live AgentHub state when available."""
         self._require_permission(user, Permission.AGENT_READ)
+
+        live_agents: list[dict] = []
+        live_available = False
+        detail = None
+
+        try:
+            live_agents = await self._fetch_agents_from_hub()
+            live_available = True
+        except Exception as e:
+            logger.warning("AgentHub listing unavailable: %s", e, exc_info=True)
+            detail = f"AgentHub unavailable: {e}"
+
+        agents = await self._get_catalog_agents(live_agents)
+        return {
+            "agents": agents,
+            "available": live_available,
+            "detail": detail,
+        }
+
+    async def _fetch_agents_from_hub(self) -> list[dict]:
         import ray
         from etl.agents.hub import get_hub
 
+        if not ray.is_initialized():
+            init_kwargs = {
+                "address": os.getenv("RAY_ADDRESS", "auto"),
+                "ignore_reinit_error": True,
+            }
+            namespace = os.getenv("RAY_NAMESPACE")
+            if namespace:
+                init_kwargs["namespace"] = namespace
+            ray.init(**init_kwargs)
+
         hub = get_hub()
-        agents = await hub.list_agents.remote()
-        return {"agents": agents}
+        return await asyncio.to_thread(ray.get, hub.list_agents.remote())
+
+    async def _get_catalog_agents(self, live_agents: list[dict]) -> list[dict]:
+        live_by_name = {}
+        for agent in live_agents:
+            agent_name = str(agent.get("name") or "").strip()
+            if agent_name:
+                live_by_name[agent_name] = agent
+
+        async with AsyncSessionLocal() as db:
+            for agent in live_by_name.values():
+                try:
+                    await crud.upsert_agent_definition(db, agent)
+                except Exception as e:
+                    logger.warning("Failed to sync agent '%s' into catalog: %s", agent.get("name"), e, exc_info=True)
+
+            catalog_agents = await crud.list_agent_definitions(db)
+
+        merged = []
+        seen = set()
+
+        for catalog_agent in catalog_agents:
+            name = catalog_agent["name"]
+            live_agent = live_by_name.get(name)
+            if live_agent:
+                merged.append({
+                    **catalog_agent,
+                    **live_agent,
+                    "source": "catalog+runtime",
+                })
+            else:
+                merged.append({
+                    **catalog_agent,
+                    "alive": False,
+                    "source": catalog_agent.get("source", "catalog"),
+                })
+            seen.add(name)
+
+        for name, live_agent in live_by_name.items():
+            if name in seen:
+                continue
+            merged.append({
+                **live_agent,
+                "source": "runtime",
+            })
+
+        merged.sort(key=lambda agent: str(agent.get("name") or "").lower())
+        return merged

@@ -8,12 +8,13 @@ All functions take an AsyncSession as their first argument.
 import json
 import secrets
 import string
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gateway.core.security import hash_password, verify_password
-from gateway.db.models import APIKeyORM, UserORM
+from gateway.db.models import APIKeyORM, AgentDefinitionORM, UserORM
 from gateway.models.user import User
 from gateway.core.rbac import rbac_provider
 
@@ -227,3 +228,86 @@ async def revoke_api_key(db: AsyncSession, key_id: str, username: str) -> bool:
     row.is_active = False
     await db.commit()
     return True
+
+
+# ---------------------------------------------------------------------------
+# Agent Catalog helpers
+# ---------------------------------------------------------------------------
+
+def _parse_json_text(value: str | None, default):
+    if not value:
+        return default
+    try:
+        return json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        return default
+
+
+def _agent_definition_to_dict(row: AgentDefinitionORM) -> dict:
+    return {
+        "name": row.name,
+        "capabilities": _parse_json_text(row.capabilities, []),
+        "capability_specs": _parse_json_text(row.capability_specs, []),
+        "metadata": _parse_json_text(row.metadata, {}),
+        "registered_at": row.registered_at.isoformat() if row.registered_at else None,
+        "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else None,
+        "alive": False,
+        "source": "catalog",
+    }
+
+
+async def upsert_agent_definition(
+    db: AsyncSession,
+    agent: dict,
+    *,
+    mark_seen: bool = True,
+) -> dict:
+    """
+    Insert or update a persistent agent catalog entry from a live/runtime payload.
+    """
+    agent_name = str(agent.get("name") or "").strip()
+    if not agent_name:
+        raise ValueError("Agent definition requires a non-empty 'name'.")
+
+    result = await db.execute(
+        select(AgentDefinitionORM).where(AgentDefinitionORM.name == agent_name)
+    )
+    row = result.scalars().first()
+    now = datetime.now(timezone.utc)
+
+    registered_at = agent.get("registered_at")
+    if isinstance(registered_at, str):
+        try:
+            registered_at = datetime.fromisoformat(registered_at)
+        except ValueError:
+            registered_at = None
+    elif not isinstance(registered_at, datetime):
+        registered_at = None
+
+    if row is None:
+        row = AgentDefinitionORM(name=agent_name)
+        db.add(row)
+
+    row.capabilities = json.dumps(agent.get("capabilities") or [])
+    row.capability_specs = json.dumps(agent.get("capability_specs") or [])
+    row.metadata = json.dumps(agent.get("metadata") or {})
+    if registered_at is not None:
+        row.registered_at = registered_at
+    if mark_seen:
+        row.last_seen_at = now
+
+    await db.commit()
+    await db.refresh(row)
+    return _agent_definition_to_dict(row)
+
+
+async def list_agent_definitions(db: AsyncSession, *, enabled_only: bool = True) -> list[dict]:
+    """
+    Return the persistent agent catalog from the database.
+    """
+    stmt = select(AgentDefinitionORM).order_by(AgentDefinitionORM.name.asc())
+    if enabled_only:
+        stmt = stmt.where(AgentDefinitionORM.is_enabled == True)
+
+    result = await db.execute(stmt)
+    return [_agent_definition_to_dict(row) for row in result.scalars().all()]

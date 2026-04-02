@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional
 import os
 from redis.asyncio import Redis
+import httpx
 
 from gateway.api.deps import get_current_user
 from gateway.models.user import User
@@ -128,3 +129,39 @@ async def get_overseer_alerts(
         return [json.loads(i) for i in items]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/infra/status", summary="Probe internal UI targets such as Prefect and Ray")
+async def get_infra_status(
+    user: User = Depends(get_current_user),
+) -> dict:
+    """
+    Perform short health probes against internal dashboard targets so the
+    frontend can avoid loading hanging iframes when a service is down.
+    """
+    targets = {
+        "prefect": os.environ.get("PREFECT_UI_URL", "http://127.0.0.1:4200"),
+        "ray": os.environ.get("RAY_DASHBOARD_URL", "http://127.0.0.1:32382"),
+        "minio": os.environ.get("MINIO_CONSOLE_URL", "http://127.0.0.1:9001"),
+    }
+
+    async with httpx.AsyncClient(timeout=2.0, follow_redirects=True) as client:
+        results = {}
+        for name, url in targets.items():
+            try:
+                response = await client.get(url)
+                results[name] = {
+                    "ok": response.status_code < 500,
+                    "status_code": response.status_code,
+                    "url": url,
+                    "detail": None,
+                }
+            except Exception as e:
+                results[name] = {
+                    "ok": False,
+                    "status_code": None,
+                    "url": url,
+                    "detail": str(e),
+                }
+
+    return {"targets": results}

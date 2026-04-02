@@ -1,9 +1,10 @@
 """
-SQLAlchemy ORM Models for the Gateway Auth database.
+SQLAlchemy ORM Models for the Gateway database.
 
 Tables:
-  - users:    Human and service accounts (username, hashed_password, roles).
-  - api_keys: Long-lived machine credentials tied to a user.
+  - users:              Human and service accounts (username, hashed_password, roles).
+  - api_keys:           Long-lived machine credentials tied to a user.
+  - agent_definitions:  Persistent agent catalog data used by the gateway UI/API.
 """
 
 import uuid
@@ -77,3 +78,26 @@ class APIKeyORM(Base):
     created_at = Column(DateTime(timezone=True), default=_now)
 
     user = relationship("UserORM", back_populates="api_keys")
+
+
+class AgentDefinitionORM(Base):
+    """
+    Persistent agent catalog entry.
+
+    This stores durable metadata about an agent independently of the live
+    Ray/Serve control plane, allowing the gateway to render known agents even
+    when the runtime is temporarily unavailable.
+    """
+
+    __tablename__ = "agent_definitions"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    name = Column(String, unique=True, nullable=False, index=True)
+    capabilities = Column(Text, nullable=False, default="[]")
+    capability_specs = Column(Text, nullable=False, default="[]")
+    metadata = Column(Text, nullable=False, default="{}")
+    registered_at = Column(DateTime(timezone=True), nullable=True)
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    is_enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), default=_now)
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)

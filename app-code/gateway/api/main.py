@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # -- Routers --
 from gateway.api.routers import auth as auth_router
 from gateway.api.routers import intent as intent_router
+from gateway.api.routers import agents as agents_router
 from gateway.api.routers import system as system_router
 from gateway.api.routers import alerts as alerts_router
 
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
     # -------------------------------------------------------------------------
     app.include_router(auth_router.router,   prefix="/api/v1/auth",   tags=["Auth"])
     app.include_router(intent_router.router, prefix="/api/v1",        tags=["Intent"])
+    app.include_router(agents_router.router, prefix="/api/v1/agents", tags=["Agents"])
     app.include_router(system_router.router, prefix="/api/v1/system", tags=["System Control"])
     app.include_router(alerts_router.router, prefix="/api/v1/stream", tags=["Streaming"])
 
