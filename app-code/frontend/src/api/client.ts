@@ -54,7 +54,11 @@ export async function sendIntent(domain: string, action: string, parameters: Rec
  * List registered agents exposed by the gateway.
  */
 export async function fetchAgents() {
-    const data = await sendIntent('agent', 'list')
+    const res = await fetch('/api/v1/agents', { credentials: 'include' })
+    const data = await res.json()
+    if (!res.ok) {
+        throw new APIError(res.status, data.detail || 'Failed to fetch agents')
+    }
     return (data.agents ?? []) as AgentSummary[]
 }
 
@@ -62,29 +66,57 @@ export async function fetchAgents() {
  * Send a chat-style message to an agent.
  */
 export async function chatWithAgent(agentName: string, message: string, sessionId?: string) {
-    return sendIntent('agent', 'chat', {
-        agent_name: agentName,
+    const res = await fetch(`/api/v1/agents/${encodeURIComponent(agentName)}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
         message,
         session_id: sessionId,
+        }),
     })
+    const data = await res.json()
+    if (!res.ok) {
+        throw new APIError(res.status, data.detail || 'Agent chat failed')
+    }
+    return data
 }
 
 /**
  * Send an arbitrary payload to an agent's invoke path.
  */
 export async function invokeAgent(agentName: string, payload: unknown, sessionId?: string) {
-    return sendIntent('agent', 'invoke', {
-        agent_name: agentName,
+    const res = await fetch(`/api/v1/agents/${encodeURIComponent(agentName)}/invoke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
         payload,
         session_id: sessionId,
+        }),
     })
+    const data = await res.json()
+    if (!res.ok) {
+        throw new APIError(res.status, data.detail || 'Agent invoke failed')
+    }
+    return data
 }
 
 /**
  * Broadcast an event to all alive agents.
  */
 export async function broadcastAgentEvent(payload: Record<string, unknown>) {
-    return sendIntent('agent', 'notify', { payload })
+    const res = await fetch('/api/v1/agents/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ payload }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+        throw new APIError(res.status, data.detail || 'Agent broadcast failed')
+    }
+    return data
 }
 
 /**
@@ -118,4 +150,23 @@ export async function fetchOverseerAlerts(n: number = 20) {
         throw new APIError(res.status, data.detail || 'Failed to fetch alerts')
     }
     return res.json()
+}
+
+/**
+ * Probe internal dashboard targets such as Prefect, Ray, and MinIO.
+ */
+export async function fetchInfraStatus() {
+    const res = await fetch('/api/v1/system/infra/status', { credentials: 'include' })
+    const data = await res.json()
+    if (!res.ok) {
+        throw new APIError(res.status, data.detail || 'Failed to fetch infrastructure status')
+    }
+    return data as {
+        targets: Record<string, {
+            ok: boolean
+            status_code: number | null
+            url: string
+            detail: string | null
+        }>
+    }
 }
