@@ -13,6 +13,25 @@ export class APIError extends Error {
     }
 }
 
+export type AgentCapabilitySpec = {
+    id: string
+    description: string
+    tags?: string[]
+    aliases?: string[]
+    input_type?: string | null
+    output_type?: string | null
+    interaction_mode?: string | null
+}
+
+export type AgentSummary = {
+    name: string
+    capabilities?: string[]
+    capability_specs?: AgentCapabilitySpec[]
+    metadata?: Record<string, unknown>
+    registered_at?: string
+    alive?: boolean
+}
+
 /**
  * Send a Universal Intent to the Gateway.
  */
@@ -36,7 +55,36 @@ export async function sendIntent(domain: string, action: string, parameters: Rec
  */
 export async function fetchAgents() {
     const data = await sendIntent('agent', 'list')
-    return data.agents ?? []
+    return (data.agents ?? []) as AgentSummary[]
+}
+
+/**
+ * Send a chat-style message to an agent.
+ */
+export async function chatWithAgent(agentName: string, message: string, sessionId?: string) {
+    return sendIntent('agent', 'chat', {
+        agent_name: agentName,
+        message,
+        session_id: sessionId,
+    })
+}
+
+/**
+ * Send an arbitrary payload to an agent's invoke path.
+ */
+export async function invokeAgent(agentName: string, payload: unknown, sessionId?: string) {
+    return sendIntent('agent', 'invoke', {
+        agent_name: agentName,
+        payload,
+        session_id: sessionId,
+    })
+}
+
+/**
+ * Broadcast an event to all alive agents.
+ */
+export async function broadcastAgentEvent(payload: Record<string, unknown>) {
+    return sendIntent('agent', 'notify', { payload })
 }
 
 /**
