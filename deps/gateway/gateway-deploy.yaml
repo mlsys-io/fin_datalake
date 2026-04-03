@@ -67,6 +67,8 @@ spec:
               value: "info"
             - name: PREFECT_UI_URL
               value: "http://prefect-server.etl-orchestrate.svc.cluster.local:4200"
+            - name: RAY_ADDRESS
+              value: "ray://etl-ray-head-svc.etl-compute.svc.cluster.local:10001"
             - name: RAY_DASHBOARD_URL
               value: "http://etl-ray-head-svc.etl-compute.svc.cluster.local:8265"
             - name: MINIO_CONSOLE_URL
