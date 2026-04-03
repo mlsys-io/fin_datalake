@@ -107,6 +107,9 @@ class ServiceTask(ABC, DependencyAwareMixin):
         return_handle=True to receive the raw Ray ActorHandle instead.
         """
         from loguru import logger
+        from etl.runtime import ensure_ray
+
+        ensure_ray()
 
         actor_name = name or cls.__name__
 
@@ -132,6 +135,9 @@ class ServiceTask(ABC, DependencyAwareMixin):
         name: str,
         return_handle: bool = False,
     ) -> Union[SyncHandle, "ray_typing.actor.ActorHandle"]:
+        from etl.runtime import ensure_ray
+
+        ensure_ray()
         handle = ray.get_actor(name)
         if return_handle:
             return handle

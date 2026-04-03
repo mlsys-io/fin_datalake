@@ -56,6 +56,7 @@ def section(title: str):
 
 from etl.agents.base import BaseAgent
 from etl.core.base_service import SyncHandle
+from etl.runtime import ensure_ray
 
 
 class AnalystAgent(BaseAgent):
@@ -98,8 +99,7 @@ def main():
     print(f"  Ray address: {RAY_ADDRESS}")
 
     # --- Init Ray ---
-    if not ray.is_initialized():
-        ray.init(address=RAY_ADDRESS, ignore_reinit_error=True)
+    ensure_ray(address=RAY_ADDRESS)
 
     cluster = ray.cluster_resources()
     print(f"  Cluster CPUs: {cluster.get('CPU', '?')}")

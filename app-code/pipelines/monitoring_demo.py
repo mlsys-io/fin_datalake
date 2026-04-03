@@ -11,8 +11,8 @@ import time
 from prefect import flow, get_run_logger
 from prefect.artifacts import create_markdown_artifact
 
-from etl.config import config
 from etl.core.base_service import ServiceTask
+from etl.runtime import ensure_ray
 
 
 class HeartbeatService(ServiceTask):
@@ -51,12 +51,9 @@ def monitor_service_flow(duration_seconds: int = 20, tick_interval: float = 1.0)
     """
     Deploy and monitor a lightweight ServiceTask on the remote Ray cluster.
     """
-    import ray
-
     logger = get_run_logger()
 
-    if not ray.is_initialized():
-        ray.init(address=config.RAY_ADDRESS, ignore_reinit_error=True)
+    ray = ensure_ray()
 
     service_name = f"HeartbeatService-{int(time.time())}"
     logger.info("Deploying HeartbeatService to Ray as '%s'...", service_name)

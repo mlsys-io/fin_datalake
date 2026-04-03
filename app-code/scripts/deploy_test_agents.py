@@ -15,12 +15,13 @@ import ray
 
 from agents.dummy_agents import ForecastAgent, RouterAgent, SentimentModelAgent, SupportAgent
 from etl.agents.hub import get_hub
+from etl.runtime import ensure_ray
 
 
 def main():
     ray_address = os.getenv("RAY_ADDRESS", "auto")
     print(f"Connecting to Ray at: {ray_address}")
-    ray.init(address=ray_address, ignore_reinit_error=True)
+    ensure_ray(address=ray_address)
 
     deployments = [
         ("SupportAgent", SupportAgent),

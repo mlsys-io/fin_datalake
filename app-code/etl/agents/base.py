@@ -46,6 +46,9 @@ class BaseAgent(ABC, ConversationManagerMixin):
         import ray.serve as serve
         from fastapi import FastAPI
         from loguru import logger
+        from etl.runtime import ensure_ray
+
+        ensure_ray()
 
         actor_name = name or cls.__name__
         app = FastAPI(title=f"Agent: {actor_name}")
@@ -67,7 +70,10 @@ class BaseAgent(ABC, ConversationManagerMixin):
 
     @classmethod
     def connect(cls, name: str):
+        from etl.runtime import ensure_ray
         import ray.serve as serve
+
+        ensure_ray()
         return serve.get_app_handle(name)
 
     def _bind_endpoints(self, app: "FastAPI"):
@@ -154,8 +160,10 @@ class BaseAgent(ABC, ConversationManagerMixin):
         """
         Remove the Ray Serve deployment and run final cleanup.
         """
+        from etl.runtime import ensure_ray
         import ray.serve as serve
 
+        ensure_ray()
         serve.delete(self.app_name or self.name)
         self.on_stop()
 
