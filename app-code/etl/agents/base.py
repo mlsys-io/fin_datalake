@@ -1,14 +1,10 @@
 """
 Base Agent class for request-driven AI agents deployed with Ray Serve.
 """
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional
 from abc import ABC, abstractmethod
 
 from etl.agents.mixins import ConversationManagerMixin
-
-
-if TYPE_CHECKING:
-    from fastapi import FastAPI
 
 
 class BaseAgent(ABC, ConversationManagerMixin):
@@ -23,15 +19,10 @@ class BaseAgent(ABC, ConversationManagerMixin):
     CAPABILITY_SPECS: list = []
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        from fastapi import FastAPI
-
         self.name = self.__class__.__name__
         self.app_name: Optional[str] = None
         self.config = config or {}
         self.executor = None
-
-        if hasattr(self, "app") and isinstance(self.app, FastAPI):
-            self._bind_endpoints(self.app)
 
     @classmethod
     def deploy(
@@ -44,21 +35,19 @@ class BaseAgent(ABC, ConversationManagerMixin):
     ):
         import ray
         import ray.serve as serve
-        from fastapi import FastAPI
         from loguru import logger
         from etl.runtime import ensure_ray
 
         ensure_ray()
 
         actor_name = name or cls.__name__
-        app = FastAPI(title=f"Agent: {actor_name}")
 
         deployment_cls = serve.deployment(
             name=actor_name,
             num_replicas=num_replicas,
             ray_actor_options={"num_cpus": num_cpus},
             **serve_options,
-        )(serve.ingress(app)(cls))
+        )(cls)
 
         handle = serve.run(deployment_cls.bind(config=config), name=actor_name)
         logger.info(f"Deployed Agent '{actor_name}' to Ray Serve")
@@ -75,21 +64,6 @@ class BaseAgent(ABC, ConversationManagerMixin):
 
         ensure_ray()
         return serve.get_app_handle(name)
-
-    def _bind_endpoints(self, app: "FastAPI"):
-        @app.post("/invoke")
-        async def invoke_endpoint(request: Dict[str, Any]):
-            payload = request.get("payload")
-            session_id = request.get("session_id")
-            return self.invoke(payload, session_id=session_id)
-
-        @app.post("/events")
-        async def event_endpoint(event: Dict[str, Any]):
-            return self.handle_event(event)
-
-        @app.get("/health")
-        async def health_check():
-            return {"status": "ok", "agent": self.app_name or self.name}
 
     def set_app_name(self, app_name: str):
         self.app_name = app_name
@@ -233,6 +207,12 @@ class BaseAgent(ABC, ConversationManagerMixin):
         Convenience wrapper for chat-capable agents.
         """
         return self.invoke(message, session_id=session_id)
+
+    def ask(self, payload: Any, session_id: Optional[str] = None) -> Any:
+        """
+        Compatibility alias used by demos and higher-level orchestration code.
+        """
+        return self.invoke(payload, session_id=session_id)
 
     def handle_event(self, event: Dict[str, Any]):
         """

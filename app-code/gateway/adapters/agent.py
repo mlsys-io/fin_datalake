@@ -15,8 +15,8 @@ Required Permissions:
 """
 
 import os
-import httpx
 import asyncio
+import inspect
 import logging
 from typing import Any
 
@@ -63,7 +63,7 @@ class AgentAdapter(BaseAdapter):
         if not agent_name or message is None:
             raise ValueError("Parameters 'agent_name' and 'message' are required.")
 
-        return await self._invoke_http(user, agent_name=agent_name, payload=message, session_id=session_id)
+        return await self._invoke_handle(user, agent_name=agent_name, method_name="chat", payload=message, session_id=session_id)
 
     async def _invoke(self, user: User, intent: UserIntent) -> dict:
         """Generic invoke against a named agent with arbitrary payload."""
@@ -76,21 +76,18 @@ class AgentAdapter(BaseAdapter):
         if not agent_name or payload is None:
             raise ValueError("Parameters 'agent_name' and 'payload' are required.")
 
-        return await self._invoke_http(user, agent_name=agent_name, payload=payload, session_id=session_id)
+        return await self._invoke_handle(user, agent_name=agent_name, method_name="invoke", payload=payload, session_id=session_id)
 
-    async def _invoke_http(self, user: User, agent_name: str, payload: Any, session_id: str | None = None) -> dict:
-        endpoint = os.getenv("RAY_SERVE_ENDPOINT", "http://localhost:8000")
-        url = f"{endpoint}/{agent_name}/invoke"
+    async def _invoke_handle(self, user: User, agent_name: str, method_name: str, payload: Any, session_id: str | None = None) -> dict:
+        handle = await self._get_agent_handle(agent_name)
+        method = getattr(handle, method_name)
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            request_body = {
-                "payload": payload,
-                "session_id": session_id,
-                "metadata": {"sender": user.username}
-            }
-            response = await client.post(url, json=request_body)
-            response.raise_for_status()
-            return {"agent": agent_name, "response": response.json()}
+        kwargs = {}
+        if session_id is not None:
+            kwargs["session_id"] = session_id
+
+        response = await self._call_handle_method(method, payload, **kwargs)
+        return {"agent": agent_name, "response": response}
 
     async def _notify(self, user: User, intent: UserIntent) -> dict:
         """Broadcast an event to all agents via HTTP."""
@@ -106,17 +103,20 @@ class AgentAdapter(BaseAdapter):
             "sender": user.username,
         }
 
-        endpoint = os.getenv("RAY_SERVE_ENDPOINT", "http://localhost:8000")
-
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            tasks = [
-                client.post(f"{endpoint}/{name}/events", json=event)
-                for name in agent_names
-            ]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        delivered = sum(1 for r in results if isinstance(r, httpx.Response) and r.status_code == 200)
+        tasks = [self._notify_one(name, event) for name in agent_names]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        delivered = sum(1 for r in results if r is True)
         return {"delivered_to": delivered, "total_targets": len(agent_names)}
+
+    async def _notify_one(self, agent_name: str, event: dict) -> bool:
+        try:
+            handle = await self._get_agent_handle(agent_name)
+            method = getattr(handle, "handle_event")
+            await self._call_handle_method(method, event)
+            return True
+        except Exception as e:
+            logger.warning("Failed to notify agent '%s': %s", agent_name, e, exc_info=True)
+            return False
 
     async def _list_agents(self, user: User, intent: UserIntent) -> dict:
         """List agents from the durable catalog, enriched with live AgentHub state when available."""
@@ -143,19 +143,35 @@ class AgentAdapter(BaseAdapter):
     async def _fetch_agents_from_hub(self) -> list[dict]:
         import ray
         from etl.agents.hub import get_hub
+        from etl.runtime import ensure_ray
 
-        if not ray.is_initialized():
-            init_kwargs = {
-                "address": os.getenv("RAY_ADDRESS", "auto"),
-                "ignore_reinit_error": True,
-            }
-            namespace = os.getenv("RAY_NAMESPACE")
-            if namespace:
-                init_kwargs["namespace"] = namespace
-            ray.init(**init_kwargs)
+        namespace = os.getenv("RAY_NAMESPACE")
+        init_kwargs = {}
+        if namespace:
+            init_kwargs["namespace"] = namespace
+        ensure_ray(address=os.getenv("RAY_ADDRESS", "auto"), **init_kwargs)
 
         hub = get_hub()
         return await asyncio.to_thread(ray.get, hub.list_agents.remote())
+
+    async def _get_agent_handle(self, agent_name: str):
+        from etl.runtime import ensure_ray
+        import ray.serve as serve
+
+        ensure_ray(address=os.getenv("RAY_ADDRESS", "auto"))
+        return serve.get_app_handle(agent_name)
+
+    async def _call_handle_method(self, method: Any, *args: Any, **kwargs: Any) -> Any:
+        import ray
+
+        remote = getattr(method, "remote", None)
+        if callable(remote):
+            return await asyncio.to_thread(ray.get, remote(*args, **kwargs))
+
+        result = method(*args, **kwargs)
+        if inspect.isawaitable(result):
+            return await result
+        return result
 
     async def _get_catalog_agents(self, live_agents: list[dict]) -> list[dict]:
         live_by_name = {}
