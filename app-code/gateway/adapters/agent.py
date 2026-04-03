@@ -162,11 +162,11 @@ class AgentAdapter(BaseAdapter):
         return serve.get_app_handle(agent_name)
 
     async def _call_handle_method(self, method: Any, *args: Any, **kwargs: Any) -> Any:
-        import ray
+        from etl.runtime import resolve_serve_response
 
         remote = getattr(method, "remote", None)
         if callable(remote):
-            return await asyncio.to_thread(ray.get, remote(*args, **kwargs))
+            return await asyncio.to_thread(resolve_serve_response, remote(*args, **kwargs))
 
         result = method(*args, **kwargs)
         if inspect.isawaitable(result):

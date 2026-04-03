@@ -15,7 +15,7 @@ import ray
 
 from agents.dummy_agents import ForecastAgent, RouterAgent, SentimentModelAgent, SupportAgent
 from etl.agents.hub import get_hub
-from etl.runtime import ensure_ray
+from etl.runtime import ensure_ray, resolve_serve_response
 
 
 def main():
@@ -51,9 +51,9 @@ def main():
 
     print("\nSmoke tests:")
     router = handles["RouterAgent"]
-    direct_result = ray.get(router.invoke.remote({"action": "direct_support", "message": "Gateway returned 503"}))
-    sentiment_result = ray.get(router.invoke.remote({"action": "score_sentiment", "text": "Bitcoin rally beats expectations"}))
-    forecast_result = ray.get(router.invoke.remote({"action": "forecast", "values": [100, 103, 106]}))
+    direct_result = resolve_serve_response(router.invoke.remote({"action": "direct_support", "message": "Gateway returned 503"}))
+    sentiment_result = resolve_serve_response(router.invoke.remote({"action": "score_sentiment", "text": "Bitcoin rally beats expectations"}))
+    forecast_result = resolve_serve_response(router.invoke.remote({"action": "forecast", "values": [100, 103, 106]}))
 
     print(f"- Direct delegation: {direct_result}")
     print(f"- Capability delegation: {sentiment_result}")

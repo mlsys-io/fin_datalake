@@ -36,7 +36,7 @@ class BaseAgent(ABC, ConversationManagerMixin):
         import ray
         import ray.serve as serve
         from loguru import logger
-        from etl.runtime import ensure_ray
+        from etl.runtime import ensure_ray, resolve_serve_response
 
         ensure_ray()
 
@@ -52,8 +52,8 @@ class BaseAgent(ABC, ConversationManagerMixin):
         handle = serve.run(deployment_cls.bind(config=config), name=actor_name)
         logger.info(f"Deployed Agent '{actor_name}' to Ray Serve")
 
-        ray.get(handle.set_app_name.remote(actor_name))
-        ray.get(handle.setup.remote())
+        resolve_serve_response(handle.set_app_name.remote(actor_name))
+        resolve_serve_response(handle.setup.remote())
 
         return handle
 
@@ -300,11 +300,11 @@ class BaseAgent(ABC, ConversationManagerMixin):
         raise RuntimeError(f"All agents for capability '{capability}' failed. Last error: {last_error}")
 
     def delegate_to(self, agent_name: str, payload: Any) -> Any:
-        import ray
         import ray.serve as serve
+        from etl.runtime import resolve_serve_response
 
         handle = serve.get_app_handle(agent_name)
-        return ray.get(handle.invoke.remote(payload))
+        return resolve_serve_response(handle.invoke.remote(payload))
 
     def _coerce_conversation_entry(self, payload: Any) -> Optional[Dict[str, str]]:
         if isinstance(payload, str):

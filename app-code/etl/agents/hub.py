@@ -242,10 +242,12 @@ class AgentHub:
         ]
 
     def call(self, name: str, payload: Any) -> Any:
+        from etl.runtime import resolve_serve_response
+
         handle = self._get_handle(name)
         if handle is None:
             raise ValueError(f"Agent '{name}' is not registered or not alive")
-        return ray.get(handle.invoke.remote(payload))
+        return resolve_serve_response(handle.invoke.remote(payload))
 
     def call_by_capability(
         self,
@@ -272,7 +274,9 @@ class AgentHub:
         handle = self._get_handle(name)
         if handle is None:
             return False
-        handle.handle_event.remote(event)
+        from etl.runtime import resolve_serve_response
+
+        resolve_serve_response(handle.handle_event.remote(event))
         return True
 
     def notify_capability(
