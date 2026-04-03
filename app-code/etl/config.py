@@ -49,6 +49,7 @@ class Config:
     
     # Ray
     RAY_ADDRESS: str = os.environ.get("RAY_ADDRESS", "auto")
+    RAY_NAMESPACE: str = os.environ.get("RAY_NAMESPACE", "serve")
     RAY_DASHBOARD_URL: str = os.environ.get("RAY_DASHBOARD_URL", "")
     
     # Prefect
@@ -107,6 +108,7 @@ class Config:
         # Re-read all values
         cls.NODE_IP = os.environ.get("NODE_IP", "localhost")
         cls.RAY_ADDRESS = os.environ.get("RAY_ADDRESS", "auto")
+        cls.RAY_NAMESPACE = os.environ.get("RAY_NAMESPACE", "serve")
         cls.RAY_DASHBOARD_URL = os.environ.get("RAY_DASHBOARD_URL", "")
         cls.PREFECT_API_URL = os.environ.get("PREFECT_API_URL", "")
         

@@ -77,10 +77,30 @@ def build_runtime_env(working_dir: str | os.PathLike[str] | None = None) -> dict
     }
 
 
+def resolve_ray_namespace(namespace: str | None = None) -> str | None:
+    """
+    Resolve the Ray namespace used by clients, actors, and gateway adapters.
+
+    Resolution order:
+    1. Explicit function argument
+    2. ``RAY_NAMESPACE`` environment variable / config
+    3. Default: ``serve``
+    """
+    if namespace is not None:
+        value = str(namespace).strip()
+        return value or None
+
+    from etl.config import config
+
+    value = str(config.RAY_NAMESPACE or "").strip()
+    return value or None
+
+
 def ensure_ray(
     address: str | None = None,
     *,
     working_dir: str | os.PathLike[str] | None = None,
+    namespace: str | None = None,
     **init_kwargs: Any,
 ):
     """
@@ -98,6 +118,9 @@ def ensure_ray(
 
     init_kwargs.setdefault("ignore_reinit_error", True)
     init_kwargs.setdefault("runtime_env", build_runtime_env(working_dir))
+    resolved_namespace = resolve_ray_namespace(namespace)
+    if resolved_namespace is not None:
+        init_kwargs.setdefault("namespace", resolved_namespace)
     ray.init(address=address or config.RAY_ADDRESS, **init_kwargs)
     return ray
 

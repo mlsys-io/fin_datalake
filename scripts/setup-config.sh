@@ -138,6 +138,7 @@ export RISINGWAVE_HOST=${NODE_IP}
 export RISINGWAVE_PORT=${RISINGWAVE_PORT:-31001}
 export PREFECT_API_URL=http://${NODE_IP}:${PREFECT_PORT:-30420}/api
 export RAY_ADDRESS=ray://${NODE_IP}:${RAY_CLIENT_PORT:-30282}
+export RAY_NAMESPACE=serve
 export RAY_DASHBOARD_URL=http://${NODE_IP}:${RAY_DASHBOARD_PORT:-30742}
 export OVERSEER_REDIS_URL=redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/0
 export INPUT_PATH=/mnt/data

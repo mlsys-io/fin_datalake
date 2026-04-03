@@ -143,22 +143,24 @@ class AgentAdapter(BaseAdapter):
     async def _fetch_agents_from_hub(self) -> list[dict]:
         import ray
         from etl.agents.hub import get_hub
-        from etl.runtime import ensure_ray
+        from etl.runtime import ensure_ray, resolve_ray_namespace
 
-        namespace = os.getenv("RAY_NAMESPACE")
-        init_kwargs = {}
-        if namespace:
-            init_kwargs["namespace"] = namespace
-        ensure_ray(address=os.getenv("RAY_ADDRESS", "auto"), **init_kwargs)
+        ensure_ray(
+            address=os.getenv("RAY_ADDRESS", "auto"),
+            namespace=resolve_ray_namespace(os.getenv("RAY_NAMESPACE")),
+        )
 
-        hub = get_hub()
+        hub = get_hub(create_if_missing=False)
         return await asyncio.to_thread(ray.get, hub.list_agents.remote())
 
     async def _get_agent_handle(self, agent_name: str):
-        from etl.runtime import ensure_ray
+        from etl.runtime import ensure_ray, resolve_ray_namespace
         import ray.serve as serve
 
-        ensure_ray(address=os.getenv("RAY_ADDRESS", "auto"))
+        ensure_ray(
+            address=os.getenv("RAY_ADDRESS", "auto"),
+            namespace=resolve_ray_namespace(os.getenv("RAY_NAMESPACE")),
+        )
         return serve.get_app_handle(agent_name)
 
     async def _call_handle_method(self, method: Any, *args: Any, **kwargs: Any) -> Any:

@@ -332,11 +332,23 @@ class AgentHub:
             return False
 
 
-def get_hub() -> ray.actor.ActorHandle:
+def get_hub(*, create_if_missing: bool = True) -> ray.actor.ActorHandle:
+    from etl.runtime import ensure_ray, resolve_ray_namespace
+
+    ensure_ray(namespace=resolve_ray_namespace())
+    namespace = resolve_ray_namespace()
+
     try:
-        return ray.get_actor("AgentHub")
+        return ray.get_actor("AgentHub", namespace=namespace)
     except ValueError:
+        if not create_if_missing:
+            raise
+
         try:
-            return AgentHub.options(name="AgentHub", lifetime="detached").remote()
+            return AgentHub.options(
+                name="AgentHub",
+                lifetime="detached",
+                namespace=namespace,
+            ).remote()
         except ValueError:
-            return ray.get_actor("AgentHub")
+            return ray.get_actor("AgentHub", namespace=namespace)
