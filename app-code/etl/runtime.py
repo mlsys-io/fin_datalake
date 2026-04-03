@@ -98,3 +98,19 @@ def ensure_ray(
     init_kwargs.setdefault("runtime_env", build_runtime_env(working_dir))
     ray.init(address=address or config.RAY_ADDRESS, **init_kwargs)
     return ray
+
+
+def resolve_serve_response(response: Any) -> Any:
+    """
+    Resolve a Ray Serve DeploymentResponse or fall back to ``ray.get``.
+
+    Ray Serve handle calls return DeploymentResponse objects, not plain
+    ObjectRefs. Older actor-style paths may still return ObjectRefs, so this
+    helper accepts both.
+    """
+    if hasattr(response, "result") and callable(response.result):
+        return response.result()
+
+    import ray
+
+    return ray.get(response)
