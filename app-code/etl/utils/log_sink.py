@@ -22,7 +22,6 @@ Usage::
 
 from __future__ import annotations
 
-import os
 import threading
 import time
 import atexit
@@ -70,14 +69,24 @@ VALUES %s
 # DSN Builder
 # ---------------------------------------------------------------------------
 
-def build_dsn() -> str:
-    """Build a PostgreSQL DSN from environment variables."""
-    host = os.environ.get("TSDB_HOST", "localhost")
-    port = os.environ.get("TSDB_PORT", "5432")
-    user = os.environ.get("TSDB_USER", "app")
-    password = os.environ.get("TSDB_PASSWORD", "")
-    database = os.environ.get("TSDB_DATABASE", "app")
+def build_dsn() -> Optional[str]:
+    """Build a PostgreSQL DSN from central config when Timescale is configured."""
+    from etl.config import config
+
+    host = str(config.TSDB_HOST or "").strip()
+    if not host:
+        return None
+
+    port = str(config.TSDB_PORT)
+    user = str(config.TSDB_USER)
+    password = str(config.TSDB_PASSWORD)
+    database = str(config.TSDB_DATABASE)
     return f"host={host} port={port} user={user} password={password} dbname={database}"
+
+
+def is_timescale_logging_configured() -> bool:
+    """Return True when Timescale logging has enough config to connect."""
+    return build_dsn() is not None
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +122,7 @@ class TimescaleLogSink:
         self.dsn = dsn or build_dsn()
         self.batch_size = batch_size
         self.flush_interval = flush_interval
+        self._disabled = self.dsn is None
 
         self._buffer: List[tuple] = []
         self._lock = threading.Lock()
@@ -212,6 +222,9 @@ class TimescaleLogSink:
 
     def _ensure_connection(self) -> None:
         """Establish a connection and create the table if needed."""
+        if self._disabled:
+            return
+
         if self._conn is not None:
             return
 

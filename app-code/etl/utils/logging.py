@@ -68,15 +68,16 @@ def setup_logging(
     # Add TimescaleDB sink for this component
     if enable_db_sink:
         try:
-            from etl.utils.log_sink import TimescaleLogSink
+            from etl.utils.log_sink import TimescaleLogSink, is_timescale_logging_configured
 
-            sink = TimescaleLogSink(component=component)
-            logger.add(
-                sink,
-                level=level,
-                format="{message}",  # Sink extracts structured fields from record
-                serialize=False,
-            )
+            if is_timescale_logging_configured():
+                sink = TimescaleLogSink(component=component)
+                logger.add(
+                    sink,
+                    level=level,
+                    format="{message}",  # Sink extracts structured fields from record
+                    serialize=False,
+                )
         except Exception as e:
             # Never crash because of logging setup
             print(
