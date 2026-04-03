@@ -1,102 +1,132 @@
 """
 Monitoring Demo Pipeline
 
-Starts a Ray Actor service and monitors it from Prefect.
-Imports are inside flow/task for remote Ray execution.
+Runs a lightweight ServiceTask on the remote Ray cluster and monitors it from
+Prefect. This is intended as a reliable smoke test for the ServiceTask actor
+lifecycle itself: deploy -> run -> poll status -> stop.
 """
+
 import time
+
 from prefect import flow, get_run_logger
 from prefect.artifacts import create_markdown_artifact
 
-# Load config (auto-loads .env via python-dotenv)
 from etl.config import config
+from etl.core.base_service import ServiceTask
+
+
+class HeartbeatService(ServiceTask):
+    """Minimal long-running service used to validate remote ServiceTask behavior."""
+
+    def __init__(self, name: str | None = None, config: dict | None = None, **kwargs):
+        super().__init__(name=name, config=config, **kwargs)
+        cfg = config or {}
+        self.tick_interval = float(cfg.get("tick_interval", 1.0))
+        self.tick_count = 0
+        self.last_tick_at = None
+
+    def run(self):
+        if not self._begin_run_loop():
+            return
+
+        try:
+            while self.running:
+                self.tick_count += 1
+                self.last_tick_at = time.time()
+                time.sleep(self.tick_interval)
+        finally:
+            self._end_run_loop()
+
+    def get_status(self):
+        return {
+            "running": self.running,
+            "tick_count": self.tick_count,
+            "last_tick_at": self.last_tick_at,
+            "tick_interval": self.tick_interval,
+        }
 
 
 @flow(name="Streaming Service with Monitoring")
-def monitor_service_flow(duration_seconds: int = 60):
+def monitor_service_flow(duration_seconds: int = 20, tick_interval: float = 1.0):
     """
-    Starts a Ray Actor service and monitors it from Prefect.
+    Deploy and monitor a lightweight ServiceTask on the remote Ray cluster.
     """
-    # Heavy imports inside flow - executes when flow runs
     import ray
-    from etl.services.processing.stateful_processor import StatefulProcessorService
-    
+
     logger = get_run_logger()
-    
-    # 1. Start Ray (if not already)
+
     if not ray.is_initialized():
         ray.init(address=config.RAY_ADDRESS, ignore_reinit_error=True)
 
-    # 2. Deploy the Service Actor using deploy()
-    logger.info("Deploying StatefulProcessorService...")
-    
-    svc = StatefulProcessorService.deploy(
-        name="CryptoProcessor",
-        config={
-            "source_config": {"url": "wss://ws.bitstamp.net", "read_timeout": 1.0},
-            "sink_config": {
-                "host": "localhost", "user": "admin", "password": "pwd", 
-                "database": "mydb", "table_name": "crypto_windowed"
-            },
-            "window_seconds": 5,
-        },
-        num_cpus=1,
+    service_name = f"HeartbeatService-{int(time.time())}"
+    logger.info("Deploying HeartbeatService to Ray as '%s'...", service_name)
+
+    svc = HeartbeatService.deploy(
+        name=service_name,
+        config={"tick_interval": tick_interval},
+        num_cpus=0.1,
+        max_concurrency=2,
     )
-    
-    # Start the processing loop in background (fire-and-forget)
-    logger.info("Starting processing loop in background...")
+
+    logger.info("Starting service loop in background...")
     svc.async_run()
 
-    # 3. Monitoring Loop
+    first_status = None
+    last_status = None
     start_time = time.time()
-    
+
     try:
         while time.time() - start_time < duration_seconds:
-            # Poll status — SyncHandle makes this clean
             status = svc.get_status()
-            metrics = status.get("metrics", {})
-            
-            # A. Log to Console (History)
-            logger.info(f"Service Status: {status}")
-            
-            # B. Publish Artifact (Live Dashboard)
-            md_report = f"""
-# 📡 Ray Service Live Dashboard
-**Service**: CryptoProcessor
-**Status**: {"🟢 Running" if status.get("running") else "🔴 Stopped"}
+            if first_status is None:
+                first_status = status
+            last_status = status
 
-## 📊 Metrics
+            logger.info("Service Status: %s", status)
+
+            md_report = f"""
+# ServiceTask Smoke Test
+**Service**: `{service_name}`
+**Status**: {"Running" if status.get("running") else "Stopped"}
+
+## Metrics
 | Metric | Value |
 |:--- |:--- |
-| **Total Processed** | `{metrics.get('total_processed')}` |
-| **Last Flush Count** | `{metrics.get('last_flush_count')}` |
-| **Buffer Size** | `{status.get('current_buffer_size')}` |
+| **Tick Count** | `{status.get('tick_count')}` |
+| **Tick Interval** | `{status.get('tick_interval')}` |
+| **Last Tick At** | `{status.get('last_tick_at')}` |
 
 *Last Updated: {time.strftime('%H:%M:%S')}*
             """
             create_markdown_artifact(
                 key="service-status",
                 markdown=md_report,
-                description="Live metrics from Ray Actor"
+                description="Live metrics from ServiceTask smoke test",
             )
-            
-            time.sleep(5)
-            
+
+            time.sleep(2)
+
+        if not last_status or not last_status.get("running"):
+            raise RuntimeError("Service never reported a running state.")
+        if last_status.get("tick_count", 0) < 2:
+            raise RuntimeError(f"Service tick_count too low: {last_status.get('tick_count')}")
+        if first_status and last_status["tick_count"] <= first_status.get("tick_count", -1):
+            raise RuntimeError("Service status did not advance while monitoring.")
+
+        logger.info("ServiceTask smoke test passed.")
+
     except KeyboardInterrupt:
         logger.info("Interrupted by user.")
     except ray.exceptions.RayActorError as e:
-        logger.error(f"🚨 Ray Actor CRASHED: {e}")
-        raise RuntimeError("Service Actor Died unexpectedly!") from e
-    except Exception as e:
-        logger.error(f"Monitoring Error: {e}")
-        raise
+        logger.error("Ray Actor crashed: %s", e)
+        raise RuntimeError("Service actor died unexpectedly.") from e
     finally:
-        logger.info("Stopping Service...")
+        logger.info("Stopping service...")
         try:
             svc.stop()
         except Exception:
             pass
-        logger.info("Service Stopped.")
+        logger.info("Service stopped.")
 
 
 if __name__ == "__main__":

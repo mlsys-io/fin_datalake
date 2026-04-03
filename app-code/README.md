@@ -24,9 +24,11 @@ python pipelines/demo_pipeline.py
 
 ```bash
 cd ~/zdb_deployment/app-code
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 ```
+
+Use Python `3.12.9` when you create the client environment if you are connecting to the Ray cluster via `ray://...`.
 
 ### 2. Install Dependencies
 
@@ -38,7 +40,7 @@ pip install -e .
 pip install -r requirements-client.txt
 
 # Install Ray (must match cluster version)
-pip install ray
+pip install "ray[default]==2.54.0"
 ```
 
 ### 3. Configure Services
@@ -174,13 +176,13 @@ python3 -c "import ray; ray.init(address='$RAY_ADDRESS'); print(ray.cluster_reso
 ```
 
 ### Version mismatch error
-Ray client version must match cluster. Check cluster version:
+Ray client version and Python version should match the cluster. Check cluster version:
 ```bash
 kubectl exec -n etl-compute $(kubectl get pods -n etl-compute -l app=ray-head -o name | head -1) -- pip show ray | grep Version
 ```
 Then install matching version locally:
 ```bash
-pip install ray==<version>
+pip install "ray[default]==<version>"
 ```
 
 ### ModuleNotFoundError: 'etl'

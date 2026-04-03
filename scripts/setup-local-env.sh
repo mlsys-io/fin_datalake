@@ -11,6 +11,8 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 APP_DIR="${PROJECT_ROOT}/app-code"
 ENV_FILE="${PROJECT_ROOT}/.env"
 USER_ENV_FILE="${PROJECT_ROOT}/.env.user"
+PYTHON_BIN="${PYTHON_BIN:-python3.12}"
+EXPECTED_PYTHON_PREFIX="${EXPECTED_PYTHON_PREFIX:-3.12.9}"
 
 # Colors
 GREEN='\033[0;32m'
@@ -30,15 +32,41 @@ load_env_file() {
     fi
 }
 
+detect_python() {
+    if command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+        echo "$PYTHON_BIN"
+        return
+    fi
+    if command -v python3.12 >/dev/null 2>&1; then
+        echo "python3.12"
+        return
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        echo "python3"
+        return
+    fi
+    if command -v python >/dev/null 2>&1; then
+        echo "python"
+        return
+    fi
+    return 1
+}
+
 echo -e "${GREEN}================================================================${NC}"
 echo -e "${GREEN}    ETL Framework - Local Environment Setup${NC}"
 echo -e "${GREEN}================================================================${NC}"
 echo ""
 
+PYTHON_CMD="$(detect_python)" || {
+    echo -e "${RED}No Python interpreter found.${NC}"
+    exit 1
+}
+echo "Using interpreter: ${PYTHON_CMD}"
+
 # 1. Setup Virtual Environment
 echo -e "${YELLOW}[1/4] Setting up virtual environment in app-code...${NC}"
 if [ ! -d "${APP_DIR}/.venv" ]; then
-    python3 -m venv "${APP_DIR}/.venv"
+    "${PYTHON_CMD}" -m venv "${APP_DIR}/.venv"
     echo -e "  ${GREEN}Created .venv${NC}"
 else
     echo -e "  ${GREEN}.venv already exists${NC}"
@@ -46,6 +74,10 @@ fi
 
 source "${APP_DIR}/.venv/bin/activate"
 echo "  Python: $(python --version)"
+if ! python -c "import sys; raise SystemExit(0 if sys.version.startswith('${EXPECTED_PYTHON_PREFIX}') else 1)"; then
+    echo -e "  ${YELLOW}Warning:${NC} local Python does not match expected ${EXPECTED_PYTHON_PREFIX}."
+    echo "  Set PYTHON_BIN to a matching interpreter before rerunning if Ray Client version checks fail."
+fi
 
 # 2. Install Dependencies
 echo -e "${YELLOW}[2/4] Installing dependencies...${NC}"
