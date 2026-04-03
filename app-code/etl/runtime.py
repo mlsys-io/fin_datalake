@@ -5,7 +5,9 @@ Runtime helpers for cluster-backed execution.
 from __future__ import annotations
 
 import os
+import asyncio
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 
@@ -109,7 +111,16 @@ def resolve_serve_response(response: Any) -> Any:
     helper accepts both.
     """
     if hasattr(response, "result") and callable(response.result):
-        return response.result()
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return response.result()
+
+        # Ray Serve forbids calling sync response resolution on the active
+        # event-loop thread. Offload that blocking wait to a helper thread so
+        # sync agent code can still delegate directly to other Serve apps.
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            return executor.submit(response.result).result()
 
     import ray
 
