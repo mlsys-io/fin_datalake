@@ -41,6 +41,7 @@ class BaseAgent(ABC, ConversationManagerMixin):
         ensure_ray()
 
         actor_name = name or cls.__name__
+        route_prefix = serve_options.pop("route_prefix", f"/{actor_name}")
 
         deployment_cls = serve.deployment(
             name=actor_name,
@@ -49,7 +50,11 @@ class BaseAgent(ABC, ConversationManagerMixin):
             **serve_options,
         )(cls)
 
-        handle = serve.run(deployment_cls.bind(config=config), name=actor_name)
+        handle = serve.run(
+            deployment_cls.bind(config=config),
+            name=actor_name,
+            route_prefix=route_prefix,
+        )
         logger.info(f"Deployed Agent '{actor_name}' to Ray Serve")
 
         resolve_serve_response(handle.set_app_name.remote(actor_name))
