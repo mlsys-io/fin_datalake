@@ -1,12 +1,13 @@
-# Custom Ray image with ETL dependencies + etl package
+# Custom Ray image with ETL dependencies + application packages
 # Pin Ray so the cluster runtime matches local client environments.
 FROM rayproject/ray:2.54.0-py312
 
-# Copy only the etl package (from build context = project root)
-COPY app-code/etl /home/ray/etl
+# Copy the full app-code tree so Serve replicas can import agents, pipelines,
+# gateway, overseer, and etl modules during deserialization.
+COPY app-code /home/ray/app-code
 
-# Add to Python path so 'import etl' works
-ENV PYTHONPATH="/home/ray"
+# Keep direct imports working for local-style module paths.
+ENV PYTHONPATH="/home/ray/app-code"
 
 WORKDIR /home/ray
 
@@ -33,3 +34,6 @@ RUN pip install --no-cache-dir -U \
     psycopg2-binary>=2.9 \
     pymilvus>=2.3 \
     thrift>=0.16
+
+# Install the project package metadata and all importable modules.
+RUN pip install --no-cache-dir -e /home/ray/app-code
