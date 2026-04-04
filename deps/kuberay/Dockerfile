@@ -4,7 +4,7 @@ FROM rayproject/ray:2.54.0-py312
 
 # Copy the full app-code tree so Serve replicas can import agents, pipelines,
 # gateway, overseer, and etl modules during deserialization.
-COPY app-code /home/ray/app-code
+COPY --chown=ray:users app-code /home/ray/app-code
 
 # Keep direct imports working for local-style module paths.
 ENV PYTHONPATH="/home/ray/app-code"
