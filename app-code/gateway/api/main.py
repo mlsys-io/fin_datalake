@@ -66,8 +66,11 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def startup():
         from gateway.core.rbac import load_roles
+        from gateway.core.ray_client import init_gateway_ray
+
         await load_roles()                       # Load dynamic RBAC roles FIRST
         await init_db()                          # Create tables + auto-provision (needs roles)
+        app.state.ray_ready = init_gateway_ray()
         app.state.registry = build_default_registry()
 
     # -------------------------------------------------------------------------

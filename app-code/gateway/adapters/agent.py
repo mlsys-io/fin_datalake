@@ -146,33 +146,29 @@ class AgentAdapter(BaseAdapter):
 
     def _fetch_agents_from_hub_sync(self) -> list[dict]:
         import ray
-        from etl.agents.hub import get_hub
-        from etl.runtime import ensure_ray, resolve_ray_namespace
+        from gateway.core.ray_client import get_gateway_hub, run_gateway_ray_operation
 
-        ensure_ray(
-            address=os.getenv("RAY_ADDRESS", "auto"),
-            namespace=resolve_ray_namespace(os.getenv("RAY_NAMESPACE")),
+        return run_gateway_ray_operation(
+            "list_agents_from_hub",
+            lambda: ray.get(get_gateway_hub().list_agents.remote()),
         )
-
-        hub = get_hub(create_if_missing=False)
-        return ray.get(hub.list_agents.remote())
 
     async def _get_agent_handle(self, agent_name: str):
-        from etl.runtime import ensure_ray, resolve_ray_namespace
-        import ray.serve as serve
+        from gateway.core.ray_client import get_gateway_agent_handle
 
-        ensure_ray(
-            address=os.getenv("RAY_ADDRESS", "auto"),
-            namespace=resolve_ray_namespace(os.getenv("RAY_NAMESPACE")),
-        )
-        return serve.get_app_handle(agent_name)
+        return get_gateway_agent_handle(agent_name)
 
     async def _call_handle_method(self, method: Any, *args: Any, **kwargs: Any) -> Any:
         from etl.runtime import resolve_serve_response
+        from gateway.core.ray_client import run_gateway_ray_operation
 
         remote = getattr(method, "remote", None)
         if callable(remote):
-            return await asyncio.to_thread(resolve_serve_response, remote(*args, **kwargs))
+            return await asyncio.to_thread(
+                run_gateway_ray_operation,
+                f"handle_method:{getattr(method, '__name__', 'remote')}",
+                lambda: resolve_serve_response(remote(*args, **kwargs)),
+            )
 
         result = method(*args, **kwargs)
         if inspect.isawaitable(result):

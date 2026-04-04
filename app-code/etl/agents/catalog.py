@@ -13,6 +13,21 @@ from datetime import datetime, timezone
 from typing import Any
 
 
+_CREATE_AGENT_DEFINITIONS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS agent_definitions (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    capabilities TEXT NOT NULL DEFAULT '[]',
+    capability_specs TEXT NOT NULL DEFAULT '[]',
+    metadata TEXT NOT NULL DEFAULT '{}',
+    registered_at TIMESTAMPTZ NULL,
+    last_seen_at TIMESTAMPTZ NULL,
+    is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+"""
+
 _ENSURE_AGENT_DEFINITIONS_COLUMNS_SQL = """
 ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ;
 ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'unknown';
@@ -104,6 +119,7 @@ def _get_dsn() -> str | None:
 
 
 def _ensure_schema(cursor) -> None:
+    cursor.execute(_CREATE_AGENT_DEFINITIONS_TABLE_SQL)
     cursor.execute(_ENSURE_AGENT_DEFINITIONS_COLUMNS_SQL)
 
 
