@@ -142,6 +142,9 @@ class AgentAdapter(BaseAdapter):
         }
 
     async def _fetch_agents_from_hub(self) -> list[dict]:
+        return await asyncio.to_thread(self._fetch_agents_from_hub_sync)
+
+    def _fetch_agents_from_hub_sync(self) -> list[dict]:
         import ray
         from etl.agents.hub import get_hub
         from etl.runtime import ensure_ray, resolve_ray_namespace
@@ -152,7 +155,7 @@ class AgentAdapter(BaseAdapter):
         )
 
         hub = get_hub(create_if_missing=False)
-        return await asyncio.to_thread(ray.get, hub.list_agents.remote())
+        return ray.get(hub.list_agents.remote())
 
     async def _get_agent_handle(self, agent_name: str):
         from etl.runtime import ensure_ray, resolve_ray_namespace
