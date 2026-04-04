@@ -39,6 +39,14 @@ spec:
               value: "etl-gateway-svc.etl-compute.svc.cluster.local"
             - name: OVERSEER_GATEWAY_PORT
               value: "8000"
+            - name: GATEWAY_INTERNAL_URL
+              value: "http://etl-gateway-svc.etl-compute.svc.cluster.local:8000"
+            - name: RAY_ADDRESS
+              value: "ray://etl-ray-head-svc.etl-compute.svc.cluster.local:10001"
+            - name: RAY_NAMESPACE
+              value: "serve"
+            - name: OVERSEER_AGENT_REGISTRY
+              value: '{"SupportAgent":"agents.dummy_agents:SupportAgent","SentimentModelAgent":"agents.dummy_agents:SentimentModelAgent","ForecastAgent":"agents.dummy_agents:ForecastAgent","RouterAgent":"agents.dummy_agents:RouterAgent"}'
 
             # 2. Redis State Store (Partition 1)
             - name: OVERSEER_REDIS_URL

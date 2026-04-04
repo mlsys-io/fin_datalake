@@ -7,6 +7,7 @@ The address is configured via the RAY_ADDRESS env var or config.yaml.
 
 from __future__ import annotations
 
+import os
 from loguru import logger
 from uuid import uuid4
 
@@ -18,15 +19,17 @@ from overseer.redis_utils import get_redis_client
 
 class RayActuator(BaseActuator):
 
-    def __init__(self, ray_address: str = "auto"):
-        self.ray_address = ray_address
+    def __init__(self, ray_address: str | None = None, ray_namespace: str | None = None):
+        self.ray_address = ray_address or os.getenv("RAY_ADDRESS") or "auto"
+        self.ray_namespace = ray_namespace or os.getenv("RAY_NAMESPACE") or "serve"
         self.redis = get_redis_client()
 
     async def execute(self, action: OverseerAction) -> ActionResult:
         try:
+            from etl.runtime import ensure_ray
             import ray
-            if not ray.is_initialized():
-                ray.init(address=self.ray_address, ignore_reinit_error=True)
+
+            ensure_ray(address=self.ray_address, namespace=self.ray_namespace)
 
             if action.type == ActionType.SCALE_UP:
                 agent_cls = self._resolve_agent_class(action.agent)
@@ -114,7 +117,7 @@ class RayActuator(BaseActuator):
         import ray
         for name in actor_names:
             try:
-                handle = ray.get_actor(name)
+                handle = ray.get_actor(name, namespace=self.ray_namespace)
                 ray.kill(handle, no_restart=True)
                 removed += 1
             except ValueError:

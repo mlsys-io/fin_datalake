@@ -24,6 +24,11 @@ class GatewayActuator(BaseActuator):
         # Get Gateway internal URL
         gateway_url = os.getenv("GATEWAY_INTERNAL_URL")
         if not gateway_url:
+            host = os.getenv("OVERSEER_GATEWAY_HOST")
+            port = os.getenv("OVERSEER_GATEWAY_PORT", "8000")
+            if host:
+                gateway_url = f"http://{host}:{port}"
+        if not gateway_url:
             return ActionResult(success=False, error="GATEWAY_INTERNAL_URL not set")
 
         endpoint = f"{gateway_url}/api/v1/system/circuit-breaker"
