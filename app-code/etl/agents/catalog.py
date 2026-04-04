@@ -13,6 +13,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 
+_UNSET = object()
+
+
 _CREATE_AGENT_DEFINITIONS_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS agent_definitions (
     id TEXT PRIMARY KEY,
@@ -133,9 +136,18 @@ SET
     health_status = COALESCE(%(health_status)s, health_status),
     recovery_state = COALESCE(%(recovery_state)s, recovery_state),
     last_reconciled_at = COALESCE(%(last_reconciled_at)s, last_reconciled_at),
-    last_failure_reason = COALESCE(%(last_failure_reason)s, last_failure_reason),
-    last_action_type = COALESCE(%(last_action_type)s, last_action_type),
-    reconcile_notes = COALESCE(%(reconcile_notes)s, reconcile_notes),
+    last_failure_reason = CASE
+        WHEN %(set_last_failure_reason)s THEN %(last_failure_reason)s
+        ELSE last_failure_reason
+    END,
+    last_action_type = CASE
+        WHEN %(set_last_action_type)s THEN %(last_action_type)s
+        ELSE last_action_type
+    END,
+    reconcile_notes = CASE
+        WHEN %(set_reconcile_notes)s THEN %(reconcile_notes)s
+        ELSE reconcile_notes
+    END,
     last_seen_at = COALESCE(%(last_seen_at)s, last_seen_at),
     last_heartbeat_at = COALESCE(%(last_heartbeat_at)s, last_heartbeat_at),
     updated_at = %(updated_at)s
@@ -206,6 +218,9 @@ def _parse_json_text(value: Any, default: Any) -> Any:
 
 
 def _row_to_agent_dict(row: tuple[Any, ...]) -> dict[str, Any]:
+    desired_status = row[10]
+    observed_status = row[11]
+    health_status = row[12]
     return {
         "name": row[0],
         "capabilities": _parse_json_text(row[1], []),
@@ -229,7 +244,11 @@ def _row_to_agent_dict(row: tuple[Any, ...]) -> dict[str, Any]:
         "runtime_namespace": row[19],
         "route_prefix": row[20],
         "is_enabled": bool(row[21]),
-        "alive": row[8] == "alive",
+        "alive": (
+            desired_status == "running"
+            and observed_status in {"ready", "degraded", "recovering"}
+            and health_status != "offline"
+        ),
         "source": "catalog",
     }
 
@@ -312,9 +331,9 @@ def update_agent_catalog_status(
     observed_status: str | None = None,
     health_status: str | None = None,
     recovery_state: str | None = None,
-    last_failure_reason: str | None = None,
-    last_action_type: str | None = None,
-    reconcile_notes: str | None = None,
+    last_failure_reason: str | None | object = _UNSET,
+    last_action_type: str | None | object = _UNSET,
+    reconcile_notes: str | None | object = _UNSET,
     reconciled: bool = False,
 ) -> bool:
     """
@@ -334,9 +353,12 @@ def update_agent_catalog_status(
         "health_status": health_status,
         "recovery_state": recovery_state,
         "last_reconciled_at": now if reconciled else None,
-        "last_failure_reason": last_failure_reason,
-        "last_action_type": last_action_type,
-        "reconcile_notes": reconcile_notes,
+        "last_failure_reason": None if last_failure_reason is _UNSET else last_failure_reason,
+        "set_last_failure_reason": last_failure_reason is not _UNSET,
+        "last_action_type": None if last_action_type is _UNSET else last_action_type,
+        "set_last_action_type": last_action_type is not _UNSET,
+        "reconcile_notes": None if reconcile_notes is _UNSET else reconcile_notes,
+        "set_reconcile_notes": reconcile_notes is not _UNSET,
         "last_seen_at": now if mark_seen else None,
         "last_heartbeat_at": now if heartbeat else None,
         "updated_at": now,

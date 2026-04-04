@@ -7,6 +7,7 @@ without needing to be inside the Ray cluster.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import httpx
 
 from overseer.collectors.base import BaseCollector
@@ -20,6 +21,135 @@ def _extract_serve_app_name(actor_name: str) -> str | None:
     if len(parts) >= 3 and parts[1].strip():
         return parts[1].strip()
     return None
+
+
+def _extract_status_token(value) -> str:
+    if isinstance(value, Mapping):
+        for key in ("status", "state"):
+            nested = value.get(key)
+            if nested:
+                return str(nested).strip().upper()
+        return ""
+    if value in (None, ""):
+        return ""
+    return str(value).strip().upper()
+
+
+def _extract_deployment_status(info: Mapping[str, object]) -> str:
+    for key in ("status", "deployment_status", "message", "state"):
+        token = _extract_status_token(info.get(key))
+        if token:
+            return token
+    status_payload = info.get("status")
+    return _extract_status_token(status_payload)
+
+
+def _extract_replica_counts(info: Mapping[str, object]) -> dict[str, int]:
+    replica_counts: dict[str, int] = {}
+
+    replica_states = info.get("replica_states")
+    if isinstance(replica_states, Mapping):
+        for state, count in replica_states.items():
+            token = _extract_status_token(state)
+            if not token:
+                continue
+            try:
+                replica_counts[token] = replica_counts.get(token, 0) + int(count)
+            except (TypeError, ValueError):
+                continue
+
+    replicas = info.get("replicas")
+    if isinstance(replicas, list):
+        for replica in replicas:
+            if not isinstance(replica, Mapping):
+                continue
+            token = _extract_status_token(replica.get("state") or replica.get("status"))
+            if not token:
+                continue
+            replica_counts[token] = replica_counts.get(token, 0) + 1
+
+    return replica_counts
+
+
+def parse_serve_applications(payload: Mapping[str, object] | None) -> list[dict[str, object]]:
+    raw = payload or {}
+    applications = raw.get("applications")
+    if applications is None and isinstance(raw.get("data"), Mapping):
+        applications = raw["data"].get("applications")
+    if applications is None and "name" in raw:
+        applications = [raw]
+
+    normalized: list[dict[str, object]] = []
+    if isinstance(applications, Mapping):
+        iterable = applications.items()
+    elif isinstance(applications, list):
+        iterable = ((str(item.get("name") or ""), item) for item in applications if isinstance(item, Mapping))
+    else:
+        iterable = []
+
+    for app_name, raw_app in iterable:
+        if not isinstance(raw_app, Mapping):
+            continue
+        name = str(raw_app.get("name") or app_name or "").strip()
+        if not name:
+            continue
+
+        app_status = _extract_status_token(raw_app.get("status"))
+        if not app_status:
+            app_status = _extract_status_token(raw_app.get("app_status"))
+
+        route_prefix = raw_app.get("route_prefix")
+        deployments_raw = raw_app.get("deployments") or {}
+        deployments: list[dict[str, object]] = []
+        total_replica_counts: dict[str, int] = {}
+
+        if isinstance(deployments_raw, Mapping):
+            deployment_items = deployments_raw.items()
+        elif isinstance(deployments_raw, list):
+            deployment_items = (
+                (str(item.get("name") or item.get("deployment_name") or ""), item)
+                for item in deployments_raw
+                if isinstance(item, Mapping)
+            )
+        else:
+            deployment_items = []
+
+        for deployment_name, raw_deployment in deployment_items:
+            if not isinstance(raw_deployment, Mapping):
+                continue
+            normalized_name = str(
+                raw_deployment.get("name")
+                or raw_deployment.get("deployment_name")
+                or deployment_name
+                or ""
+            ).strip()
+            if not normalized_name:
+                continue
+
+            deployment_status = _extract_deployment_status(raw_deployment)
+            replica_counts = _extract_replica_counts(raw_deployment)
+            for state, count in replica_counts.items():
+                total_replica_counts[state] = total_replica_counts.get(state, 0) + count
+
+            deployments.append(
+                {
+                    "name": normalized_name,
+                    "status": deployment_status,
+                    "replica_counts": replica_counts,
+                }
+            )
+
+        normalized.append(
+            {
+                "name": name,
+                "status": app_status,
+                "route_prefix": route_prefix,
+                "deployments": deployments,
+                "replica_counts": total_replica_counts,
+            }
+        )
+
+    return normalized
 
 
 class RayCollector(BaseCollector):
@@ -36,6 +166,10 @@ class RayCollector(BaseCollector):
                 actor_resp = await client.get(f"{base}/api/v0/actors")
                 actors_raw = actor_resp.json() if actor_resp.status_code == 200 else {}
 
+                # Serve applications
+                serve_resp = await client.get(f"{base}/api/serve/applications/")
+                serve_raw = serve_resp.json() if serve_resp.status_code == 200 else {}
+
             # Parse actors into a clean summary
             actors = []
             for actor_id, info in actors_raw.get("data", {}).get("actors", {}).items():
@@ -51,6 +185,7 @@ class RayCollector(BaseCollector):
 
             alive = sum(1 for a in actors if a["state"] == "ALIVE")
             dead = sum(1 for a in actors if a["state"] == "DEAD")
+            serve_applications = parse_serve_applications(serve_raw)
 
             return ServiceMetrics(
                 service="ray",
@@ -59,6 +194,7 @@ class RayCollector(BaseCollector):
                     "actors": actors,
                     "actors_alive": alive,
                     "actors_dead": dead,
+                    "serve_applications": serve_applications,
                     "cluster": cluster,
                 },
             )
