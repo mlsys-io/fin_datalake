@@ -25,6 +25,16 @@ engine = create_async_engine(DATABASE_URL, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
+_ENSURE_AGENT_DEFINITION_COLUMNS_SQL = """
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ;
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS runtime_source TEXT;
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS runtime_namespace TEXT;
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS route_prefix TEXT;
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS deployment_metadata TEXT NOT NULL DEFAULT '{}';
+"""
+
+
 class Base(DeclarativeBase):
     """Shared base class for all ORM models in the gateway DB."""
     pass
@@ -60,6 +70,7 @@ async def init_db():
     async with engine.begin() as conn:
         # Create tables (idempotent)
         await conn.run_sync(Base.metadata.create_all)
+        await conn.exec_driver_sql(_ENSURE_AGENT_DEFINITION_COLUMNS_SQL)
     
     # Check for empty users table to trigger auto-provisioning
     async with AsyncSessionLocal() as db:

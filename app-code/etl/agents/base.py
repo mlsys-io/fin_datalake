@@ -92,8 +92,11 @@ class BaseAgent(ABC, ConversationManagerMixin):
     def _register_with_hub(self):
         import ray
         from loguru import logger
+        from etl.runtime import resolve_ray_namespace
 
         registered_name = self.app_name or self.name
+        route_prefix = f"/{registered_name}"
+        runtime_namespace = resolve_ray_namespace()
 
         try:
             from etl.agents.hub import get_hub
@@ -116,6 +119,29 @@ class BaseAgent(ABC, ConversationManagerMixin):
             )
         except Exception as e:
             logger.warning(f"[{self.name}] Failed to register with AgentHub: {e}")
+
+        try:
+            from etl.agents.catalog import upsert_agent_catalog_entry
+
+            upsert_agent_catalog_entry(
+                name=registered_name,
+                capabilities=[spec["id"] if isinstance(spec, dict) else spec for spec in self.get_capability_specs()],
+                capability_specs=self.get_capability_specs(),
+                metadata={
+                    "class": self.__class__.__name__,
+                    "app_name": registered_name,
+                    "interaction_modes": self.get_interaction_modes(),
+                },
+                deployment_metadata={
+                    "replication_mode": "serve",
+                },
+                route_prefix=route_prefix,
+                runtime_namespace=runtime_namespace,
+                runtime_source="ray-serve",
+                status="alive",
+            )
+        except Exception as e:
+            logger.warning(f"[{self.name}] Failed to upsert durable agent catalog entry: {e}")
 
     @classmethod
     def get_capability_specs(cls) -> List[Dict[str, Any]]:
@@ -163,6 +189,18 @@ class BaseAgent(ABC, ConversationManagerMixin):
             hub = get_hub()
             ray.get(hub.unregister.remote(registered_name))
             logger.info(f"[{self.name}] Deregistered '{registered_name}' from AgentHub")
+        except Exception:
+            pass
+
+        try:
+            from etl.agents.catalog import update_agent_catalog_status
+
+            update_agent_catalog_status(
+                name=registered_name,
+                status="offline",
+                mark_seen=True,
+                heartbeat=False,
+            )
         except Exception:
             pass
 

@@ -18,6 +18,7 @@ import os
 import asyncio
 import inspect
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from gateway.core.adapters import BaseAdapter, ActionNotFoundError
@@ -177,10 +178,12 @@ class AgentAdapter(BaseAdapter):
 
     async def _get_catalog_agents(self, live_agents: list[dict]) -> list[dict]:
         live_by_name = {}
+        runtime_namespace = os.getenv("RAY_NAMESPACE") or "serve"
         for agent in live_agents:
-            agent_name = str(agent.get("name") or "").strip()
+            normalized_agent = self._normalize_live_agent(agent, runtime_namespace=runtime_namespace)
+            agent_name = str(normalized_agent.get("name") or "").strip()
             if agent_name:
-                live_by_name[agent_name] = agent
+                live_by_name[agent_name] = normalized_agent
 
         async with AsyncSessionLocal() as db:
             for agent in live_by_name.values():
@@ -206,7 +209,7 @@ class AgentAdapter(BaseAdapter):
             else:
                 merged.append({
                     **catalog_agent,
-                    "alive": False,
+                    "alive": catalog_agent.get("alive", False),
                     "source": catalog_agent.get("source", "catalog"),
                 })
             seen.add(name)
@@ -221,3 +224,19 @@ class AgentAdapter(BaseAdapter):
 
         merged.sort(key=lambda agent: str(agent.get("name") or "").lower())
         return merged
+
+    def _normalize_live_agent(self, agent: dict, *, runtime_namespace: str) -> dict:
+        agent_name = str(agent.get("name") or "").strip()
+        route_prefix = agent.get("route_prefix") or (f"/{agent_name}" if agent_name else None)
+
+        normalized = dict(agent)
+        normalized.setdefault("runtime_source", "ray-serve")
+        normalized.setdefault("runtime_namespace", runtime_namespace)
+        normalized.setdefault("route_prefix", route_prefix)
+        normalized.setdefault("status", "alive" if normalized.get("alive", False) else "unknown")
+        normalized.setdefault("deployment_metadata", {})
+
+        now = datetime.now(timezone.utc).isoformat()
+        normalized.setdefault("last_seen_at", now)
+        normalized.setdefault("last_heartbeat_at", now)
+        return normalized

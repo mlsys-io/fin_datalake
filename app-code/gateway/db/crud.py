@@ -249,9 +249,15 @@ def _agent_definition_to_dict(row: AgentDefinitionORM) -> dict:
         "capabilities": _parse_json_text(row.capabilities, []),
         "capability_specs": _parse_json_text(row.capability_specs, []),
         "metadata": _parse_json_text(row.metadata_json, {}),
+        "deployment_metadata": _parse_json_text(row.deployment_metadata_json, {}),
         "registered_at": row.registered_at.isoformat() if row.registered_at else None,
         "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else None,
-        "alive": False,
+        "last_heartbeat_at": row.last_heartbeat_at.isoformat() if row.last_heartbeat_at else None,
+        "status": row.status,
+        "runtime_source": row.runtime_source,
+        "runtime_namespace": row.runtime_namespace,
+        "route_prefix": row.route_prefix,
+        "alive": row.status == "alive",
         "source": "catalog",
     }
 
@@ -291,14 +297,76 @@ async def upsert_agent_definition(
     row.capabilities = json.dumps(agent.get("capabilities") or [])
     row.capability_specs = json.dumps(agent.get("capability_specs") or [])
     row.metadata_json = json.dumps(agent.get("metadata") or {})
+    row.deployment_metadata_json = json.dumps(agent.get("deployment_metadata") or {})
+    row.runtime_source = agent.get("runtime_source") or row.runtime_source or "ray-serve"
+    row.runtime_namespace = agent.get("runtime_namespace") or row.runtime_namespace
+    row.route_prefix = agent.get("route_prefix") or row.route_prefix
+    row.status = str(agent.get("status") or row.status or "unknown")
     if registered_at is not None:
         row.registered_at = registered_at
     if mark_seen:
         row.last_seen_at = now
+        row.last_heartbeat_at = now
 
     await db.commit()
     await db.refresh(row)
     return _agent_definition_to_dict(row)
+
+
+async def mark_agent_status(
+    db: AsyncSession,
+    name: str,
+    *,
+    status: str,
+    mark_seen: bool = False,
+    heartbeat: bool = False,
+) -> dict | None:
+    """
+    Update runtime status metadata for a known agent catalog entry.
+    """
+    result = await db.execute(
+        select(AgentDefinitionORM).where(AgentDefinitionORM.name == name)
+    )
+    row = result.scalars().first()
+    if row is None:
+        return None
+
+    now = datetime.now(timezone.utc)
+    row.status = status
+    if mark_seen:
+        row.last_seen_at = now
+    if heartbeat:
+        row.last_heartbeat_at = now
+
+    await db.commit()
+    await db.refresh(row)
+    return _agent_definition_to_dict(row)
+
+
+async def mark_stale_agents(
+    db: AsyncSession,
+    *,
+    stale_before: datetime,
+    from_statuses: list[str] | None = None,
+    stale_status: str = "stale",
+) -> int:
+    """
+    Mark agents as stale when they have not heartbeated recently.
+    """
+    stmt = select(AgentDefinitionORM).where(
+        AgentDefinitionORM.last_heartbeat_at.is_not(None),
+        AgentDefinitionORM.last_heartbeat_at < stale_before,
+    )
+    if from_statuses:
+        stmt = stmt.where(AgentDefinitionORM.status.in_(from_statuses))
+
+    result = await db.execute(stmt)
+    rows = result.scalars().all()
+    for row in rows:
+        row.status = stale_status
+
+    await db.commit()
+    return len(rows)
 
 
 async def list_agent_definitions(db: AsyncSession, *, enabled_only: bool = True) -> list[dict]:

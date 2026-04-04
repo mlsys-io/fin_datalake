@@ -60,6 +60,19 @@ spec:
                     key: AWS_SECRET_ACCESS_KEY
               - name: OVERSEER_REDIS_URL
                 value: "redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/0"
+              - name: TSDB_HOST
+                value: "tsdb-ha.etl-data.svc.cluster.local"
+              - name: TSDB_PORT
+                value: "5432"
+              - name: TSDB_USER
+                value: "app"
+              - name: TSDB_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: etl-secrets
+                    key: TSDB_PASSWORD
+              - name: TSDB_DATABASE
+                value: "app"
             volumeMounts:
               - mountPath: /tmp/ray
                 name: ray-logs
@@ -117,6 +130,19 @@ spec:
                       key: AWS_SECRET_ACCESS_KEY
                 - name: OVERSEER_REDIS_URL
                   value: "redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/0"
+                - name: TSDB_HOST
+                  value: "tsdb-ha.etl-data.svc.cluster.local"
+                - name: TSDB_PORT
+                  value: "5432"
+                - name: TSDB_USER
+                  value: "app"
+                - name: TSDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: etl-secrets
+                      key: TSDB_PASSWORD
+                - name: TSDB_DATABASE
+                  value: "app"
               volumeMounts:
                 - mountPath: /tmp/ray
                   name: ray-logs
