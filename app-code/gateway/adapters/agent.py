@@ -16,7 +16,6 @@ Required Permissions:
 
 import os
 import asyncio
-import inspect
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -80,14 +79,11 @@ class AgentAdapter(BaseAdapter):
         return await self._invoke_handle(user, agent_name=agent_name, method_name="invoke", payload=payload, session_id=session_id)
 
     async def _invoke_handle(self, user: User, agent_name: str, method_name: str, payload: Any, session_id: str | None = None) -> dict:
-        handle = await self._get_agent_handle(agent_name)
-        method = getattr(handle, method_name)
-
         kwargs = {}
         if session_id is not None:
             kwargs["session_id"] = session_id
 
-        response = await self._call_handle_method(method, payload, **kwargs)
+        response = await self._call_agent_method(agent_name, method_name, payload, **kwargs)
         return {"agent": agent_name, "response": response}
 
     async def _notify(self, user: User, intent: UserIntent) -> dict:
@@ -111,9 +107,7 @@ class AgentAdapter(BaseAdapter):
 
     async def _notify_one(self, agent_name: str, event: dict) -> bool:
         try:
-            handle = await self._get_agent_handle(agent_name)
-            method = getattr(handle, "handle_event")
-            await self._call_handle_method(method, event)
+            await self._call_agent_method(agent_name, "handle_event", event)
             return True
         except Exception as e:
             logger.warning("Failed to notify agent '%s': %s", agent_name, e, exc_info=True)
@@ -142,38 +136,14 @@ class AgentAdapter(BaseAdapter):
         }
 
     async def _fetch_agents_from_hub(self) -> list[dict]:
-        return await asyncio.to_thread(self._fetch_agents_from_hub_sync)
+        from gateway.core.ray_client import list_agents_from_hub
 
-    def _fetch_agents_from_hub_sync(self) -> list[dict]:
-        import ray
-        from gateway.core.ray_client import get_gateway_hub, run_gateway_ray_operation
+        return await asyncio.to_thread(list_agents_from_hub)
 
-        return run_gateway_ray_operation(
-            "list_agents_from_hub",
-            lambda: ray.get(get_gateway_hub().list_agents.remote()),
-        )
+    async def _call_agent_method(self, agent_name: str, method_name: str, *args: Any, **kwargs: Any) -> Any:
+        from gateway.core.ray_client import call_agent_method
 
-    async def _get_agent_handle(self, agent_name: str):
-        from gateway.core.ray_client import get_gateway_agent_handle
-
-        return get_gateway_agent_handle(agent_name)
-
-    async def _call_handle_method(self, method: Any, *args: Any, **kwargs: Any) -> Any:
-        from etl.runtime import resolve_serve_response
-        from gateway.core.ray_client import run_gateway_ray_operation
-
-        remote = getattr(method, "remote", None)
-        if callable(remote):
-            return await asyncio.to_thread(
-                run_gateway_ray_operation,
-                f"handle_method:{getattr(method, '__name__', 'remote')}",
-                lambda: resolve_serve_response(remote(*args, **kwargs)),
-            )
-
-        result = method(*args, **kwargs)
-        if inspect.isawaitable(result):
-            return await result
-        return result
+        return await asyncio.to_thread(call_agent_method, agent_name, method_name, *args, **kwargs)
 
     async def _get_catalog_agents(self, live_agents: list[dict]) -> list[dict]:
         live_by_name = {}
