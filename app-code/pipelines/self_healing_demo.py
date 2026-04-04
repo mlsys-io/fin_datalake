@@ -55,7 +55,7 @@ def _kill_serve_actor(app_name: str) -> bool:
 def run_self_healing_demo() -> None:
     """
     Deploy a dummy SupportAgent, kill its Serve replica, and wait for the
-    Overseer to respawn another SupportAgent instance via RayActuator.
+    Overseer to restore the same SupportAgent deployment via RayActuator.
     """
     logger.info("=== OVERSEER SELF-HEALING DEMO ===")
 
@@ -84,7 +84,7 @@ def run_self_healing_demo() -> None:
     except Exception:
         logger.success("[2] Confirmed: victim agent is no longer serving requests.")
 
-    logger.info("[3] Waiting for Overseer recovery...")
+    logger.info("[3] Waiting for Overseer recovery of the same deployment name...")
     start = time.perf_counter()
 
     for attempt in range(45):
@@ -93,19 +93,17 @@ def run_self_healing_demo() -> None:
             logger.debug(f"... polling AgentHub (attempt {attempt + 1}/45)")
 
         agent_names = ray.get(hub.find_by_capability.remote(capability_id))
-        healed_candidates = [name for name in agent_names if name != victim_name]
-        if not healed_candidates:
+        if victim_name not in agent_names:
             continue
 
-        healed_name = healed_candidates[0]
         try:
-            healed_handle = serve.get_app_handle(healed_name)
+            healed_handle = serve.get_app_handle(victim_name)
             healed_response = resolve_serve_response(
                 healed_handle.chat.remote("Hello from healed agent")
             )
             mttr = time.perf_counter() - start
-            logger.success(f"[4] Recovery successful in {mttr:.1f}s via {healed_name}")
-            logger.success(f"Recovered agent response: {healed_response}")
+            logger.success(f"[4] Recovery successful in {mttr:.1f}s via {victim_name}")
+            logger.success(f"Recovered same-name deployment response: {healed_response}")
             return
         except Exception:
             continue

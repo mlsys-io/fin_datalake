@@ -81,16 +81,31 @@ class OverseerAction:
     type: ActionType
     target: str = "ray"             # Which actuator handles this
     agent: str = ""                 # Agent class name (for scaling/respawn)
+    agent_class: str = ""           # Explicit deployment class name
+    deployment_name: str = ""       # Exact deployment/app identity to recover
+    runtime_namespace: str = ""     # Ray namespace for the target deployment
+    route_prefix: str = ""          # Serve route prefix to preserve on recovery
+    deployment_metadata: dict[str, Any] = field(default_factory=dict)
     count: int = 1
     reason: str = ""
     timestamp: float = field(default_factory=time.time)
 
     def to_alert(self) -> dict:
+        level = "warning" if self.type in {ActionType.RESPAWN, ActionType.CIRCUIT_BREAK} else "info"
         return {
+            "level": level,
             "type": self.type.value,
+            "action": self.type.value.upper(),
+            "target": self.target,
             "agent": self.agent,
+            "agent_class": self.agent_class or self.agent,
+            "deployment_name": self.deployment_name,
+            "runtime_namespace": self.runtime_namespace,
+            "route_prefix": self.route_prefix,
+            "deployment_metadata": self.deployment_metadata,
             "count": self.count,
             "reason": self.reason,
+            "detail": self.reason,
             "timestamp": self.timestamp,
         }
 

@@ -28,7 +28,24 @@ export type AgentSummary = {
     capabilities?: string[]
     capability_specs?: AgentCapabilitySpec[]
     metadata?: Record<string, unknown>
+    deployment_metadata?: Record<string, unknown>
     registered_at?: string
+    last_seen_at?: string
+    last_heartbeat_at?: string
+    status?: string
+    managed_by_overseer?: boolean
+    desired_status?: string
+    observed_status?: string
+    health_status?: string
+    recovery_state?: string
+    last_reconciled_at?: string
+    last_failure_reason?: string | null
+    last_action_type?: string | null
+    reconcile_notes?: string | null
+    runtime_source?: string | null
+    runtime_namespace?: string | null
+    route_prefix?: string | null
+    source?: string
     alive?: boolean
 }
 

@@ -170,11 +170,7 @@ class AgentAdapter(BaseAdapter):
             name = catalog_agent["name"]
             live_agent = live_by_name.get(name)
             if live_agent:
-                merged.append({
-                    **catalog_agent,
-                    **live_agent,
-                    "source": "catalog+runtime",
-                })
+                merged.append(self._merge_catalog_and_live_agent(catalog_agent, live_agent))
             else:
                 merged.append({
                     **catalog_agent,
@@ -197,15 +193,56 @@ class AgentAdapter(BaseAdapter):
     def _normalize_live_agent(self, agent: dict, *, runtime_namespace: str) -> dict:
         agent_name = str(agent.get("name") or "").strip()
         route_prefix = agent.get("route_prefix") or (f"/{agent_name}" if agent_name else None)
+        is_alive = bool(agent.get("alive", False))
 
         normalized = dict(agent)
         normalized.setdefault("runtime_source", "ray-serve")
         normalized.setdefault("runtime_namespace", runtime_namespace)
         normalized.setdefault("route_prefix", route_prefix)
-        normalized.setdefault("status", "alive" if normalized.get("alive", False) else "unknown")
+        normalized.setdefault("status", "alive" if is_alive else "unknown")
+        normalized.setdefault("managed_by_overseer", True)
+        normalized.setdefault("desired_status", "running")
+        normalized.setdefault("observed_status", "ready" if is_alive else "unknown")
+        normalized.setdefault("health_status", "healthy" if is_alive else "unknown")
+        normalized.setdefault("recovery_state", "idle")
+        normalized.setdefault("last_failure_reason", None)
+        normalized.setdefault("last_action_type", None)
+        normalized.setdefault("reconcile_notes", None)
         normalized.setdefault("deployment_metadata", {})
 
         now = datetime.now(timezone.utc).isoformat()
         normalized.setdefault("last_seen_at", now)
         normalized.setdefault("last_heartbeat_at", now)
+        normalized.setdefault("last_reconciled_at", now if is_alive else None)
         return normalized
+
+    def _merge_catalog_and_live_agent(self, catalog_agent: dict, live_agent: dict) -> dict:
+        merged = dict(catalog_agent)
+
+        passthrough_fields = (
+            "capabilities",
+            "capability_specs",
+            "metadata",
+            "deployment_metadata",
+            "runtime_source",
+            "runtime_namespace",
+            "route_prefix",
+            "registered_at",
+            "last_seen_at",
+            "last_heartbeat_at",
+        )
+        for field in passthrough_fields:
+            if live_agent.get(field) is not None:
+                merged[field] = live_agent[field]
+
+        merged["source"] = "catalog+runtime"
+
+        # Preserve the richer control-plane status coming from the catalog.
+        if not merged.get("status"):
+            merged["status"] = live_agent.get("status", "unknown")
+        merged["alive"] = (
+            str(merged.get("desired_status") or "") == "running"
+            and str(merged.get("observed_status") or "unknown") in {"ready", "degraded", "recovering"}
+            and str(merged.get("health_status") or "unknown") != "offline"
+        )
+        return merged

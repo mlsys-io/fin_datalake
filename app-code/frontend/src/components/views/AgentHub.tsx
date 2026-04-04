@@ -88,6 +88,109 @@ function titleCase(value: string): string {
         .join(' ')
 }
 
+function formatTimestamp(value?: string | null): string {
+    if (!value) return 'n/a'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return date.toLocaleString()
+}
+
+function getObservedState(agent: AgentSummary): string {
+    const observed = String(agent.observed_status ?? '').trim().toLowerCase()
+    if (observed) return observed
+    if (agent.alive === true) return 'ready'
+    if (agent.alive === false) return 'offline'
+    return 'unknown'
+}
+
+function getAgentState(agent: AgentSummary) {
+    const observed = getObservedState(agent)
+    const recovery = String(agent.recovery_state ?? '').trim().toLowerCase()
+
+    if (observed === 'ready') {
+        return {
+            key: 'ready',
+            label: 'Ready',
+            tone: 'bg-emerald-50 text-emerald-700',
+            helperTone: 'text-emerald-600',
+            helper: 'Healthy in the live control plane',
+            routable: true,
+        }
+    }
+    if (observed === 'degraded') {
+        return {
+            key: 'degraded',
+            label: 'Degraded',
+            tone: 'bg-amber-50 text-amber-700',
+            helperTone: 'text-amber-600',
+            helper: 'Partially available or impaired',
+            routable: true,
+        }
+    }
+    if (observed === 'recovering' || recovery === 'recovering') {
+        return {
+            key: 'recovering',
+            label: 'Recovering',
+            tone: 'bg-sky-50 text-sky-700',
+            helperTone: 'text-sky-600',
+            helper: 'Overseer is restoring this deployment',
+            routable: false,
+        }
+    }
+    if (observed === 'missing') {
+        return {
+            key: 'missing',
+            label: 'Missing',
+            tone: 'bg-rose-50 text-rose-700',
+            helperTone: 'text-rose-600',
+            helper: 'Expected deployment is absent from runtime',
+            routable: false,
+        }
+    }
+    if (observed === 'offline') {
+        return {
+            key: 'offline',
+            label: 'Offline',
+            tone: 'bg-stone-100 text-stone-700',
+            helperTone: 'text-stone-500',
+            helper: 'Not currently running',
+            routable: false,
+        }
+    }
+    if (observed === 'stale') {
+        return {
+            key: 'stale',
+            label: 'Stale',
+            tone: 'bg-yellow-50 text-yellow-700',
+            helperTone: 'text-yellow-700',
+            helper: 'Catalog state is old and needs refresh',
+            routable: false,
+        }
+    }
+
+    return {
+        key: 'unknown',
+        label: 'Unknown',
+        tone: 'bg-stone-100 text-stone-600',
+        helperTone: 'text-stone-500',
+        helper: 'Runtime state has not been reconciled yet',
+        routable: false,
+    }
+}
+
+function getControlPlaneDetails(agent: AgentSummary) {
+    return [
+        ['Desired', titleCase(String(agent.desired_status ?? 'unknown'))],
+        ['Observed', titleCase(getObservedState(agent))],
+        ['Recovery', titleCase(String(agent.recovery_state ?? 'idle'))],
+        ['Last Action', titleCase(String(agent.last_action_type ?? 'none'))],
+        ['Last Reconciled', formatTimestamp(agent.last_reconciled_at)],
+        ['Runtime Namespace', agent.runtime_namespace ?? 'n/a'],
+        ['Route Prefix', agent.route_prefix ?? 'n/a'],
+        ['Source', agent.source ?? 'n/a'],
+    ] as const
+}
+
 export const AgentHub: React.FC = () => {
     const [agents, setAgents] = useState<AgentSummary[]>([])
     const [loading, setLoading] = useState(true)
@@ -103,13 +206,35 @@ export const AgentHub: React.FC = () => {
     const [actionError, setActionError] = useState<string | null>(null)
     const [actionResult, setActionResult] = useState<unknown>(null)
 
-    const aliveAgents = useMemo(() => agents.filter(agent => agent.alive !== false), [agents])
-    const deadAgents = useMemo(() => agents.filter(agent => agent.alive === false), [agents])
-    const chatCapableCount = useMemo(() => agents.filter(agent => supportsMode(agent, 'chat')).length, [agents])
-    const invokeCapableCount = useMemo(() => agents.filter(agent => supportsMode(agent, 'invoke')).length, [agents])
+    const stateCounts = useMemo(() => {
+        const counts = {
+            ready: 0,
+            recovering: 0,
+            degraded: 0,
+            missing: 0,
+            offline: 0,
+        }
+
+        for (const agent of agents) {
+            const state = getAgentState(agent).key
+            if (state in counts) {
+                counts[state as keyof typeof counts] += 1
+            }
+        }
+
+        return counts
+    }, [agents])
     const selectedAgent = useMemo(
         () => agents.find(agent => agent.name === selectedAgentName) ?? null,
         [agents, selectedAgentName],
+    )
+    const selectedState = useMemo(
+        () => (selectedAgent ? getAgentState(selectedAgent) : null),
+        [selectedAgent],
+    )
+    const canInteract = useMemo(
+        () => !!selectedAgent && ['ready', 'degraded'].includes(getAgentState(selectedAgent).key),
+        [selectedAgent],
     )
 
     const load = async (silent = false) => {
@@ -247,13 +372,14 @@ export const AgentHub: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
                 {[
-                    { label: 'Total Agents', value: agents.length, color: 'text-stone-900' },
-                    { label: 'Alive', value: aliveAgents.length, color: 'text-emerald-600' },
-                    { label: 'Unreachable', value: deadAgents.length, color: 'text-red-500' },
-                    { label: 'Chat Capable', value: chatCapableCount, color: 'text-sky-600' },
-                    { label: 'Invoke Capable', value: invokeCapableCount, color: 'text-amber-600' },
+                    { label: 'Total', value: agents.length, color: 'text-stone-900' },
+                    { label: 'Ready', value: stateCounts.ready, color: 'text-emerald-600' },
+                    { label: 'Recovering', value: stateCounts.recovering, color: 'text-sky-600' },
+                    { label: 'Degraded', value: stateCounts.degraded, color: 'text-amber-600' },
+                    { label: 'Missing', value: stateCounts.missing, color: 'text-rose-600' },
+                    { label: 'Offline', value: stateCounts.offline, color: 'text-stone-600' },
                 ].map(stat => (
                     <div key={stat.label} className="rounded-2xl border border-stone-200 bg-white px-5 py-4 shadow-sm">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-400">{stat.label}</p>
@@ -292,10 +418,10 @@ export const AgentHub: React.FC = () => {
                     ) : (
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             {agents.map(agent => {
-                                const alive = agent.alive !== false
                                 const selected = selectedAgentName === agent.name
                                 const modes = getInteractionModes(agent)
                                 const primarySpec = agent.capability_specs?.[0]
+                                const state = getAgentState(agent)
 
                                 return (
                                     <button
@@ -307,19 +433,19 @@ export const AgentHub: React.FC = () => {
                                         }`}
                                     >
                                         <div className="flex items-start gap-4">
-                                            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${alive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-500'}`}>
+                                            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${state.tone}`}>
                                                 <Bot size={20} />
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2">
                                                     <p className="truncate text-sm font-semibold text-stone-900">{agent.name}</p>
-                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${alive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                                                        {alive ? 'Alive' : 'Down'}
+                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${state.tone}`}>
+                                                        {state.label}
                                                     </span>
                                                 </div>
-                                                <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${alive ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                    {alive ? <Wifi size={11} /> : <WifiOff size={11} />}
-                                                    {alive ? 'Responding through AgentHub' : 'Not currently reachable'}
+                                                <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${state.helperTone}`}>
+                                                    {state.routable ? <Wifi size={11} /> : <WifiOff size={11} />}
+                                                    {state.helper}
                                                 </p>
                                             </div>
                                         </div>
@@ -392,14 +518,18 @@ export const AgentHub: React.FC = () => {
                                     <div>
                                         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-400">Agent Detail</p>
                                         <h3 className="mt-1 text-xl font-bold text-stone-900">{selectedAgent.name}</h3>
-                                        <p className={`mt-1 flex items-center gap-1 text-sm font-medium ${selectedAgent.alive !== false ? 'text-emerald-600' : 'text-red-500'}`}>
-                                            {selectedAgent.alive !== false ? <Wifi size={13} /> : <WifiOff size={13} />}
-                                            {selectedAgent.alive !== false ? 'Alive and routable' : 'Registered but currently unreachable'}
-                                        </p>
+                                        {selectedState && (
+                                            <p className="mt-1 flex items-center gap-2 text-sm font-medium text-stone-600">
+                                                <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${selectedState.tone}`}>
+                                                    {selectedState.label}
+                                                </span>
+                                                <span>{selectedState.helper}</span>
+                                            </p>
+                                        )}
                                     </div>
                                     {selectedAgent.registered_at && (
                                         <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-[11px] text-stone-500">
-                                            {new Date(selectedAgent.registered_at).toLocaleString()}
+                                            {formatTimestamp(selectedAgent.registered_at)}
                                         </span>
                                     )}
                                 </div>
@@ -413,6 +543,34 @@ export const AgentHub: React.FC = () => {
                                             {titleCase(mode)}
                                         </span>
                                     ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400">
+                                    <Info size={10} /> Control Plane
+                                </p>
+                                <div className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
+                                    {getControlPlaneDetails(selectedAgent).map(([label, value]) => (
+                                        <div key={label} className="flex justify-between gap-3 py-1 text-xs">
+                                            <span className="font-medium text-stone-500">{label}</span>
+                                            <span className="max-w-[60%] break-words text-right font-mono text-stone-700">
+                                                {value}
+                                            </span>
+                                        </div>
+                                    ))}
+                                    {selectedAgent.last_failure_reason && (
+                                        <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-3 text-xs text-rose-700">
+                                            <p className="font-semibold uppercase tracking-[0.16em]">Last Failure</p>
+                                            <p className="mt-1 leading-relaxed">{selectedAgent.last_failure_reason}</p>
+                                        </div>
+                                    )}
+                                    {selectedAgent.reconcile_notes && (
+                                        <div className="mt-3 rounded-2xl border border-stone-200 bg-white px-3 py-3 text-xs text-stone-600">
+                                            <p className="font-semibold uppercase tracking-[0.16em] text-stone-500">Reconcile Notes</p>
+                                            <p className="mt-1 leading-relaxed">{selectedAgent.reconcile_notes}</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -503,7 +661,7 @@ export const AgentHub: React.FC = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => void handleChatTest()}
-                                                disabled={selectedAgent.alive === false || actionPending || !chatMessage.trim()}
+                                                disabled={!canInteract || actionPending || !chatMessage.trim()}
                                                 className="mt-3 inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
                                             >
                                                 <MessageSquare size={14} />
@@ -528,7 +686,7 @@ export const AgentHub: React.FC = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => void handleInvokeTest()}
-                                                disabled={selectedAgent.alive === false || actionPending}
+                                                disabled={!canInteract || actionPending}
                                                 className="mt-3 inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
                                             >
                                                 <Play size={14} />
@@ -540,6 +698,11 @@ export const AgentHub: React.FC = () => {
                                     {!supportsMode(selectedAgent, 'chat') && !supportsMode(selectedAgent, 'invoke') && (
                                         <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-4 py-6 text-sm text-stone-500">
                                             This agent does not advertise a manual chat or invoke interface.
+                                        </div>
+                                    )}
+                                    {!canInteract && (
+                                        <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-4 py-4 text-sm text-stone-500">
+                                            Manual interaction is only enabled while the deployment is ready or degraded.
                                         </div>
                                     )}
                                 </div>

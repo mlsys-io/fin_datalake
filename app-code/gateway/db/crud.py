@@ -244,6 +244,7 @@ def _parse_json_text(value: str | None, default):
 
 
 def _agent_definition_to_dict(row: AgentDefinitionORM) -> dict:
+    alive = row.desired_status == "running" and row.observed_status in {"ready", "degraded", "recovering"} and row.health_status != "offline"
     return {
         "name": row.name,
         "capabilities": _parse_json_text(row.capabilities, []),
@@ -254,10 +255,19 @@ def _agent_definition_to_dict(row: AgentDefinitionORM) -> dict:
         "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else None,
         "last_heartbeat_at": row.last_heartbeat_at.isoformat() if row.last_heartbeat_at else None,
         "status": row.status,
+        "managed_by_overseer": row.managed_by_overseer,
+        "desired_status": row.desired_status,
+        "observed_status": row.observed_status,
+        "health_status": row.health_status,
+        "recovery_state": row.recovery_state,
+        "last_reconciled_at": row.last_reconciled_at.isoformat() if row.last_reconciled_at else None,
+        "last_failure_reason": row.last_failure_reason,
+        "last_action_type": row.last_action_type,
+        "reconcile_notes": row.reconcile_notes,
         "runtime_source": row.runtime_source,
         "runtime_namespace": row.runtime_namespace,
         "route_prefix": row.route_prefix,
-        "alive": row.status == "alive",
+        "alive": alive,
         "source": "catalog",
     }
 
@@ -302,8 +312,26 @@ async def upsert_agent_definition(
     row.runtime_namespace = agent.get("runtime_namespace") or row.runtime_namespace
     row.route_prefix = agent.get("route_prefix") or row.route_prefix
     row.status = str(agent.get("status") or row.status or "unknown")
+    row.managed_by_overseer = bool(agent.get("managed_by_overseer", row.managed_by_overseer if row.managed_by_overseer is not None else True))
+    row.desired_status = str(agent.get("desired_status") or row.desired_status or "running")
+    row.observed_status = str(agent.get("observed_status") or row.observed_status or "unknown")
+    row.health_status = str(agent.get("health_status") or row.health_status or "unknown")
+    row.recovery_state = str(agent.get("recovery_state") or row.recovery_state or "idle")
+    row.last_failure_reason = agent.get("last_failure_reason") or row.last_failure_reason
+    row.last_action_type = agent.get("last_action_type") or row.last_action_type
+    row.reconcile_notes = agent.get("reconcile_notes") or row.reconcile_notes
     if registered_at is not None:
         row.registered_at = registered_at
+    reconciled_at = agent.get("last_reconciled_at")
+    if isinstance(reconciled_at, str):
+        try:
+            reconciled_at = datetime.fromisoformat(reconciled_at)
+        except ValueError:
+            reconciled_at = None
+    elif not isinstance(reconciled_at, datetime):
+        reconciled_at = None
+    if reconciled_at is not None:
+        row.last_reconciled_at = reconciled_at
     if mark_seen:
         row.last_seen_at = now
         row.last_heartbeat_at = now
@@ -333,6 +361,19 @@ async def mark_agent_status(
 
     now = datetime.now(timezone.utc)
     row.status = status
+    observed_status = status
+    health_status = row.health_status
+    if status == "alive":
+        observed_status = "ready"
+        health_status = "healthy"
+    elif status == "stale":
+        observed_status = "stale"
+        health_status = "degraded"
+    elif status == "offline":
+        observed_status = "offline"
+        health_status = "offline"
+    row.observed_status = observed_status
+    row.health_status = health_status
     if mark_seen:
         row.last_seen_at = now
     if heartbeat:

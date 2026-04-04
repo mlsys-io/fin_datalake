@@ -45,15 +45,32 @@ class RayActuator(BaseActuator):
                 )
 
             if action.type == ActionType.RESPAWN:
-                agent_cls = self._resolve_agent_class(action.agent)
+                class_name = action.agent_class or action.agent
+                agent_cls = self._resolve_agent_class(class_name)
                 if agent_cls is None:
-                    return ActionResult(success=False, error=f"Unknown agent class: {action.agent}")
-                actor_name = self._make_actor_name(action.agent)
-                self._deploy_agent(agent_cls, actor_name)
-                await self._track_actor(action.agent, actor_name)
+                    return ActionResult(success=False, error=f"Unknown agent class: {class_name}")
+
+                deployment_name = action.deployment_name or self._make_actor_name(class_name)
+                deployment_metadata = dict(action.deployment_metadata or {})
+                route_prefix = action.route_prefix or f"/{deployment_name}"
+                config = deployment_metadata.get("config")
+                num_replicas = int(deployment_metadata.get("num_replicas", 1) or 1)
+                num_cpus = float(deployment_metadata.get("num_cpus", 0.5) or 0.5)
+                serve_options = dict(deployment_metadata.get("serve_options") or {})
+                serve_options.setdefault("route_prefix", route_prefix)
+
+                self._deploy_agent(
+                    agent_cls,
+                    deployment_name,
+                    config=config,
+                    num_replicas=num_replicas,
+                    num_cpus=num_cpus,
+                    serve_options=serve_options,
+                )
+                await self._track_actor(class_name, deployment_name)
                 return ActionResult(
                     success=True,
-                    detail=f"Respawned 1x {action.agent}",
+                    detail=f"Respawned deployment '{deployment_name}' as {class_name}",
                 )
 
             if action.type == ActionType.SCALE_DOWN:
@@ -85,10 +102,25 @@ class RayActuator(BaseActuator):
         """Generate a unique, traceable actor name."""
         return f"{class_name}-overseer-{uuid4().hex[:8]}"
 
-    def _deploy_agent(self, agent_cls, actor_name: str) -> None:
+    def _deploy_agent(
+        self,
+        agent_cls,
+        actor_name: str,
+        *,
+        config: dict | None = None,
+        num_replicas: int = 1,
+        num_cpus: float = 0.5,
+        serve_options: dict | None = None,
+    ) -> None:
         """Deploy an agent via its deploy() helper when available."""
         if hasattr(agent_cls, "deploy") and callable(getattr(agent_cls, "deploy")):
-            agent_cls.deploy(name=actor_name)
+            agent_cls.deploy(
+                name=actor_name,
+                num_replicas=num_replicas,
+                num_cpus=num_cpus,
+                config=config,
+                **(serve_options or {}),
+            )
         else:
             agent_cls.options(name=actor_name, lifetime="detached").remote()
 

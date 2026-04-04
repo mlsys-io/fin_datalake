@@ -13,6 +13,15 @@ from overseer.collectors.base import BaseCollector
 from overseer.models import ServiceMetrics
 
 
+def _extract_serve_app_name(actor_name: str) -> str | None:
+    if not actor_name.startswith("ServeReplica:"):
+        return None
+    parts = actor_name.split(":")
+    if len(parts) >= 3 and parts[1].strip():
+        return parts[1].strip()
+    return None
+
+
 class RayCollector(BaseCollector):
 
     async def collect(self) -> ServiceMetrics:
@@ -30,11 +39,14 @@ class RayCollector(BaseCollector):
             # Parse actors into a clean summary
             actors = []
             for actor_id, info in actors_raw.get("data", {}).get("actors", {}).items():
+                actor_name = info.get("name", "unknown")
                 actors.append({
                     "actor_id": actor_id,
+                    "name": actor_name,
                     "class_name": info.get("className", "unknown"),
                     "state": info.get("state", "UNKNOWN"),
                     "pid": info.get("pid"),
+                    "serve_app_name": _extract_serve_app_name(actor_name),
                 })
 
             alive = sum(1 for a in actors if a["state"] == "ALIVE")

@@ -23,6 +23,7 @@ class BaseAgent(ABC, ConversationManagerMixin):
         self.app_name: Optional[str] = None
         self.config = config or {}
         self.executor = None
+        self.runtime_metadata: Dict[str, Any] = {}
 
     @classmethod
     def deploy(
@@ -42,6 +43,16 @@ class BaseAgent(ABC, ConversationManagerMixin):
 
         actor_name = name or cls.__name__
         route_prefix = serve_options.pop("route_prefix", f"/{actor_name}")
+        runtime_metadata = {
+            "route_prefix": route_prefix,
+            "deployment_metadata": {
+                "replication_mode": "serve",
+                "num_replicas": num_replicas,
+                "num_cpus": num_cpus,
+                "config": config or {},
+                "serve_options": dict(serve_options),
+            },
+        }
 
         deployment_cls = serve.deployment(
             name=actor_name,
@@ -58,6 +69,7 @@ class BaseAgent(ABC, ConversationManagerMixin):
         logger.info(f"Deployed Agent '{actor_name}' to Ray Serve")
 
         resolve_serve_response(handle.set_app_name.remote(actor_name))
+        resolve_serve_response(handle.set_runtime_metadata.remote(runtime_metadata))
         resolve_serve_response(handle.setup.remote())
 
         return handle
@@ -72,6 +84,9 @@ class BaseAgent(ABC, ConversationManagerMixin):
 
     def set_app_name(self, app_name: str):
         self.app_name = app_name
+
+    def set_runtime_metadata(self, metadata: Optional[Dict[str, Any]] = None):
+        self.runtime_metadata = metadata or {}
 
     def setup(self):
         if self.executor is not None:
@@ -95,8 +110,20 @@ class BaseAgent(ABC, ConversationManagerMixin):
         from etl.runtime import resolve_ray_namespace
 
         registered_name = self.app_name or self.name
-        route_prefix = f"/{registered_name}"
+        route_prefix = (
+            str(self.runtime_metadata.get("route_prefix") or "").strip()
+            or f"/{registered_name}"
+        )
         runtime_namespace = resolve_ray_namespace()
+        deployment_metadata = dict(self.runtime_metadata.get("deployment_metadata") or {})
+        metadata_payload = {
+            "class": self.__class__.__name__,
+            "app_name": registered_name,
+            "interaction_modes": self.get_interaction_modes(),
+            "route_prefix": route_prefix,
+            "runtime_namespace": runtime_namespace,
+            "deployment_metadata": deployment_metadata,
+        }
 
         try:
             from etl.agents.hub import get_hub
@@ -106,11 +133,7 @@ class BaseAgent(ABC, ConversationManagerMixin):
                 hub.register.remote(
                     name=registered_name,
                     capabilities=self.get_capability_specs(),
-                    metadata={
-                        "class": self.__class__.__name__,
-                        "app_name": registered_name,
-                        "interaction_modes": self.get_interaction_modes(),
-                    },
+                    metadata=metadata_payload,
                 )
             )
             logger.info(
@@ -127,18 +150,18 @@ class BaseAgent(ABC, ConversationManagerMixin):
                 name=registered_name,
                 capabilities=[spec["id"] if isinstance(spec, dict) else spec for spec in self.get_capability_specs()],
                 capability_specs=self.get_capability_specs(),
-                metadata={
-                    "class": self.__class__.__name__,
-                    "app_name": registered_name,
-                    "interaction_modes": self.get_interaction_modes(),
-                },
-                deployment_metadata={
-                    "replication_mode": "serve",
-                },
+                metadata=metadata_payload,
+                deployment_metadata=deployment_metadata,
                 route_prefix=route_prefix,
                 runtime_namespace=runtime_namespace,
                 runtime_source="ray-serve",
                 status="alive",
+                managed_by_overseer=True,
+                desired_status="running",
+                observed_status="ready",
+                health_status="healthy",
+                recovery_state="idle",
+                last_action_type="register",
             )
         except Exception as e:
             logger.warning(f"[{self.name}] Failed to upsert durable agent catalog entry: {e}")

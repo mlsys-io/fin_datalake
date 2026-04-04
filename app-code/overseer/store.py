@@ -46,9 +46,13 @@ class MetricsStore:
             pipe.ltrim(self._snapshot_key, 0, self.max_snapshots - 1)
             await pipe.execute()
 
-    async def append_alert(self, action: OverseerAction) -> None:
+    async def append_alert(self, action: OverseerAction | dict) -> None:
         """Push a serialized alert to Redis."""
-        data = json.dumps(action.to_alert())
+        if isinstance(action, dict):
+            payload = action
+        else:
+            payload = action.to_alert()
+        data = json.dumps(payload)
         async with self.redis.pipeline(transaction=True) as pipe:
             pipe.lpush(self._alert_key, data)
             pipe.ltrim(self._alert_key, 0, self.max_alerts - 1)

@@ -31,6 +31,15 @@ CREATE TABLE IF NOT EXISTS agent_definitions (
 _ENSURE_AGENT_DEFINITIONS_COLUMNS_SQL = """
 ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ;
 ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS managed_by_overseer BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS desired_status TEXT NOT NULL DEFAULT 'running';
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS observed_status TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS health_status TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS recovery_state TEXT NOT NULL DEFAULT 'idle';
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS last_reconciled_at TIMESTAMPTZ;
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS last_failure_reason TEXT;
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS last_action_type TEXT;
+ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS reconcile_notes TEXT;
 ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS runtime_source TEXT;
 ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS runtime_namespace TEXT;
 ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS route_prefix TEXT;
@@ -49,6 +58,15 @@ INSERT INTO agent_definitions (
     last_seen_at,
     last_heartbeat_at,
     status,
+    managed_by_overseer,
+    desired_status,
+    observed_status,
+    health_status,
+    recovery_state,
+    last_reconciled_at,
+    last_failure_reason,
+    last_action_type,
+    reconcile_notes,
     runtime_source,
     runtime_namespace,
     route_prefix,
@@ -67,6 +85,15 @@ VALUES (
     %(last_seen_at)s,
     %(last_heartbeat_at)s,
     %(status)s,
+    %(managed_by_overseer)s,
+    %(desired_status)s,
+    %(observed_status)s,
+    %(health_status)s,
+    %(recovery_state)s,
+    %(last_reconciled_at)s,
+    %(last_failure_reason)s,
+    %(last_action_type)s,
+    %(reconcile_notes)s,
     %(runtime_source)s,
     %(runtime_namespace)s,
     %(route_prefix)s,
@@ -83,6 +110,15 @@ ON CONFLICT (name) DO UPDATE SET
     last_seen_at = EXCLUDED.last_seen_at,
     last_heartbeat_at = EXCLUDED.last_heartbeat_at,
     status = EXCLUDED.status,
+    managed_by_overseer = EXCLUDED.managed_by_overseer,
+    desired_status = EXCLUDED.desired_status,
+    observed_status = EXCLUDED.observed_status,
+    health_status = EXCLUDED.health_status,
+    recovery_state = EXCLUDED.recovery_state,
+    last_reconciled_at = EXCLUDED.last_reconciled_at,
+    last_failure_reason = EXCLUDED.last_failure_reason,
+    last_action_type = EXCLUDED.last_action_type,
+    reconcile_notes = EXCLUDED.reconcile_notes,
     runtime_source = EXCLUDED.runtime_source,
     runtime_namespace = EXCLUDED.runtime_namespace,
     route_prefix = EXCLUDED.route_prefix,
@@ -93,10 +129,47 @@ _UPDATE_STATUS_SQL = """
 UPDATE agent_definitions
 SET
     status = %(status)s,
+    observed_status = COALESCE(%(observed_status)s, observed_status),
+    health_status = COALESCE(%(health_status)s, health_status),
+    recovery_state = COALESCE(%(recovery_state)s, recovery_state),
+    last_reconciled_at = COALESCE(%(last_reconciled_at)s, last_reconciled_at),
+    last_failure_reason = COALESCE(%(last_failure_reason)s, last_failure_reason),
+    last_action_type = COALESCE(%(last_action_type)s, last_action_type),
+    reconcile_notes = COALESCE(%(reconcile_notes)s, reconcile_notes),
     last_seen_at = COALESCE(%(last_seen_at)s, last_seen_at),
     last_heartbeat_at = COALESCE(%(last_heartbeat_at)s, last_heartbeat_at),
     updated_at = %(updated_at)s
 WHERE name = %(name)s;
+"""
+
+_LIST_AGENTS_SQL = """
+SELECT
+    name,
+    capabilities,
+    capability_specs,
+    metadata,
+    deployment_metadata,
+    registered_at,
+    last_seen_at,
+    last_heartbeat_at,
+    status,
+    managed_by_overseer,
+    desired_status,
+    observed_status,
+    health_status,
+    recovery_state,
+    last_reconciled_at,
+    last_failure_reason,
+    last_action_type,
+    reconcile_notes,
+    runtime_source,
+    runtime_namespace,
+    route_prefix,
+    is_enabled
+FROM agent_definitions
+WHERE (%(runtime_source)s IS NULL OR runtime_source = %(runtime_source)s)
+  AND (%(enabled_only)s = FALSE OR is_enabled = TRUE)
+ORDER BY name ASC;
 """
 
 
@@ -123,6 +196,44 @@ def _ensure_schema(cursor) -> None:
     cursor.execute(_ENSURE_AGENT_DEFINITIONS_COLUMNS_SQL)
 
 
+def _parse_json_text(value: Any, default: Any) -> Any:
+    if value in (None, ""):
+        return default
+    try:
+        return json.loads(value)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return default
+
+
+def _row_to_agent_dict(row: tuple[Any, ...]) -> dict[str, Any]:
+    return {
+        "name": row[0],
+        "capabilities": _parse_json_text(row[1], []),
+        "capability_specs": _parse_json_text(row[2], []),
+        "metadata": _parse_json_text(row[3], {}),
+        "deployment_metadata": _parse_json_text(row[4], {}),
+        "registered_at": row[5].isoformat() if row[5] else None,
+        "last_seen_at": row[6].isoformat() if row[6] else None,
+        "last_heartbeat_at": row[7].isoformat() if row[7] else None,
+        "status": row[8],
+        "managed_by_overseer": bool(row[9]),
+        "desired_status": row[10],
+        "observed_status": row[11],
+        "health_status": row[12],
+        "recovery_state": row[13],
+        "last_reconciled_at": row[14].isoformat() if row[14] else None,
+        "last_failure_reason": row[15],
+        "last_action_type": row[16],
+        "reconcile_notes": row[17],
+        "runtime_source": row[18],
+        "runtime_namespace": row[19],
+        "route_prefix": row[20],
+        "is_enabled": bool(row[21]),
+        "alive": row[8] == "alive",
+        "source": "catalog",
+    }
+
+
 def upsert_agent_catalog_entry(
     *,
     name: str,
@@ -134,6 +245,14 @@ def upsert_agent_catalog_entry(
     runtime_namespace: str | None = None,
     runtime_source: str = "ray-serve",
     status: str = "alive",
+    managed_by_overseer: bool = True,
+    desired_status: str = "running",
+    observed_status: str = "ready",
+    health_status: str = "healthy",
+    recovery_state: str = "idle",
+    last_failure_reason: str | None = None,
+    last_action_type: str | None = None,
+    reconcile_notes: str | None = None,
     registered_at: datetime | None = None,
 ) -> bool:
     """
@@ -157,6 +276,15 @@ def upsert_agent_catalog_entry(
         "last_seen_at": now,
         "last_heartbeat_at": now,
         "status": status,
+        "managed_by_overseer": managed_by_overseer,
+        "desired_status": desired_status,
+        "observed_status": observed_status,
+        "health_status": health_status,
+        "recovery_state": recovery_state,
+        "last_reconciled_at": now,
+        "last_failure_reason": last_failure_reason,
+        "last_action_type": last_action_type,
+        "reconcile_notes": reconcile_notes,
         "runtime_source": runtime_source,
         "runtime_namespace": runtime_namespace,
         "route_prefix": route_prefix,
@@ -181,6 +309,13 @@ def update_agent_catalog_status(
     status: str,
     mark_seen: bool = False,
     heartbeat: bool = False,
+    observed_status: str | None = None,
+    health_status: str | None = None,
+    recovery_state: str | None = None,
+    last_failure_reason: str | None = None,
+    last_action_type: str | None = None,
+    reconcile_notes: str | None = None,
+    reconciled: bool = False,
 ) -> bool:
     """
     Update durable runtime status for an already-registered agent.
@@ -195,6 +330,13 @@ def update_agent_catalog_status(
     payload = {
         "name": name,
         "status": status,
+        "observed_status": observed_status,
+        "health_status": health_status,
+        "recovery_state": recovery_state,
+        "last_reconciled_at": now if reconciled else None,
+        "last_failure_reason": last_failure_reason,
+        "last_action_type": last_action_type,
+        "reconcile_notes": reconcile_notes,
         "last_seen_at": now if mark_seen else None,
         "last_heartbeat_at": now if heartbeat else None,
         "updated_at": now,
@@ -207,5 +349,37 @@ def update_agent_catalog_status(
                 _ensure_schema(cursor)
                 cursor.execute(_UPDATE_STATUS_SQL, payload)
         return True
+    finally:
+        conn.close()
+
+
+def list_agent_catalog_entries(
+    *,
+    runtime_source: str | None = None,
+    enabled_only: bool = True,
+) -> list[dict[str, Any]]:
+    """
+    Read durable catalog entries directly from Timescale/Postgres.
+    """
+    dsn = _get_dsn()
+    if not dsn:
+        return []
+
+    import psycopg2
+
+    conn = psycopg2.connect(dsn)
+    try:
+        with conn:
+            with conn.cursor() as cursor:
+                _ensure_schema(cursor)
+                cursor.execute(
+                    _LIST_AGENTS_SQL,
+                    {
+                        "runtime_source": runtime_source,
+                        "enabled_only": enabled_only,
+                    },
+                )
+                rows = cursor.fetchall()
+        return [_row_to_agent_dict(row) for row in rows]
     finally:
         conn.close()
