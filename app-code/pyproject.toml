@@ -81,7 +81,7 @@ overseer = [
     "redis>=7.2.0",
     "deltalake>=0.14",
     "confluent-kafka>=2.3",
-    "ray[default]==2.54.0",
+    "ray[serve]==2.54.0",
     "psycopg2-binary>=2.9",
 ]
 hive = [
