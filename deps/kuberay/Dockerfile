@@ -36,4 +36,6 @@ RUN pip install --no-cache-dir -U \
     thrift>=0.16
 
 # Install the project package metadata and all importable modules.
-RUN pip install --no-cache-dir -e /home/ray/app-code
+# A regular install is sufficient in the image; editable installs require
+# write access to the source tree and are only useful for local development.
+RUN pip install --no-cache-dir /home/ray/app-code
