@@ -184,6 +184,11 @@ WHERE (%(runtime_source)s IS NULL OR runtime_source = %(runtime_source)s)
 ORDER BY name ASC;
 """
 
+_DELETE_AGENT_SQL = """
+DELETE FROM agent_definitions
+WHERE name = %(name)s;
+"""
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -403,5 +408,26 @@ def list_agent_catalog_entries(
                 )
                 rows = cursor.fetchall()
         return [_row_to_agent_dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def delete_agent_catalog_entry(name: str) -> bool:
+    """
+    Delete a durable catalog entry by exact deployment name.
+    """
+    dsn = _get_dsn()
+    if not dsn:
+        return False
+
+    import psycopg2
+
+    conn = psycopg2.connect(dsn)
+    try:
+        with conn:
+            with conn.cursor() as cursor:
+                _ensure_schema(cursor)
+                cursor.execute(_DELETE_AGENT_SQL, {"name": name})
+                return cursor.rowcount > 0
     finally:
         conn.close()
