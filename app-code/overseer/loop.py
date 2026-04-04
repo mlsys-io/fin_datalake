@@ -187,9 +187,10 @@ class Overseer:
                 logger.debug("  No actions needed")
 
             for action in actions:
-                if not self.cooldown.can_fire(action.type.value, action.target):
+                cooldown_scope = self._cooldown_scope(action)
+                if not self.cooldown.can_fire(action.type.value, cooldown_scope):
                     logger.info(
-                        f"  [SKIP] {action.type.value} - cooldown active for {action.target}"
+                        f"  [SKIP] {action.type.value} - cooldown active for {cooldown_scope}"
                     )
                     continue
 
@@ -211,9 +212,7 @@ class Overseer:
                             actuator.execute(action),
                             timeout=30.0,
                         )
-                        if result.success:
-                            self.cooldown.record(action.type.value, action.target)
-                        else:
+                        if not result.success:
                             logger.error(f"  Actuator failed: {result.error}")
                     except asyncio.TimeoutError:
                         result = ActionResult(
@@ -225,6 +224,7 @@ class Overseer:
                         result = ActionResult(success=False, error=str(exc))
                         logger.error(f"  Actuator {action.target} crashed: {exc}")
 
+                self.cooldown.record(action.type.value, cooldown_scope)
                 await self._apply_action_result(action, result)
                 await self.store.append_alert(self._build_action_alert(action, result))
 
@@ -547,6 +547,15 @@ class Overseer:
             reconcile_notes="Overseer action failed; manual inspection may be required.",
             reconciled=True,
         )
+
+    def _cooldown_scope(self, action: OverseerAction) -> str:
+        if action.deployment_name:
+            return action.deployment_name
+        if action.agent_class:
+            return action.agent_class
+        if action.agent:
+            return action.agent
+        return action.target
 
     def _build_action_alert(
         self,
