@@ -177,7 +177,7 @@ class AgentHub:
         output_type_key = str(output_type).strip().lower() if output_type else None
 
         matches = []
-        for info in self._agents.values():
+        for info in list(self._agents.values()):
             alive = self._is_alive(info.name)
             if alive_only and not alive:
                 continue
@@ -222,17 +222,22 @@ class AgentHub:
         return matches
 
     def list_agents(self) -> List[Dict]:
-        return [
-            {
-                "name": info.name,
-                "capabilities": info.capabilities,
-                "capability_specs": info.capability_specs,
-                "registered_at": info.registered_at.isoformat(),
-                "metadata": info.metadata,
-                "alive": self._is_alive(info.name),
-            }
-            for info in self._agents.values()
-        ]
+        agents = []
+        for info in list(self._agents.values()):
+            alive = self._is_alive(info.name)
+            if not alive:
+                continue
+            agents.append(
+                {
+                    "name": info.name,
+                    "capabilities": info.capabilities,
+                    "capability_specs": info.capability_specs,
+                    "registered_at": info.registered_at.isoformat(),
+                    "metadata": info.metadata,
+                    "alive": alive,
+                }
+            )
+        return agents
 
     def get_capabilities(self) -> List[str]:
         return [
@@ -306,7 +311,7 @@ class AgentHub:
         return self._is_alive(name)
 
     def health_check(self) -> Dict[str, bool]:
-        return {name: self._is_alive(name) for name in self._agents}
+        return {name: self._is_alive(name) for name in list(self._agents)}
 
     def get_stats(self) -> Dict:
         return {
@@ -324,12 +329,11 @@ class AgentHub:
             return None
 
     def _is_alive(self, name: str) -> bool:
-        import ray.serve as serve
-        try:
-            serve.get_app_handle(name)
-            return True
-        except (ValueError, KeyError, RuntimeError):
+        handle = self._get_handle(name)
+        if handle is None:
+            self.unregister(name)
             return False
+        return True
 
 
 def get_hub(*, create_if_missing: bool = True) -> ray.actor.ActorHandle:
