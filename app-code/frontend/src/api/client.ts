@@ -72,12 +72,12 @@ export type OverseerServiceMetrics = {
 }
 
 export type OverseerSnapshot = {
-    timestamp: string
+    timestamp: string | number
     services: Record<string, OverseerServiceMetrics>
 }
 
 export type OverseerAlert = {
-    timestamp: string
+    timestamp: string | number
     level: 'info' | 'warning' | 'error' | 'critical'
     type: string
     action: string
