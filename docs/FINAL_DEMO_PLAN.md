@@ -101,10 +101,10 @@ Suggested comparison dimensions:
 
 ## Recommended Operator Scripts
 
-- `scripts/deploy_test_agents.py`
-- `pipelines/self_healing_demo.py`
-- `etl-agents deploy-baseline`
-- `etl-agents list`
+- `scripts/verify/01-deploy-baseline.sh`
+- `scripts/verify/02-control-plane-smoke.sh`
+- `scripts/verify/03-self-healing.sh`
+- `scripts/verify/run-all.sh`
 
 ## Pre-Demo Checklist
 

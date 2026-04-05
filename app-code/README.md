@@ -95,18 +95,34 @@ uv run etl-agents list
 
 ## Demo And Validation Workflows
 
-### Deploy baseline test agents
+Use the consolidated verification scripts from the repo root when you want the standard correctness flow.
+
+### Full verification pass
 
 ```bash
-cd ~/zdb_deployment/app-code
-uv run python scripts/deploy_test_agents.py
+cd ~/zdb_deployment
+bash ./scripts/verify/run-all.sh
 ```
 
-### Run the self-healing demo
+### Deploy baseline fleet only
 
 ```bash
-cd ~/zdb_deployment/app-code
-uv run python pipelines/self_healing_demo.py
+cd ~/zdb_deployment
+bash ./scripts/verify/01-deploy-baseline.sh
+```
+
+### Run control-plane smoke checks
+
+```bash
+cd ~/zdb_deployment
+bash ./scripts/verify/02-control-plane-smoke.sh
+```
+
+### Run the self-healing verification only
+
+```bash
+cd ~/zdb_deployment
+bash ./scripts/verify/03-self-healing.sh
 ```
 
 ### Run focused regression tests
@@ -152,3 +168,4 @@ Check:
 - Framework and API details: [etl/README.md](etl/README.md)
 - Control-plane interaction model: [../docs/architecture/compute-gateway-overseer.md](../docs/architecture/compute-gateway-overseer.md)
 - Final demo plan reference: [../docs/FINAL_DEMO_PLAN.md](../docs/FINAL_DEMO_PLAN.md)
+- Verification script guide: [../scripts/verify/README.md](../scripts/verify/README.md)

@@ -10,3 +10,7 @@ This directory now keeps only the durable reference set for the project: the cur
 ## Final Demo Plan
 
 - [FINAL_DEMO_PLAN.md](FINAL_DEMO_PLAN.md)
+
+## Verification
+
+- [../scripts/verify/README.md](../scripts/verify/README.md)
