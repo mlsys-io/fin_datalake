@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { fetchOverseerSnapshots, fetchOverseerAlerts } from '../../api/client'
+import type { OverseerServiceMetrics } from '../../api/client'
 import { 
     Shield, 
     Activity, 
@@ -8,30 +9,9 @@ import {
     Zap, 
     Server
 } from 'lucide-react'
-
-interface ServiceMetrics {
-    healthy: boolean
-    data: any
-    error: string | null
-}
-
-interface Snapshot {
-    timestamp: string
-    services: Record<string, ServiceMetrics>
-}
-
-interface Alert {
-    timestamp: string
-    level: 'info' | 'warning' | 'error' | 'critical'
-    type: string
-    action: string
-    target: string
-    detail: string
-    status?: string
-    deployment_name?: string
-    result_detail?: string | null
-    result_error?: string | null
-}
+import { ErrorState, EmptyState, LoadingState, ResourceMeta } from '../shared/AsyncState'
+import { usePollingResource } from '../../hooks/usePollingResource'
+import { formatLocalTimeOnly } from '../../lib/time'
 
 function titleCase(value: string): string {
     return value
@@ -42,32 +22,26 @@ function titleCase(value: string): string {
 }
 
 export const SystemOverseer: React.FC = () => {
-    const [snapshots, setSnapshots] = useState<Snapshot[]>([])
-    const [alerts, setAlerts] = useState<Alert[]>([])
-    const [loading, setLoading] = useState(true)
-    const [lastRefresh, setLastRefresh] = useState(new Date())
-
-    const fetchData = async () => {
-        try {
-            const [snapRes, alertRes] = await Promise.all([
+    const {
+        data,
+        loading,
+        refreshing,
+        error,
+        lastUpdated,
+        stale,
+        refresh,
+    } = usePollingResource(
+        async () => {
+            const [snapshots, alerts] = await Promise.all([
                 fetchOverseerSnapshots(50),
-                fetchOverseerAlerts(20)
+                fetchOverseerAlerts(20),
             ])
-            setSnapshots(snapRes)
-            setAlerts(alertRes)
-            setLastRefresh(new Date())
-        } catch (e) {
-            console.error('Failed to fetch Overseer data', e)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    useEffect(() => {
-        fetchData()
-        const interval = setInterval(fetchData, 15000) // Auto-poll every 15s
-        return () => clearInterval(interval)
-    }, [])
+            return { snapshots, alerts }
+        },
+        { pollIntervalMs: 15_000 },
+    )
+    const snapshots = data?.snapshots ?? []
+    const alerts = data?.alerts ?? []
 
     const latestSnap = snapshots[snapshots.length - 1]
     const services = latestSnap?.services || {}
@@ -139,11 +113,19 @@ export const SystemOverseer: React.FC = () => {
                         <p className="text-stone-400 text-xs font-medium uppercase tracking-wider">Managed Deployments</p>
                         <p className="text-xl font-bold text-stone-900">{deploymentSummary.total ?? 0}</p>
                         <p className="mt-1 text-[11px] text-stone-400">
-                            Last sync {lastRefresh.toLocaleTimeString()}
+                            {lastUpdated ? `Last sync ${formatLocalTimeOnly(lastUpdated)}` : 'Awaiting first sync'}
                         </p>
                     </div>
                 </div>
             </div>
+
+            <div className="flex justify-end">
+                <ResourceMeta lastUpdated={lastUpdated} refreshing={refreshing} stale={stale} />
+            </div>
+
+            {error && snapshots.length > 0 && (
+                <ErrorState title="Overseer refresh failed" detail={error} onRetry={() => void refresh()} />
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Health Monitoring Panel */}
@@ -167,7 +149,7 @@ export const SystemOverseer: React.FC = () => {
                             ))}
                         </div>
                         <div className="space-y-1">
-                            {Object.entries(services).map(([name, metrics]) => (
+                            {Object.entries(services as Record<string, OverseerServiceMetrics>).map(([name, metrics]) => (
                                 <div key={name} className="flex items-center justify-between p-3 hover:bg-stone-50 rounded-lg transition-colors border-b border-stone-50 last:border-0">
                                     <div className="flex items-center gap-3">
                                         <div className={`w-2 h-2 rounded-full ${metrics.healthy ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`} />
@@ -209,9 +191,11 @@ export const SystemOverseer: React.FC = () => {
                         
                         <div className="overflow-auto max-h-[500px]">
                             {loading ? (
-                                <div className="p-8 text-center text-stone-400 animate-pulse">Loading orchestration history...</div>
+                                <LoadingState label="Loading orchestration history..." />
+                            ) : error && snapshots.length === 0 ? (
+                                <ErrorState title="Overseer data unavailable" detail={error} onRetry={() => void refresh()} />
                             ) : alerts.length === 0 ? (
-                                <div className="p-12 text-center text-stone-400 italic">No autonomic actions logged in this window.</div>
+                                <EmptyState title="No autonomic actions logged" detail="No autonomic actions were recorded in the current window." />
                             ) : (
                                 <table className="w-full text-left border-collapse">
                                     <thead className="bg-[#F7F7F5] border-b border-stone-200">
@@ -257,7 +241,7 @@ export const SystemOverseer: React.FC = () => {
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-stone-400 text-xs font-mono">
-                                                    {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                    {formatLocalTimeOnly(alert.timestamp)}
                                                 </td>
                                             </tr>
                                         ))}

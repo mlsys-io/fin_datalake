@@ -7,10 +7,20 @@
 // Basic error class for API failures
 export class APIError extends Error {
     status: number;
-    constructor(status: number, message: string) {
+    code: string;
+    context: Record<string, unknown> | null;
+    constructor(status: number, message: string, code: string = 'api_error', context: Record<string, unknown> | null = null) {
         super(message)
         this.status = status
+        this.code = code
+        this.context = context
     }
+}
+
+export type APIErrorEnvelope = {
+    detail: string
+    code: string
+    context?: Record<string, unknown> | null
 }
 
 export type AgentCapabilitySpec = {
@@ -49,10 +59,89 @@ export type AgentSummary = {
     alive?: boolean
 }
 
+export type AgentListResponse = {
+    agents: AgentSummary[]
+    available: boolean
+    detail: string | null
+}
+
+export type OverseerServiceMetrics = {
+    healthy: boolean
+    data: any
+    error: string | null
+}
+
+export type OverseerSnapshot = {
+    timestamp: string
+    services: Record<string, OverseerServiceMetrics>
+}
+
+export type OverseerAlert = {
+    timestamp: string
+    level: 'info' | 'warning' | 'error' | 'critical'
+    type: string
+    action: string
+    target: string
+    detail: string
+    status?: string
+    deployment_name?: string
+    result_detail?: string | null
+    result_error?: string | null
+}
+
+export type InfraStatusResponse = {
+    targets: Record<string, {
+        ok: boolean
+        status_code: number | null
+        url: string
+        detail: string | null
+    }>
+}
+
+export type ReadinessResponse = {
+    ready: boolean
+    timestamp: string
+    checks: Record<string, {
+        ready?: boolean
+        configured?: boolean
+        detail: string | null
+    }>
+}
+
+async function parseAPIError(response: Response, fallback: string): Promise<APIError> {
+    let detail = fallback
+    let code = 'api_error'
+    let context: Record<string, unknown> | null = null
+
+    try {
+        const data = await response.json()
+        if (typeof data?.detail === 'string') {
+            detail = data.detail
+            code = data.code ?? code
+            context = data.context ?? null
+        } else if (data?.detail && typeof data.detail === 'object') {
+            detail = data.detail.detail ?? fallback
+            code = data.detail.code ?? data.code ?? code
+            context = data.detail.context ?? data.context ?? null
+        }
+    } catch {
+        // Fall back to the provided message.
+    }
+
+    return new APIError(response.status, detail, code, context)
+}
+
+async function parseJSONOrThrow<T>(response: Response, fallback: string): Promise<T> {
+    if (!response.ok) {
+        throw await parseAPIError(response, fallback)
+    }
+    return response.json() as Promise<T>
+}
+
 /**
  * Send a Universal Intent to the Gateway.
  */
-export async function sendIntent(domain: string, action: string, parameters: Record<string, any> = {}) {
+export async function sendIntent<T = any>(domain: string, action: string, parameters: Record<string, any> = {}) {
     const res = await fetch('/api/v1/intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -60,11 +149,7 @@ export async function sendIntent(domain: string, action: string, parameters: Rec
         body: JSON.stringify({ domain, action, parameters }),
     })
 
-    const data = await res.json()
-    if (!res.ok) {
-        throw new APIError(res.status, data.detail || 'Intent execution failed')
-    }
-    return data
+    return parseJSONOrThrow<T>(res, 'Intent execution failed')
 }
 
 /**
@@ -72,11 +157,8 @@ export async function sendIntent(domain: string, action: string, parameters: Rec
  */
 export async function fetchAgents() {
     const res = await fetch('/api/v1/agents', { credentials: 'include' })
-    const data = await res.json()
-    if (!res.ok) {
-        throw new APIError(res.status, data.detail || 'Failed to fetch agents')
-    }
-    return (data.agents ?? []) as AgentSummary[]
+    const data = await parseJSONOrThrow<AgentListResponse>(res, 'Failed to fetch agents')
+    return data.agents ?? []
 }
 
 /**
@@ -92,11 +174,7 @@ export async function chatWithAgent(agentName: string, message: string, sessionI
         session_id: sessionId,
         }),
     })
-    const data = await res.json()
-    if (!res.ok) {
-        throw new APIError(res.status, data.detail || 'Agent chat failed')
-    }
-    return data
+    return parseJSONOrThrow(res, 'Agent chat failed')
 }
 
 /**
@@ -112,11 +190,7 @@ export async function invokeAgent(agentName: string, payload: unknown, sessionId
         session_id: sessionId,
         }),
     })
-    const data = await res.json()
-    if (!res.ok) {
-        throw new APIError(res.status, data.detail || 'Agent invoke failed')
-    }
-    return data
+    return parseJSONOrThrow(res, 'Agent invoke failed')
 }
 
 /**
@@ -129,11 +203,17 @@ export async function broadcastAgentEvent(payload: Record<string, unknown>) {
         credentials: 'include',
         body: JSON.stringify({ payload }),
     })
-    const data = await res.json()
-    if (!res.ok) {
-        throw new APIError(res.status, data.detail || 'Agent broadcast failed')
-    }
-    return data
+    return parseJSONOrThrow<{ delivered_to: number; total_targets: number }>(res, 'Agent broadcast failed')
+}
+
+export async function loginWithPassword(username: string, password: string) {
+    const res = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username, password }),
+    })
+    return parseJSONOrThrow(res, 'Login failed')
 }
 
 /**
@@ -150,11 +230,7 @@ export async function fetchMe() {
  */
 export async function fetchOverseerSnapshots(n: number = 50) {
     const res = await fetch(`/api/v1/system/overseer/snapshots?n=${n}`, { credentials: 'include' })
-    if (!res.ok) {
-        const data = await res.json()
-        throw new APIError(res.status, data.detail || 'Failed to fetch snapshots')
-    }
-    return res.json()
+    return parseJSONOrThrow<OverseerSnapshot[]>(res, 'Failed to fetch snapshots')
 }
 
 /**
@@ -162,11 +238,7 @@ export async function fetchOverseerSnapshots(n: number = 50) {
  */
 export async function fetchOverseerAlerts(n: number = 20) {
     const res = await fetch(`/api/v1/system/overseer/alerts?n=${n}`, { credentials: 'include' })
-    if (!res.ok) {
-        const data = await res.json()
-        throw new APIError(res.status, data.detail || 'Failed to fetch alerts')
-    }
-    return res.json()
+    return parseJSONOrThrow<OverseerAlert[]>(res, 'Failed to fetch alerts')
 }
 
 /**
@@ -174,16 +246,10 @@ export async function fetchOverseerAlerts(n: number = 20) {
  */
 export async function fetchInfraStatus() {
     const res = await fetch('/api/v1/system/infra/status', { credentials: 'include' })
-    const data = await res.json()
-    if (!res.ok) {
-        throw new APIError(res.status, data.detail || 'Failed to fetch infrastructure status')
-    }
-    return data as {
-        targets: Record<string, {
-            ok: boolean
-            status_code: number | null
-            url: string
-            detail: string | null
-        }>
-    }
+    return parseJSONOrThrow<InfraStatusResponse>(res, 'Failed to fetch infrastructure status')
+}
+
+export async function fetchReadiness() {
+    const res = await fetch('/readyz', { credentials: 'include' })
+    return parseJSONOrThrow<ReadinessResponse>(res, 'Failed to fetch gateway readiness')
 }

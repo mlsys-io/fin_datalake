@@ -19,6 +19,9 @@ import {
     invokeAgent,
 } from '../../api/client'
 import type { AgentSummary } from '../../api/client'
+import { ErrorState, EmptyState, LoadingState, ResourceMeta } from '../shared/AsyncState'
+import { usePollingResource } from '../../hooks/usePollingResource'
+import { formatLocalTimestamp } from '../../lib/time'
 
 const POLL_INTERVAL_MS = 15_000
 
@@ -86,13 +89,6 @@ function titleCase(value: string): string {
         .filter(Boolean)
         .map(part => part.charAt(0).toUpperCase() + part.slice(1))
         .join(' ')
-}
-
-function formatTimestamp(value?: string | null): string {
-    if (!value) return 'n/a'
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return value
-    return date.toLocaleString()
 }
 
 function getObservedState(agent: AgentSummary): string {
@@ -184,7 +180,7 @@ function getControlPlaneDetails(agent: AgentSummary) {
         ['Observed', titleCase(getObservedState(agent))],
         ['Recovery', titleCase(String(agent.recovery_state ?? 'idle'))],
         ['Last Action', titleCase(String(agent.last_action_type ?? 'none'))],
-        ['Last Reconciled', formatTimestamp(agent.last_reconciled_at)],
+        ['Last Reconciled', formatLocalTimestamp(agent.last_reconciled_at)],
         ['Runtime Namespace', agent.runtime_namespace ?? 'n/a'],
         ['Route Prefix', agent.route_prefix ?? 'n/a'],
         ['Source', agent.source ?? 'n/a'],
@@ -192,10 +188,6 @@ function getControlPlaneDetails(agent: AgentSummary) {
 }
 
 export const AgentHub: React.FC = () => {
-    const [agents, setAgents] = useState<AgentSummary[]>([])
-    const [loading, setLoading] = useState(true)
-    const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
-    const [error, setError] = useState<string | null>(null)
     const [selectedAgentName, setSelectedAgentName] = useState<string | null>(null)
     const [broadcasting, setBroadcasting] = useState(false)
     const [broadcastResult, setBroadcastResult] = useState<string | null>(null)
@@ -205,6 +197,16 @@ export const AgentHub: React.FC = () => {
     const [actionLabel, setActionLabel] = useState<string | null>(null)
     const [actionError, setActionError] = useState<string | null>(null)
     const [actionResult, setActionResult] = useState<unknown>(null)
+    const {
+        data: agentsData,
+        loading,
+        refreshing,
+        error,
+        lastUpdated,
+        stale,
+        refresh,
+    } = usePollingResource(fetchAgents, { pollIntervalMs: POLL_INTERVAL_MS })
+    const agents = agentsData ?? []
 
     const stateCounts = useMemo(() => {
         const counts = {
@@ -236,26 +238,6 @@ export const AgentHub: React.FC = () => {
         () => !!selectedAgent && ['ready', 'degraded'].includes(getAgentState(selectedAgent).key),
         [selectedAgent],
     )
-
-    const load = async (silent = false) => {
-        if (!silent) setLoading(true)
-        setError(null)
-        try {
-            const data = await fetchAgents()
-            setAgents(data)
-            setLastRefresh(new Date())
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to fetch agents')
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    useEffect(() => {
-        void load()
-        const interval = setInterval(() => void load(true), POLL_INTERVAL_MS)
-        return () => clearInterval(interval)
-    }, [])
 
     useEffect(() => {
         if (agents.length === 0) {
@@ -347,11 +329,7 @@ export const AgentHub: React.FC = () => {
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-3">
-                    {lastRefresh && (
-                        <span className="text-xs text-stone-400">
-                            Last synced {lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                        </span>
-                    )}
+                    <ResourceMeta lastUpdated={lastUpdated} refreshing={refreshing} stale={stale} />
                     <button
                         type="button"
                         onClick={() => void handleBroadcastPing()}
@@ -363,10 +341,10 @@ export const AgentHub: React.FC = () => {
                     </button>
                     <button
                         type="button"
-                        onClick={() => void load()}
+                        onClick={() => void refresh()}
                         className="flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm transition hover:border-stone-300 hover:bg-stone-50"
                     >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                        <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
                         Refresh
                     </button>
                 </div>
@@ -394,27 +372,18 @@ export const AgentHub: React.FC = () => {
                 </div>
             )}
 
-            {error && (
-                <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-                    <AlertTriangle size={16} className="shrink-0" />
-                    {error}
-                </div>
+            {error && agents.length > 0 && (
+                <ErrorState title="Agent status refresh failed" detail={error} onRetry={() => void refresh()} />
             )}
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,1fr)]">
                 <div className="space-y-4">
                     {loading && agents.length === 0 ? (
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            {[...Array(4)].map((_, i) => (
-                                <div key={i} className="h-48 animate-pulse rounded-3xl border border-stone-100 bg-stone-100" />
-                            ))}
-                        </div>
+                        <LoadingState label="Loading agent fleet..." />
+                    ) : error && agents.length === 0 ? (
+                        <ErrorState title="Agent fleet unavailable" detail={error} onRetry={() => void refresh()} />
                     ) : agents.length === 0 ? (
-                        <div className="rounded-3xl border border-dashed border-stone-300 bg-white py-20 text-center text-stone-500">
-                            <Bot size={40} className="mx-auto mb-3 text-stone-300" />
-                            <p className="font-medium">No agents registered</p>
-                            <p className="mt-1 text-sm">Deploy agents to the Ray cluster and they will appear here automatically.</p>
-                        </div>
+                        <EmptyState title="No agents registered" detail="Deploy agents to the Ray cluster and they will appear here automatically." />
                     ) : (
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             {agents.map(agent => {
@@ -529,7 +498,7 @@ export const AgentHub: React.FC = () => {
                                     </div>
                                     {selectedAgent.registered_at && (
                                         <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-[11px] text-stone-500">
-                                            {formatTimestamp(selectedAgent.registered_at)}
+                                            {formatLocalTimestamp(selectedAgent.registered_at)}
                                         </span>
                                     )}
                                 </div>

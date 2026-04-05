@@ -1,30 +1,31 @@
-import React, { useState, useEffect } from 'react'
+import React, { useMemo, useState } from 'react'
 import { sendIntent } from '../../api/client'
-import { Database, Search, Table2 } from 'lucide-react'
+import { Database, RefreshCw, Search, Table2 } from 'lucide-react'
+import { EmptyState, ErrorState, LoadingState, ResourceMeta } from '../shared/AsyncState'
+import { usePollingResource } from '../../hooks/usePollingResource'
 
 export const DataCatalog: React.FC = () => {
-    const [tables, setTables] = useState<{ name: string, path: string }[]>([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState('')
     const [search, setSearch] = useState('')
-
-    useEffect(() => {
-        const fetchTables = async () => {
-            try {
-                const res = await sendIntent('data', 'list_tables')
-                setTables(res.tables || [])
-            } catch (e: any) {
-                setError(e.message)
-            } finally {
-                setLoading(false)
-            }
-        }
-        fetchTables()
-    }, [])
-
-    const filteredTables = tables.filter(t =>
-        t.name.toLowerCase().includes(search.toLowerCase())
+    const {
+        data: tablesData,
+        loading,
+        refreshing,
+        error,
+        lastUpdated,
+        stale,
+        refresh,
+    } = usePollingResource(
+        async () => {
+            const res = await sendIntent<{ tables?: { name: string; path: string }[] }>('data', 'list_tables')
+            return (res.tables || []) as { name: string; path: string }[]
+        },
+        { pollIntervalMs: 60_000 },
     )
+    const tables = tablesData ?? []
+
+    const filteredTables = useMemo(() => tables.filter(t =>
+        t.name.toLowerCase().includes(search.toLowerCase())
+    ), [search, tables])
 
     return (
         <div className="space-y-6 max-w-6xl mx-auto">
@@ -48,30 +49,41 @@ export const DataCatalog: React.FC = () => {
                         <Table2 size={20} className="text-stone-500" />
                         Delta Lake Tables
                     </h3>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={16} />
-                        <input
-                            type="text"
-                            placeholder="Search tables..."
-                            className="pl-9 pr-4 py-2 bg-white border border-stone-200 rounded text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400"
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                        />
+                    <div className="flex items-center gap-3">
+                        <ResourceMeta lastUpdated={lastUpdated} refreshing={refreshing} stale={stale} />
+                        <button
+                            type="button"
+                            onClick={() => void refresh()}
+                            className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100"
+                        >
+                            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                            Refresh
+                        </button>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={16} />
+                            <input
+                                type="text"
+                                placeholder="Search tables..."
+                                className="pl-9 pr-4 py-2 bg-white border border-stone-200 rounded text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400"
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                            />
+                        </div>
                     </div>
                 </div>
 
                 <div className="p-6">
-                    {loading ? (
-                        <div className="animate-pulse flex space-x-4">
-                            <div className="flex-1 space-y-4 py-1">
-                                <div className="h-4 bg-stone-200 rounded w-3/4"></div>
-                                <div className="h-4 bg-stone-200 rounded w-1/2"></div>
-                            </div>
+                    {error && tables.length > 0 && (
+                        <div className="mb-4">
+                            <ErrorState title="Data catalog refresh failed" detail={error} onRetry={() => void refresh()} />
                         </div>
-                    ) : error ? (
-                        <p className="text-red-500">{error}</p>
+                    )}
+                    {loading ? (
+                        <LoadingState label="Loading Delta Lake tables..." />
+                    ) : error && tables.length === 0 ? (
+                        <ErrorState title="Data catalog unavailable" detail={error} onRetry={() => void refresh()} />
                     ) : filteredTables.length === 0 ? (
-                        <p className="text-stone-500 text-center py-8">{search ? 'No tables match your search.' : 'No tables found in Delta Lake.'}</p>
+                        <EmptyState title={search ? 'No tables match your search' : 'No tables found in Delta Lake'} detail={search ? 'Try a broader search term.' : 'The data catalog is currently empty.'} />
                     ) : (
                         <div className="grid grid-cols-1 gap-4">
                             {filteredTables.map((t, idx) => (

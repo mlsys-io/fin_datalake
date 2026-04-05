@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ExternalLink, LoaderCircle, MonitorPlay, RefreshCw, Server } from 'lucide-react'
+import React, { useMemo, useState } from 'react'
+import { AlertTriangle, ExternalLink, MonitorPlay, RefreshCw, Server } from 'lucide-react'
 import { fetchInfraStatus } from '../../api/client'
+import { ErrorState, LoadingState, ResourceMeta } from '../shared/AsyncState'
+import { usePollingResource } from '../../hooks/usePollingResource'
 
 // In production (via Nginx on port 8080): iframes load through the auth bouncer.
 // In local dev (no Nginx): open localUrl directly in a separate tab.
@@ -11,28 +13,18 @@ const IFRAMES = [
 
 export const InfraIframes: React.FC = () => {
     const [activeIframe, setActiveIframe] = useState(IFRAMES[0])
-    const [statusById, setStatusById] = useState<Record<string, { ok: boolean; status_code: number | null; url: string; detail: string | null }>>({})
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
+    const {
+        data,
+        loading,
+        refreshing,
+        error,
+        lastUpdated,
+        stale,
+        refresh,
+    } = usePollingResource(fetchInfraStatus, { pollIntervalMs: 30_000 })
+    const statusById = data?.targets ?? {}
 
     const activeStatus = useMemo(() => statusById[activeIframe.id], [statusById, activeIframe.id])
-
-    const loadStatuses = async () => {
-        setLoading(true)
-        setError(null)
-        try {
-            const data = await fetchInfraStatus()
-            setStatusById(data.targets ?? {})
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load infrastructure status')
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    useEffect(() => {
-        void loadStatuses()
-    }, [])
 
     return (
         <div className="h-full flex flex-col space-y-4">
@@ -54,32 +46,27 @@ export const InfraIframes: React.FC = () => {
                 </div>
                 <button
                     type="button"
-                    onClick={() => void loadStatuses()}
+                    onClick={() => void refresh()}
                     className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100"
                 >
-                    <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                    <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
                     Refresh Status
                 </button>
             </div>
 
+            <div className="flex justify-end">
+                <ResourceMeta lastUpdated={lastUpdated} refreshing={refreshing} stale={stale} />
+            </div>
+
             <div className="flex-1 bg-[#F7F7F5] rounded-xl border border-stone-200 overflow-hidden relative shadow-sm">
                 {loading ? (
-                    <div className="flex h-full items-center justify-center bg-white text-stone-500">
-                        <div className="flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-4 py-3 shadow-sm">
-                            <LoaderCircle size={18} className="animate-spin" />
-                            Checking internal dashboard availability...
-                        </div>
+                    <div className="bg-white h-full">
+                        <LoadingState label="Checking internal dashboard availability..." />
                     </div>
                 ) : error ? (
                     <div className="flex h-full items-center justify-center p-8">
-                        <div className="max-w-lg rounded-xl border border-red-200 bg-red-50 p-6 text-red-700 shadow-sm">
-                            <div className="flex items-start gap-3">
-                                <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-                                <div>
-                                    <p className="font-semibold">Infrastructure status check failed</p>
-                                    <p className="mt-2 text-sm">{error}</p>
-                                </div>
-                            </div>
+                        <div className="max-w-lg w-full">
+                            <ErrorState title="Infrastructure status check failed" detail={error} onRetry={() => void refresh()} />
                         </div>
                     </div>
                 ) : activeStatus?.ok === false ? (
@@ -105,7 +92,7 @@ export const InfraIframes: React.FC = () => {
                                         </a>
                                         <button
                                             type="button"
-                                            onClick={() => void loadStatuses()}
+                                            onClick={() => void refresh()}
                                             className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100"
                                         >
                                             <RefreshCw size={14} />

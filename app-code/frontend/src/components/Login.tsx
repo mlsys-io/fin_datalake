@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Database } from 'lucide-react'
-import { fetchMe } from '../api/client'
+import { fetchMe, loginWithPassword } from '../api/client'
 import { useAuthStore } from '../store/useAuthStore'
 
 export const Login: React.FC = () => {
@@ -17,17 +17,7 @@ export const Login: React.FC = () => {
         setLoading(true)
 
         try {
-            const res = await fetch('/api/v1/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ username, password })
-            })
-
-            if (!res.ok) {
-                const errData = await res.json()
-                throw new Error(errData.detail || 'Login failed')
-            }
+            await loginWithPassword(username, password)
 
             // If login succeeded, fetch the user profile
             const userProfile = await fetchMe()
