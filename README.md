@@ -33,22 +33,19 @@ For the detailed interaction model, read [compute-gateway-overseer.md](docs/arch
 - Deploy the baseline fleet:
 
 ```bash
-cd app-code
-uv run etl-agents deploy-baseline
+bash ./scripts/verify/01-deploy-baseline.sh
 ```
 
-- Inspect current fleet state:
+- Run the control-plane smoke check:
 
 ```bash
-cd app-code
-uv run etl-agents list
+bash ./scripts/verify/02-control-plane-smoke.sh
 ```
 
-- Run the self-healing demo:
+- Run the full verification pass:
 
 ```bash
-cd app-code
-uv run python pipelines/self_healing_demo.py
+bash ./scripts/verify/run-all.sh
 ```
 
 ## Documentation Map
@@ -58,6 +55,7 @@ uv run python pipelines/self_healing_demo.py
 - Architecture overview and subsystem narratives: [docs/README.md](docs/README.md)
 - Control-plane interaction model: [docs/architecture/compute-gateway-overseer.md](docs/architecture/compute-gateway-overseer.md)
 - Final demo plan: [docs/FINAL_DEMO_PLAN.md](docs/FINAL_DEMO_PLAN.md)
+- Verification scripts and run order: [scripts/verify/README.md](scripts/verify/README.md)
 
 ## Repository Layout
 
@@ -76,3 +74,4 @@ zdb_deployment/
 - Gateway reads from the durable catalog and enriches from live runtime state when available.
 - Overseer reconciles catalog desired state against normalized Serve application state from the Ray collector.
 - The self-healing demo uses the same deployment lifecycle utilities as the rest of the platform.
+- The preferred correctness-check entrypoint now lives under `scripts/verify/`.
