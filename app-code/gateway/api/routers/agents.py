@@ -7,7 +7,7 @@ These routes remain thin wrappers over the shared dispatch pipeline.
 
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 
 from gateway.api.deps import get_current_user, get_registry
@@ -15,6 +15,7 @@ from gateway.core.adapters import ActionNotFoundError, PermissionError
 from gateway.core.dispatch import CircuitBreakerOpenError, dispatch
 from gateway.core.registry import DomainNotFoundError, InterfaceRegistry
 from gateway.models.user import User
+from gateway.api.errors import api_error
 
 router = APIRouter()
 
@@ -51,15 +52,35 @@ async def _dispatch_agent_action(
         )
         return result.data
     except CircuitBreakerOpenError as e:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+        raise api_error(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e),
+            code="circuit_breaker_open",
+        )
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise api_error(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+            code="permission_denied",
+        )
     except DomainNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+            code="domain_not_found",
+        )
     except ActionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        raise api_error(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e),
+            code="action_not_found",
+        )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise api_error(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+            code="invalid_request",
+        )
 
 
 @router.get("", summary="List all registered agents")

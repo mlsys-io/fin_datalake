@@ -13,7 +13,7 @@ Endpoints:
   DELETE /api-keys/{id}— Revoke an API Key by ID
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,7 @@ from gateway.api.deps import create_jwt, get_current_user, get_db
 from gateway.db import crud
 from gateway.models.user import User
 from gateway.core.rbac import rbac_provider
+from gateway.api.errors import api_error
 
 router = APIRouter()
 
@@ -67,9 +68,10 @@ async def login(
     """
     user = await crud.authenticate_user(db, body.username, body.password)
     if not user:
-        raise HTTPException(
+        raise api_error(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password.",
+            code="invalid_credentials",
         )
 
     token = create_jwt(user.username)
@@ -180,8 +182,10 @@ async def revoke_api_key(
     """Permanently revoke an API Key by ID. The key cannot be restored."""
     revoked = await crud.revoke_api_key(db, key_id, current_user.username)
     if not revoked:
-        raise HTTPException(
+        raise api_error(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"API key '{key_id}' not found or does not belong to you.",
+            code="api_key_not_found",
+            context={"key_id": key_id},
         )
     return {"message": f"API key '{key_id}' has been revoked."}

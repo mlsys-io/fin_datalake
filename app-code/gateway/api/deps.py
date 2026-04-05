@@ -15,7 +15,7 @@ Auth Flow:
 import os
 from datetime import datetime, timezone, timedelta
 
-from fastapi import Cookie, Depends, HTTPException, Request, status
+from fastapi import Cookie, Depends, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +26,7 @@ from gateway.core.registry import InterfaceRegistry
 from gateway.db.session import get_db
 from gateway.db import crud
 from gateway.models.user import User
+from gateway.api.errors import api_error
 
 # ---------------------------------------------------------------------------
 # 1. Registry Dependency
@@ -35,9 +36,10 @@ def get_registry(request: Request) -> InterfaceRegistry:
     """Return the singleton InterfaceRegistry from app state (set at startup)."""
     registry: InterfaceRegistry = getattr(request.app.state, "registry", None)
     if registry is None:
-        raise HTTPException(
+        raise api_error(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Gateway registry is not initialized.",
+            code="registry_unavailable",
         )
     return registry
 
@@ -101,9 +103,10 @@ async def get_current_user(
             user = await crud.get_user_by_username(db, username)
 
     if user is None:
-        raise HTTPException(
+        raise api_error(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated. Provide a Bearer token or log in via /api/v1/auth/login.",
+            code="not_authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user

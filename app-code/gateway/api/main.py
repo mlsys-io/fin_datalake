@@ -14,8 +14,10 @@ Usage:
     # uvicorn gateway.api.main:create_app --factory --reload
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 # -- Routers --
 from gateway.api.routers import auth as auth_router
@@ -29,6 +31,8 @@ from gateway.core.registry import build_default_registry
 
 # -- Database --
 from gateway.db.session import init_db
+from gateway.api.errors import normalize_error_payload
+from gateway.services.system import build_readiness_report
 
 
 def create_app() -> FastAPI:
@@ -73,6 +77,28 @@ def create_app() -> FastAPI:
         app.state.ray_ready = init_gateway_ray()
         app.state.registry = build_default_registry()
 
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(_: Request, exc: HTTPException):
+        payload = normalize_error_payload(exc.detail)
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=payload,
+            headers=exc.headers,
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(_: Request, exc: RequestValidationError):
+        return JSONResponse(
+            status_code=422,
+            content=normalize_error_payload(
+                {
+                    "detail": "Request validation failed.",
+                    "code": "validation_error",
+                    "context": {"errors": exc.errors()},
+                }
+            ),
+        )
+
     # -------------------------------------------------------------------------
     # Routers
     # -------------------------------------------------------------------------
@@ -88,6 +114,12 @@ def create_app() -> FastAPI:
     @app.get("/healthz", tags=["System"])
     def health_check():
         return {"status": "ok"}
+
+    @app.get("/readyz", tags=["System"])
+    async def readiness_check():
+        report = await build_readiness_report(app)
+        status_code = 200 if report["ready"] else 503
+        return JSONResponse(status_code=status_code, content=report)
 
     return app
 

@@ -3,16 +3,14 @@ System Router — /api/v1/system
 Dedicated control endpoints for system-level operations (backpressure, maintenance, etc).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
-from typing import Optional
-import os
-from redis.asyncio import Redis
-import httpx
 
 from gateway.api.deps import get_current_user
 from gateway.models.user import User
 from gateway.core.rbac import Permission, rbac_provider
+from gateway.api.errors import api_error
+from gateway.services.system import fetch_overseer_alerts, fetch_overseer_snapshots, probe_infra_targets
 
 router = APIRouter()
 
@@ -32,9 +30,10 @@ async def set_circuit_breaker(
     """
     # Authorization check
     if not rbac_provider.is_authorized(user.role_names, Permission.SYSTEM_ADMIN):
-        raise HTTPException(
+        raise api_error(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: SYSTEM_ADMIN permission required.",
+            code="permission_denied",
         )
 
     state = body.state.lower()
@@ -44,7 +43,11 @@ async def set_circuit_breaker(
     from gateway.core.redis import get_redis_client
     r = get_redis_client()
     if not r:
-        raise HTTPException(status_code=500, detail="Redis not configured")
+        raise api_error(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Redis not configured",
+            code="redis_not_configured",
+        )
     
     async with r:
         if state == "open":
@@ -69,38 +72,14 @@ async def get_overseer_snapshots(
     Fetch historical heartbeat snapshots from Overseer Redis (db 1).
     Uses a dedicated connection to avoid contaminating the shared gateway Redis pool.
     """
-    import json
-    from redis.asyncio import Redis as AsyncRedis
-    from gateway.core import config
-
-    if not config.REDIS_URL:
-        raise HTTPException(status_code=500, detail="Redis not configured")
-
-    # Build a dedicated db=1 URL robustly using urllib.parse
-    from urllib.parse import urlparse, urlunparse
-    parsed = urlparse(config.REDIS_URL)
-    # The path component of a redis:// URL is the db number (e.g. "/0" or "/1")
-    overseer_redis_url = urlunparse(parsed._replace(path='/1'))
-
     try:
-        r = AsyncRedis.from_url(overseer_redis_url, decode_responses=True)
-        async with r:
-            items = await r.lrange("overseer:snapshots", 0, n - 1)
-
-        result = []
-        for item in reversed(items):
-            try:
-                snap = json.loads(item)
-                entry = {
-                    "timestamp": snap.get("timestamp"),
-                    "services": snap.get("services", {})
-                }
-                result.append(entry)
-            except Exception:
-                continue
-        return result
+        return await fetch_overseer_snapshots(n)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise api_error(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+            code="overseer_snapshots_unavailable",
+        )
 
 @router.get("/overseer/alerts", summary="Retrieve recent autonomic actions taken by the Overseer")
 async def get_overseer_alerts(
@@ -111,25 +90,14 @@ async def get_overseer_alerts(
     Fetch recent alert logs from Overseer Redis (db 1).
     Uses a dedicated connection to avoid contaminating the shared gateway Redis pool.
     """
-    import json
-    from redis.asyncio import Redis as AsyncRedis
-    from gateway.core import config
-
-    if not config.REDIS_URL:
-        raise HTTPException(status_code=500, detail="Redis not configured")
-
-    from urllib.parse import urlparse, urlunparse
-    parsed = urlparse(config.REDIS_URL)
-    overseer_redis_url = urlunparse(parsed._replace(path='/1'))
-
     try:
-        r = AsyncRedis.from_url(overseer_redis_url, decode_responses=True)
-        async with r:
-            items = await r.lrange("overseer:alerts", 0, n - 1)
-        return [json.loads(i) for i in items]
+        return await fetch_overseer_alerts(n)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        raise api_error(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+            code="overseer_alerts_unavailable",
+        )
 
 @router.get("/infra/status", summary="Probe internal UI targets such as Prefect and Ray")
 async def get_infra_status(
@@ -139,29 +107,4 @@ async def get_infra_status(
     Perform short health probes against internal dashboard targets so the
     frontend can avoid loading hanging iframes when a service is down.
     """
-    targets = {
-        "prefect": os.environ.get("PREFECT_UI_URL", "http://127.0.0.1:4200"),
-        "ray": os.environ.get("RAY_DASHBOARD_URL", "http://127.0.0.1:32382"),
-        "minio": os.environ.get("MINIO_CONSOLE_URL", "http://127.0.0.1:9001"),
-    }
-
-    async with httpx.AsyncClient(timeout=2.0, follow_redirects=True) as client:
-        results = {}
-        for name, url in targets.items():
-            try:
-                response = await client.get(url)
-                results[name] = {
-                    "ok": response.status_code < 500,
-                    "status_code": response.status_code,
-                    "url": url,
-                    "detail": None,
-                }
-            except Exception as e:
-                results[name] = {
-                    "ok": False,
-                    "status_code": None,
-                    "url": url,
-                    "detail": str(e),
-                }
-
-    return {"targets": results}
+    return await probe_infra_targets()
