@@ -1,193 +1,154 @@
-# ETL Framework
+# Application Workspace Guide
 
-A distributed ETL framework built on Prefect and Ray for scalable data pipelines.
+This directory contains the runnable platform code: ETL framework modules, Ray Serve agents, the gateway, the overseer, pipelines, and the frontend.
 
-## Quick Start
+## Environment Setup
 
-```bash
-cd ~/zdb_deployment/app-code
-source ~/zdb_deployment/.env
-source .venv/bin/activate
-
-# Configure Prefect to use dedicated server
-prefect config set PREFECT_API_URL="http://${NODE_IP}:30420/api"
-
-# Run a pipeline
-python pipelines/demo_pipeline.py
-```
-
----
-
-## Installation
-
-### 1. Create Virtual Environment
+Use Python 3.12 for the client environment if you connect to the Ray cluster through Ray Client.
 
 ```bash
 cd ~/zdb_deployment/app-code
 python3.12 -m venv .venv
 source .venv/bin/activate
-```
-
-Use Python `3.12.9` when you create the client environment if you are connecting to the Ray cluster via `ray://...`.
-
-### 2. Install Dependencies
-
-```bash
-# Install the ETL framework package
 pip install -e .
-
-# Install client dependencies
 pip install -r requirements-client.txt
-
-# Install Ray (must match cluster version)
-pip install "ray[default]==2.54.0"
-```
-
-### 3. Configure Services
-
-```bash
-# Generate environment variables
-cd ~/zdb_deployment
-bash setup-config.sh
-source .env
-
-# Configure Prefect to use dedicated server
-prefect config set PREFECT_API_URL="http://${NODE_IP}:30420/api"
-
-# Verify configuration
-prefect config view
-echo "RAY_ADDRESS=$RAY_ADDRESS"
-```
-
-### 4. Verify Connection
-
-```bash
-# Test Ray connection
-python3 -c "import ray; ray.init(address='$RAY_ADDRESS'); print('✅ Ray connected:', ray.cluster_resources())"
-
-# Test Prefect connection (should NOT show "temporary server")
-python pipelines/demo_pipeline.py
-```
-
----
-
-## ⚠️ Important: Import Pattern for Ray Execution
-
-Since pipelines run on **Ray workers** (not your local machine), heavy dependencies must be imported **inside task functions**, not at module level.
-
-### ❌ WRONG - Will fail on client
-
-```python
-from etl.io.sinks.delta_lake import DeltaLakeSink  # Imports pyarrow, deltalake
-from etl.agents import BaseAgent  # Imports ray
-
-@task
-def my_task():
-    sink = DeltaLakeSink(...)  # Already imported at module level!
-```
-
-### ✅ CORRECT - Import inside task
-
-```python
-from prefect import flow, task
-
-@task
-def write_to_delta(data: list, uri: str):
-    # Import INSIDE the task - runs on Ray worker
-    from etl.io.sinks.delta_lake import DeltaLakeSink
-    
-    sink = DeltaLakeSink(uri=uri, ...)
-    with sink.open() as writer:
-        writer.write_batch(data)
-
-@flow
-def my_pipeline():
-    write_to_delta(data, "s3://bucket/table")
-```
-
-### Summary
-
-| Import Location | When Executed | Works on Client? |
-|-----------------|---------------|------------------|
-| Module level (top of file) | On `import` | ❌ No (missing deps) |
-| Inside `@task` function | On Ray worker | ✅ Yes |
-| Inside `@flow` function | On client | ❌ No |
-
----
-
-## Module Overview
-
-### `etl.core`
-- `BaseTask` - Base class for ETL tasks
-- `ServiceTask` - Base class for long-running services (Ray Actors)
-
-### `etl.io.sources`
-- `RestApiSource` - REST API consumption with pagination
-- `KafkaSource` - Kafka topic consumption
-- `WebSocketSource` - WebSocket streaming
-- `DeltaLakeSource` - Read from Delta Lake tables
-
-### `etl.io.sinks`
-- `DeltaLakeSink` - Write to Delta Lake with Hive registration
-- `TimescaleDBSink` - Write to TimescaleDB
-- `MilvusSink` - Write to Milvus vector database
-- `HttpSink` - Send to webhooks/APIs
-
-### `etl.agents`
-- `BaseAgent` - Base class for AI agents (Ray Actor)
-- `AgentHub` - Central coordination: discovery, routing, notifications
-- `ContextStore` - Shared state for agent coordination
-
----
-
-## Running Pipelines
-
-```bash
-# Activate environment
-cd ~/zdb_deployment/app-code
-source .venv/bin/activate
 source ~/zdb_deployment/.env
-
-# Run a specific pipeline
-python pipelines/demo_pipeline.py
-python pipelines/api_to_delta_pipeline.py
-python pipelines/kafka_to_delta_pipeline.py
 ```
 
----
+If you use Prefect against the cluster deployment:
+
+```bash
+prefect config set PREFECT_API_URL="http://${NODE_IP}:30420/api"
+```
+
+## Main Services
+
+### Gateway
+
+```bash
+cd ~/zdb_deployment/app-code
+uv run uvicorn gateway.api.main:app --host 0.0.0.0 --port 8000
+```
+
+### Overseer
+
+```bash
+cd ~/zdb_deployment/app-code
+uv run python -m overseer.main
+```
+
+### Frontend
+
+```bash
+cd ~/zdb_deployment/app-code/frontend
+npm install
+npm run dev
+```
+
+## Agent Lifecycle Commands
+
+The standard deployment management surface now lives behind `etl-agents`.
+
+### List the baseline fleet profile
+
+```bash
+cd ~/zdb_deployment/app-code
+uv run etl-agents profiles
+```
+
+### Deploy one named agent
+
+```bash
+cd ~/zdb_deployment/app-code
+uv run etl-agents deploy SupportAgent --name SupportAgent
+```
+
+### Deploy the baseline fleet
+
+```bash
+cd ~/zdb_deployment/app-code
+uv run etl-agents deploy-baseline
+```
+
+### Delete one deployment intentionally
+
+Use catalog cleanup when you do not want Overseer to bring the deployment back.
+
+```bash
+cd ~/zdb_deployment/app-code
+uv run etl-agents delete SupportAgent --clean-catalog
+```
+
+### Delete the baseline fleet
+
+```bash
+cd ~/zdb_deployment/app-code
+uv run etl-agents delete-baseline --clean-catalog
+```
+
+### Inspect merged catalog and runtime state
+
+```bash
+cd ~/zdb_deployment/app-code
+uv run etl-agents list
+```
+
+## Demo And Validation Workflows
+
+### Deploy baseline test agents
+
+```bash
+cd ~/zdb_deployment/app-code
+uv run python scripts/deploy_test_agents.py
+```
+
+### Run the self-healing demo
+
+```bash
+cd ~/zdb_deployment/app-code
+uv run python pipelines/self_healing_demo.py
+```
+
+### Run focused regression tests
+
+```bash
+cd ~/zdb_deployment/app-code
+uv run --extra overseer pytest tests/test_agent_control_live_detection.py tests/test_agent_hub_stale_cleanup.py tests/test_agent_manager_cli.py
+```
+
+## Workspace Responsibilities
+
+- `etl/`: framework code, deployment utilities, runtime helpers, and agent infrastructure
+- `gateway/`: API layer, auth, adapters, and integration surface for the frontend
+- `overseer/`: collectors, policies, actuators, and the control loop
+- `pipelines/`: Prefect flows and demo workflows
+- `scripts/`: operational helpers and smoke-test entrypoints
 
 ## Troubleshooting
 
-### "Starting temporary server" message
-Prefect isn't using your dedicated server. Fix:
+### Prefect starts a temporary server
+
 ```bash
-prefect config set PREFECT_API_URL="http://172.28.176.60:30420/api"
+prefect config set PREFECT_API_URL="http://${NODE_IP}:30420/api"
 ```
 
-### "Creating a local Ray instance" message
-Ray isn't connecting to the cluster. Fix:
+### Ray connects to a local instance instead of the cluster
+
 ```bash
-# Make sure RAY_ADDRESS is set
 source ~/zdb_deployment/.env
-echo $RAY_ADDRESS  # Should show ray://IP:PORT
-
-# Test connection
-python3 -c "import ray; ray.init(address='$RAY_ADDRESS'); print(ray.cluster_resources())"
+echo "$RAY_ADDRESS"
 ```
 
-### Version mismatch error
-Ray client version and Python version should match the cluster. Check cluster version:
-```bash
-kubectl exec -n etl-compute $(kubectl get pods -n etl-compute -l app=ray-head -o name | head -1) -- pip show ray | grep Version
-```
-Then install matching version locally:
-```bash
-pip install "ray[default]==<version>"
-```
+### `/api/v1/agents` falls back to catalog-only state
 
-### ModuleNotFoundError: 'etl'
-Install the package:
-```bash
-cd ~/zdb_deployment/app-code
-pip install -e .
-```
+Check:
+
+- Ray cluster health
+- AgentHub availability inside Ray
+- Overseer snapshot output at `/api/v1/system/overseer/snapshots?n=1`
+
+## Read Next
+
+- Framework and API details: [etl/README.md](etl/README.md)
+- Control-plane interaction model: [../docs/architecture/compute-gateway-overseer.md](../docs/architecture/compute-gateway-overseer.md)
+- Final demo plan reference: [../docs/FINAL_DEMO_PLAN.md](../docs/FINAL_DEMO_PLAN.md)

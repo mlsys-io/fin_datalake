@@ -1,256 +1,140 @@
-# AI-Native Lakehouse ETL Framework
+# ETL And Agent Framework Guide
 
-This framework provides a modular, platform-agnostic way to build distributed data pipelines and AI Agents. It leverages **Prefect** for orchestration and **Ray** for scalable computation.
+This guide explains the framework layer used by the compute, gateway, and overseer services. It covers the ETL runtime, Serve-backed agents, the durable catalog, and the standard deployment management helpers.
 
-## 🏗 Architecture Layers
+## Core Building Blocks
 
-1.  **Ingestion Layer (`etl.io.sources`)**: Fetches data from APIs, Streams, Files, or Databases.
-2.  **Storage Layer (`etl.io.sinks`)**: Writers for Delta Lake (History), TimescaleDB (Metrics), Milvus (Vectors), and HTTP endpoints.
-3.  **Processing Layer (`etl.core`)**: Distributed Tasks (`BaseTask`) and Stateful Services (`ServiceTask`) running on Ray.
-4.  **Services Layer (`etl.services`)**: Long-running services for streaming, Hive registration, MinIO management, etc.
-5.  **Intelligence Layer (`etl.agents`)**: AI Agents hosted as persistent Ray Actors with coordination via AgentHub and ContextStore.
+### BaseTask
 
----
+`BaseTask` is the unit-of-work abstraction for distributed ETL tasks. It is appropriate for finite compute steps that can be submitted and retried through Ray and Prefect.
 
-## 🧩 Component Reference
+### ServiceTask
 
-### 1. Data Sources (`etl.io.sources`)
-Configuration objects that define *where* data comes from.
-*   **`RestApiSource`**: Polls JSON APIs (News, Prices) with pagination and auth.
-*   **`WebSocketSource`**: Connects to live streams and yields micro-batches.
-*   **`FileSource`**: Reads large static files (CSV, Parquet) using Ray Data.
-*   **`KafkaSource`**: Consumes events from Kafka topics with micro-batching.
-*   **`DeltaLakeSource`** *(direct import)*: Reads from Delta Lake tables.
-*   **`RisingWaveSource`** *(direct import)*: Reads from the Streaming Database.
+`ServiceTask` is the base for long-running Ray actors and service-style workloads. It provides the deploy/connect pattern used by persistent components.
 
-### 2. Data Sinks (`etl.io.sinks`)
-Configuration objects that define *where* data goes.
-*   **`DeltaLakeSink`**: The "Source of Truth". Writes Parquet to S3/MinIO and **auto-registers to Hive**.
-*   **`TimescaleDBSink`**: Optimized for high-frequency time-series metrics.
-*   **`MilvusSink`**: Stores vector embeddings for RAG.
-*   **`HttpSink`**: Sends data to webhooks/APIs with retry and auth support.
+### BaseAgent
 
-### 3. Processing & Services (`etl.core`, `etl.services`)
-*   **`BaseTask`**: Unit of distributed work. Runs on Ray workers via `@ray.remote`.
-*   **`ServiceTask`**: Long-running actor base class. Provides `deploy()`, `connect()`, and `SyncHandle`.
-*   **`StatefulProcessorService`**: Streaming service with windowed aggregations (WebSocket → TimescaleDB).
+`BaseAgent` is the request-driven agent container for Ray Serve. Its main responsibilities are:
 
-### 4. AI Agents (`etl.agents`)
-*   **`BaseAgent`**: The "Container". Deploy as a Ray Actor via `deploy()`. Handles lifecycle, messaging, and coordination.
-*   **`LangChainAgent`**: A helper for Agents built with LangChain/LangGraph.
-*   **`Tools`**: Pre-built wrappers for Sinks (e.g., `TimescaleTool`, `MilvusTool`).
+- deploy a Serve application with a stable app name
+- register typed capabilities in AgentHub
+- upsert a durable catalog entry
+- expose `invoke`, `chat`, delegation, and event-handling paths
 
-### 5. Agent Coordination (`etl.agents`)
-*   **`AgentHub`**: Central coordination — service discovery, synchronous routing, notifications, health monitoring.
-*   **`ContextStore`**: Shared key-value state with TTL for cross-agent collaboration.
-*   **`SyncHandle`**: Proxy that removes `ray.get`/`.remote()` boilerplate. Supports `async_` prefix for fire-and-forget.
+## Coordination Components
 
----
+### AgentHub
 
-## 🚀 Usage Guide
+AgentHub is the live runtime registry inside Ray. It provides:
 
-### A. Building a Data Pipeline
-Combine a Source and a Sink in a Prefect Flow.
+- capability-based discovery
+- live agent listing
+- request routing by capability or explicit name
+- lightweight liveness checks for Serve apps
 
-```python
-from prefect import flow
-from prefect_ray.task_runners import RayTaskRunner
-from etl.io.sources.rest_api import RestApiSource
-from etl.io.sinks.delta_lake import DeltaLakeSink
+AgentHub is intentionally live-only. It does not replace the durable catalog.
 
-@flow(task_runner=RayTaskRunner)
-def ingest_news():
-    # 1. Define Config
-    source = RestApiSource(url="https://api.market.com/news", auth=...)
-    sink = DeltaLakeSink(uri="s3://lake/news", hive_table_name="default.news")
+### Durable Agent Catalog
 
-    # 2. Run Task (Generic Ingestion Logic)
-    ingest_task.submit(source, sink)
+The catalog in `etl.agents.catalog` stores durable deployment records used by:
+
+- Gateway, for catalog-backed listing and fallback behavior
+- Overseer, for reconciliation and recovery
+- demos and scripts, for checking control-plane state
+
+Each entry stores both desired state and observed runtime state, including:
+
+- `desired_status`
+- `observed_status`
+- `health_status`
+- `recovery_state`
+- `last_failure_reason`
+- deployment metadata needed for respawn
+
+## Deployment Management Helpers
+
+The standard deployment lifecycle utilities now live in `etl.agents.manager`.
+
+### Available Helpers
+
+- `deploy_agent(...)`
+- `deploy_fleet(...)`
+- `deploy_baseline_fleet()`
+- `delete_agent(...)`
+- `delete_fleet(...)`
+- `delete_baseline_fleet()`
+- `list_fleet_state()`
+- `baseline_fleet_specs()`
+
+These helpers are deployment-aware rather than demo-specific. They use:
+
+- `BaseAgent.deploy()` for creation
+- `serve.delete(...)` for intentional removal
+- catalog cleanup helpers when a deployment should not be restored by Overseer
+
+### Baseline Fleet
+
+The built-in baseline fleet currently consists of:
+
+- `SupportAgent`
+- `SentimentModel-1`
+- `ForecastModel-1`
+- `RouterAgent`
+
+That same fleet definition is used by:
+
+- the CLI
+- `scripts/deploy_test_agents.py`
+- operational workflows that need a stable baseline profile
+
+## CLI Surface
+
+The project exposes the lifecycle helper through the `etl-agents` command.
+
+```bash
+cd ~/zdb_deployment/app-code
+uv run etl-agents deploy-baseline
+uv run etl-agents list
+uv run etl-agents delete SupportAgent --clean-catalog
 ```
 
-### B. Deploying an AI Agent
-Define the Agent logic and deploy it as a persistent service.
+This CLI is the recommended operator entrypoint for intentional agent lifecycle actions.
+
+## Typical Interaction Flow
+
+### Deploy
+
+1. A deployment helper resolves the agent class.
+2. `BaseAgent.deploy()` creates the Ray Serve app.
+3. The agent registers itself with AgentHub.
+4. The agent upserts its durable catalog entry.
+5. Gateway and Overseer can now observe the deployment through both live and durable paths.
+
+### Recover
+
+1. The Serve app disappears or becomes unhealthy.
+2. Overseer compares the catalog against normalized Serve state from the Ray collector.
+3. Overseer plans a `RESPAWN` for managed desired deployments that are missing.
+4. The actuator redeploys the same Serve app name using catalog metadata.
+
+### Intentionally Delete
+
+1. An operator deletes the Serve app through the manager or CLI.
+2. The operator also cleans the catalog entry when the deployment should stay gone.
+3. Because the desired-state record is removed, Overseer does not respawn it.
+
+## Example
 
 ```python
-from sample_agents.market_analyst import MarketAnalystAgent
+from etl.agents.manager import deploy_agent, delete_agent, list_fleet_state
 
-# Deploy on the Cluster — returns SyncHandle
-agent = MarketAnalystAgent.deploy(name="MarketAnalyst", num_cpus=1)
-
-# Interact — no ray.get/.remote() needed
-response = agent.ask("What is the trend for AAPL?")
-print(response)
-
-# Fire-and-forget (async_ prefix)
-agent.async_notify({"topic": "alert", "payload": {"msg": "New earnings data"}})
+deploy_agent("SupportAgent", name="SupportAgent")
+state = list_fleet_state()
+delete_agent("SupportAgent", clean_catalog=True)
 ```
 
-### C. Accessing Services in Pipelines
-Connect to running agents from within your Prefect Tasks.
+## Related Documents
 
-```python
-from etl.agents import BaseAgent
-
-@task
-def ask_analyst_agent(question: str):
-    # connect() retrieves an existing actor by name — returns SyncHandle
-    analyst = BaseAgent.connect("MarketAnalyst")
-    return analyst.ask(question)
-```
-
-### D. Agent Coordination
-Agents coordinate via AgentHub and ContextStore.
-
-```python
-from etl.agents import get_hub, get_context
-from etl.core.base_service import SyncHandle
-
-hub = SyncHandle(get_hub())
-ctx = SyncHandle(get_context())
-
-# Discovery + routing
-analysts = hub.find_by_capability("analysis")
-result = hub.call_by_capability("analysis", payload)
-
-# Notifications
-hub.notify_capability("analysis", event)
-
-# Shared state with TTL
-ctx.set("signal:aapl", "BUY", owner="AnalystAgent", ttl=300)
-signal = ctx.get("signal:aapl")
-```
-
-### E. Event-Driven Pipeline with Kafka
-Consume from Kafka and write to Delta Lake.
-
-```python
-from etl.io.sources.kafka import KafkaSource
-from etl.io.sinks.delta_lake import DeltaLakeSink
-
-@flow
-def kafka_to_delta():
-    source = KafkaSource(
-        bootstrap_servers="localhost:9092",
-        topics=["events"],
-        batch_size=100
-    )
-    sink = DeltaLakeSink(uri="s3://lake/events")
-    
-    with source.open() as reader:
-        with sink.open() as writer:
-            for batch in reader.read_batch():
-                writer.write_batch(batch)
-```
-
-### F. Deploying a Streaming Service
-Deploy a stateful processor with monitoring.
-
-```python
-from etl.services.processing.stateful_processor import StatefulProcessorService
-
-svc = StatefulProcessorService.deploy(
-    name="CryptoProcessor",
-    config={
-        "source_config": {"url": "wss://ws.bitstamp.net"},
-        "sink_config": {"host": "localhost", "database": "mydb", "table_name": "crypto"},
-        "window_seconds": 5,
-    },
-)
-
-svc.async_run()              # Start streaming loop (fire-and-forget)
-status = svc.get_status()    # Poll metrics
-svc.stop()                   # Graceful shutdown
-```
-
-### G. Sending Notifications via HTTP
-Send processed data to a webhook endpoint.
-
-```python
-from etl.io.sinks.http import HttpSink
-
-sink = HttpSink(
-    url="https://api.slack.com/webhook",
-    auth_token="xoxb-token",
-    batch_key="events"
-)
-
-with sink.open() as writer:
-    writer.write_batch([{"event": "pipeline_complete", "count": 100}])
-```
-
----
-
-## 🛠 Developer Guide: Extending the Framework
-
-You can easily create your own components by inheriting from the base classes.
-
-### 1. Creating a Custom Source
-Use `DataSource` for config and `DataReader` for runtime logic.
-
-```python
-from etl.io.base import DataSource, DataReader
-
-# 1. The Config (Serializable)
-@dataclass
-class TwitterSource(DataSource):
-    api_key: str
-    query: str
-    
-    def open(self):
-        return TwitterReader(self)
-
-# 2. The Runtime (Worker)
-class TwitterReader(DataReader):
-    def read_batch(self):
-        # Connect and yield lists of dicts
-        client = TwitterClient(self.source.api_key)
-        yield client.search(self.source.query)
-```
-
-### 2. Creating a Custom Sink
-Use `DataSink` and `DataWriter`.
-
-```python
-from etl.io.base import DataSink, DataWriter
-
-# 1. The Config
-@dataclass
-class SlackSink(DataSink):
-    webhook_url: str
-    
-    def open(self):
-        return SlackWriter(self)
-
-# 2. The Runtime
-class SlackWriter(DataWriter):
-    def write_batch(self, data):
-        # Post data to Slack
-        requests.post(self.sink.webhook_url, json={"text": str(data)})
-```
-
-### 3. Creating a Custom Agent
-Inherit from `BaseAgent` (or `LangChainAgent`) and implement `build_executor`.
-
-```python
-from etl.agents import BaseAgent
-
-class SentimentAgent(BaseAgent):
-    CAPABILITIES = ["sentiment"]
-
-    def build_executor(self):
-        # Return any callable. Could be a pure function or a complex chain.
-        def _analyze(text):
-            return "Positive" if "good" in text else "Negative"
-        return _analyze
-
-# Deploy — one-liner, returns SyncHandle
-agent = SentimentAgent.deploy(name="SentimentAgent")
-print(agent.ask("This is good code"))  # -> "Positive"
-
-# From another process:
-agent = SentimentAgent.connect("SentimentAgent")
-agent.ask("Market looks bad")  # -> "Negative"
-
-# Graceful shutdown
-agent.shutdown()
-```
+- Workspace and operations guide: [../README.md](../README.md)
+- Platform interaction model: [../../docs/architecture/compute-gateway-overseer.md](../../docs/architecture/compute-gateway-overseer.md)
+- Final demo plan reference: [../../docs/FINAL_DEMO_PLAN.md](../../docs/FINAL_DEMO_PLAN.md)
