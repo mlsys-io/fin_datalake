@@ -71,6 +71,81 @@ def _extract_replica_counts(info: Mapping[str, object]) -> dict[str, int]:
     return replica_counts
 
 
+def _summarize_serve_application(
+    *,
+    name: str,
+    app_status: str,
+    route_prefix,
+    deployments: list[dict[str, object]],
+    replica_counts: dict[str, int],
+) -> dict[str, object]:
+    running_replicas = 0
+    unhealthy_replicas = 0
+    for state, count in replica_counts.items():
+        if state in {"RUNNING", "HEALTHY"}:
+            running_replicas += count
+        else:
+            unhealthy_replicas += count
+
+    deployment_states = [str(deployment.get("status") or "").upper() for deployment in deployments]
+    healthy_statuses = {"RUNNING", "HEALTHY"}
+    recovering_statuses = {"DEPLOYING", "UPDATING", "STARTING", "RESTARTING"}
+    degraded_statuses = {"UNHEALTHY", "DEPLOY_FAILED", "FAILED"}
+
+    any_recovering = app_status in recovering_statuses or any(
+        state in recovering_statuses for state in deployment_states
+    )
+    any_degraded = app_status in degraded_statuses or any(
+        state in degraded_statuses for state in deployment_states
+    )
+
+    if any_recovering and running_replicas <= 0:
+        observed_status = "recovering"
+        health_status = "degraded"
+        recovery_state = "recovering"
+        failure_reason = None
+        notes = "Deployment is actively being reconciled by Ray Serve."
+    elif running_replicas > 0 and (unhealthy_replicas > 0 or any_recovering or any_degraded):
+        observed_status = "degraded"
+        health_status = "degraded"
+        recovery_state = "idle"
+        failure_reason = None
+        notes = "Deployment is partially available in Ray Serve."
+    elif running_replicas > 0 and app_status in healthy_statuses.union(recovering_statuses, {""}):
+        observed_status = "ready"
+        health_status = "healthy"
+        recovery_state = "idle"
+        failure_reason = None
+        notes = "Deployment is healthy in Ray Serve."
+    elif any_degraded:
+        observed_status = "degraded"
+        health_status = "degraded"
+        recovery_state = "failed"
+        failure_reason = f"Ray Serve reports deployment '{name}' in a degraded state."
+        notes = "Ray Serve reports application or deployment health issues."
+    else:
+        observed_status = "unknown"
+        health_status = "unknown"
+        recovery_state = "idle"
+        failure_reason = None
+        notes = "Ray Serve reported the application, but its state could not be classified."
+
+    return {
+        "name": name,
+        "status": app_status,
+        "route_prefix": route_prefix,
+        "deployments": deployments,
+        "replica_counts": replica_counts,
+        "running_replicas": running_replicas,
+        "unhealthy_replicas": unhealthy_replicas,
+        "observed_status": observed_status,
+        "health_status": health_status,
+        "recovery_state": recovery_state,
+        "failure_reason": failure_reason,
+        "notes": notes,
+    }
+
+
 def parse_serve_applications(payload: Mapping[str, object] | None) -> list[dict[str, object]]:
     raw = payload or {}
     applications = raw.get("applications")
@@ -140,16 +215,26 @@ def parse_serve_applications(payload: Mapping[str, object] | None) -> list[dict[
             )
 
         normalized.append(
-            {
-                "name": name,
-                "status": app_status,
-                "route_prefix": route_prefix,
-                "deployments": deployments,
-                "replica_counts": total_replica_counts,
-            }
+            _summarize_serve_application(
+                name=name,
+                app_status=app_status,
+                route_prefix=route_prefix,
+                deployments=deployments,
+                replica_counts=total_replica_counts,
+            )
         )
 
     return normalized
+
+
+def map_serve_applications_by_name(
+    applications: list[dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    return {
+        str(app.get("name") or "").strip(): dict(app)
+        for app in applications
+        if str(app.get("name") or "").strip()
+    }
 
 
 class RayCollector(BaseCollector):
@@ -195,6 +280,9 @@ class RayCollector(BaseCollector):
                     "actors_alive": alive,
                     "actors_dead": dead,
                     "serve_applications": serve_applications,
+                    "serve_applications_by_name": map_serve_applications_by_name(
+                        serve_applications
+                    ),
                     "cluster": cluster,
                 },
             )

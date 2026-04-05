@@ -8,8 +8,8 @@ from uuid import uuid4
 import ray.serve as serve
 from loguru import logger
 
-from agents.dummy_agents import SupportAgent
-from etl.agents.catalog import delete_agent_catalog_entry, list_agent_catalog_entries
+from etl.agents.catalog import list_agent_catalog_entries
+from etl.agents.manager import delete_agent, deploy_agent
 from etl.runtime import ensure_ray, resolve_serve_response
 
 
@@ -30,29 +30,20 @@ def _get_catalog_entry(name: str) -> dict | None:
 
 
 def _delete_serve_app(app_name: str) -> bool:
-    """Delete the Serve app to simulate a deployment outage."""
-    try:
-        serve.delete(app_name, _blocking=True)
+    result = delete_agent(app_name, clean_catalog=False)
+    if result["serve_deleted"]:
         logger.warning(f"Deleted Serve app '{app_name}' to simulate an outage.")
         return True
-    except Exception as e:
-        logger.error(f"serve.delete('{app_name}') failed: {e}")
-        return False
+    logger.error(f"serve.delete('{app_name}') failed.")
+    return False
 
 
 def _cleanup_victim(app_name: str) -> None:
-    try:
-        serve.delete(app_name, _blocking=True)
+    result = delete_agent(app_name, clean_catalog=True)
+    if result["serve_deleted"]:
         logger.info(f"Cleanup removed Serve app '{app_name}'.")
-    except Exception as e:
-        logger.debug(f"Cleanup could not delete Serve app '{app_name}': {e}")
-
-    try:
-        removed = delete_agent_catalog_entry(app_name)
-        if removed:
-            logger.info(f"Cleanup removed durable catalog entry '{app_name}'.")
-    except Exception as e:
-        logger.debug(f"Cleanup could not delete catalog entry '{app_name}': {e}")
+    if result["catalog_deleted"]:
+        logger.info(f"Cleanup removed durable catalog entry '{app_name}'.")
 
 
 def run_self_healing_demo() -> None:
@@ -69,7 +60,7 @@ def run_self_healing_demo() -> None:
 
     try:
         logger.info(f"[1] Deploying {victim_name}...")
-        SupportAgent.deploy(name=victim_name)
+        deploy_agent("SupportAgent", name=victim_name)
         time.sleep(2)
 
         handle = serve.get_app_handle(victim_name)

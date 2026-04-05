@@ -13,8 +13,8 @@ import time
 
 import ray
 
-from agents.dummy_agents import ForecastAgent, RouterAgent, SentimentModelAgent, SupportAgent
 from etl.agents.hub import get_hub
+from etl.agents.manager import deploy_baseline_fleet
 from etl.runtime import ensure_ray, resolve_serve_response
 
 
@@ -23,17 +23,8 @@ def main():
     print(f"Connecting to Ray at: {ray_address}")
     ensure_ray(address=ray_address)
 
-    deployments = [
-        ("SupportAgent", SupportAgent),
-        ("SentimentModel-1", SentimentModelAgent),
-        ("ForecastModel-1", ForecastAgent),
-        ("RouterAgent", RouterAgent),
-    ]
-
-    handles = {}
-    for name, agent_cls in deployments:
-        print(f"Deploying {name}...")
-        handles[name] = agent_cls.deploy(name=name)
+    print("Deploying baseline fleet...")
+    handles = deploy_baseline_fleet()
 
     time.sleep(2)
 

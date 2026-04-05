@@ -14,6 +14,7 @@ requires-python = ">=3.11"
 dependencies = [
     "redis>=7.2.0",
     "numpy>=2.0.0",
+    "typer>=0.12.0",
 ]
 
 [project.optional-dependencies]
@@ -92,6 +93,7 @@ hive = [
 gateway-api = "gateway.api.main:app"
 gateway-mcp = "gateway.mcp.server:main"
 overseer = "overseer.main:main"
+etl-agents = "etl.agents.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

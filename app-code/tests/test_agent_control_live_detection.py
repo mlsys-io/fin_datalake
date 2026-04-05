@@ -1,4 +1,4 @@
-from overseer.collectors.ray import parse_serve_applications
+from overseer.collectors.ray import map_serve_applications_by_name, parse_serve_applications
 from overseer.loop import Overseer
 
 
@@ -39,10 +39,21 @@ def test_parse_serve_applications_normalizes_dashboard_payload() -> None:
     assert support["status"] == "RUNNING"
     assert support["route_prefix"] == "/SupportAgent"
     assert support["replica_counts"] == {"RUNNING": 1}
+    assert support["observed_status"] == "ready"
+    assert support["health_status"] == "healthy"
+    assert support["recovery_state"] == "idle"
 
     forecast = next(app for app in applications if app["name"] == "ForecastModel-1")
     assert forecast["status"] == "DEPLOYING"
     assert forecast["replica_counts"] == {"STARTING": 1}
+    assert forecast["observed_status"] == "recovering"
+    assert forecast["health_status"] == "degraded"
+    assert forecast["recovery_state"] == "recovering"
+
+    by_name = map_serve_applications_by_name(applications)
+    assert set(by_name) == {"SupportAgent", "ForecastModel-1"}
+    assert by_name["SupportAgent"]["observed_status"] == "ready"
+    assert by_name["ForecastModel-1"]["recovery_state"] == "recovering"
 
 
 def test_normalize_catalog_deployment_uses_metadata_app_name_match() -> None:
@@ -61,12 +72,14 @@ def test_normalize_catalog_deployment_uses_metadata_app_name_match() -> None:
         ray_available=True,
         app_state={
             "name": "SupportAgent",
-            "status": "RUNNING",
             "route_prefix": "/SupportAgent",
-            "deployments": [{"name": "SupportAgent", "status": "HEALTHY"}],
-            "replica_counts": {"RUNNING": 1},
             "running_replicas": 1,
             "unhealthy_replicas": 0,
+            "observed_status": "ready",
+            "health_status": "healthy",
+            "recovery_state": "idle",
+            "failure_reason": None,
+            "notes": "Deployment is healthy in Ray Serve.",
         },
     )
 

@@ -272,9 +272,15 @@ class Overseer:
         )
         ray_metrics = snapshot.services.get("ray")
         ray_available = bool(ray_metrics and ray_metrics.healthy)
-        serve_app_groups = self._group_serve_applications(
-            ray_metrics.data.get("serve_applications", []) if ray_metrics else []
-        )
+        serve_applications = {}
+        if ray_metrics:
+            serve_applications = dict(ray_metrics.data.get("serve_applications_by_name") or {})
+            if not serve_applications:
+                serve_applications = {
+                    str(app.get("name") or "").strip(): dict(app)
+                    for app in ray_metrics.data.get("serve_applications", [])
+                    if str(app.get("name") or "").strip()
+                }
 
         deployments = []
         summary = {
@@ -295,7 +301,7 @@ class Overseer:
             deployment = self._normalize_catalog_deployment(
                 entry=entry,
                 ray_available=ray_available,
-                app_state=serve_app_groups.get(deployment_name, {}),
+                app_state=serve_applications.get(deployment_name, {}),
             )
             deployments.append(deployment)
             summary["total"] += 1
@@ -320,38 +326,6 @@ class Overseer:
             error=detail,
         )
 
-    def _group_serve_applications(
-        self,
-        applications: list[dict[str, Any]],
-    ) -> dict[str, dict[str, Any]]:
-        grouped: dict[str, dict[str, Any]] = {}
-        for app in applications:
-            deployment_name = str(app.get("name") or "").strip()
-            if not deployment_name:
-                continue
-            replica_counts = {
-                str(state).upper(): int(count)
-                for state, count in dict(app.get("replica_counts") or {}).items()
-            }
-            running_replicas = 0
-            unhealthy_replicas = 0
-            for state, count in replica_counts.items():
-                if state in {"RUNNING", "HEALTHY"}:
-                    running_replicas += count
-                else:
-                    unhealthy_replicas += count
-
-            grouped[deployment_name] = {
-                "name": deployment_name,
-                "status": str(app.get("status") or "").upper(),
-                "route_prefix": app.get("route_prefix"),
-                "deployments": list(app.get("deployments") or []),
-                "replica_counts": replica_counts,
-                "running_replicas": running_replicas,
-                "unhealthy_replicas": unhealthy_replicas,
-            }
-        return grouped
-
     def _normalize_catalog_deployment(
         self,
         *,
@@ -368,25 +342,9 @@ class Overseer:
         previous_recovery = str(entry.get("recovery_state") or "idle")
         managed = bool(entry.get("managed_by_overseer", True))
 
-        app_status = str(app_state.get("status") or "").upper()
-        deployment_states = [
-            str(deployment.get("status") or "").upper()
-            for deployment in list(app_state.get("deployments") or [])
-        ]
         running_replicas = int(app_state.get("running_replicas", 0) or 0)
         unhealthy_replicas = int(app_state.get("unhealthy_replicas", 0) or 0)
-        total_replicas = running_replicas + unhealthy_replicas
         route_prefix = app_state.get("route_prefix") or entry.get("route_prefix")
-
-        healthy_statuses = {"RUNNING", "HEALTHY"}
-        recovering_statuses = {"DEPLOYING", "UPDATING", "STARTING", "RESTARTING"}
-        degraded_statuses = {"UNHEALTHY", "DEPLOY_FAILED", "FAILED"}
-        any_recovering = app_status in recovering_statuses or any(
-            state in recovering_statuses for state in deployment_states
-        )
-        any_degraded = app_status in degraded_statuses or any(
-            state in degraded_statuses for state in deployment_states
-        )
 
         if not ray_available:
             observed_status = previous_observed
@@ -400,32 +358,14 @@ class Overseer:
             recovery_state = "idle"
             failure_reason = None
             notes = "Deployment is intentionally not running."
-        elif app_state and any_recovering and running_replicas <= 0:
-            observed_status = "recovering"
-            health_status = "degraded"
-            recovery_state = "recovering"
-            failure_reason = None
-            notes = "Deployment is actively being reconciled by Ray Serve."
-        elif app_state and running_replicas > 0 and (unhealthy_replicas > 0 or any_recovering or any_degraded):
-            observed_status = "degraded"
-            health_status = "degraded"
-            recovery_state = "idle"
-            failure_reason = None
-            notes = "Deployment is partially available in Ray Serve."
-        elif app_state and running_replicas > 0 and app_status in healthy_statuses.union(recovering_statuses, {""}):
-            observed_status = "ready"
-            health_status = "healthy"
-            recovery_state = "idle"
-            failure_reason = None
-            notes = "Deployment is healthy in Ray Serve."
-        elif app_state and any_degraded:
-            observed_status = "degraded"
-            health_status = "degraded"
-            recovery_state = "failed" if previous_recovery == "recovering" else "idle"
-            failure_reason = (
-                f"Ray Serve reports deployment '{deployment_name}' in a degraded state."
+        elif app_state:
+            observed_status = str(app_state.get("observed_status") or "unknown")
+            health_status = str(app_state.get("health_status") or "unknown")
+            recovery_state = str(app_state.get("recovery_state") or "idle")
+            failure_reason = app_state.get("failure_reason")
+            notes = str(
+                app_state.get("notes") or "Deployment state derived from Ray Serve."
             )
-            notes = "Ray Serve reports application or deployment health issues."
         elif previous_recovery == "recovering":
             observed_status = "recovering"
             health_status = "degraded"
