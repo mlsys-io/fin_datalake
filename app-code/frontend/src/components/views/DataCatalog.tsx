@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { sendIntent } from '../../api/client'
 import { Database, RefreshCw, Search, Table2 } from 'lucide-react'
 import { EmptyState, ErrorState, LoadingState, ResourceMeta } from '../shared/AsyncState'
@@ -6,6 +6,10 @@ import { usePollingResource } from '../../hooks/usePollingResource'
 
 export const DataCatalog: React.FC = () => {
     const [search, setSearch] = useState('')
+    const loadTables = useCallback(async () => {
+        const res = await sendIntent<{ tables?: { name: string; path: string }[] }>('data', 'list_tables')
+        return (res.tables || []) as { name: string; path: string }[]
+    }, [])
     const {
         data: tablesData,
         loading,
@@ -14,13 +18,7 @@ export const DataCatalog: React.FC = () => {
         lastUpdated,
         stale,
         refresh,
-    } = usePollingResource(
-        async () => {
-            const res = await sendIntent<{ tables?: { name: string; path: string }[] }>('data', 'list_tables')
-            return (res.tables || []) as { name: string; path: string }[]
-        },
-        { pollIntervalMs: 60_000 },
-    )
+    } = usePollingResource(loadTables, { pollIntervalMs: 60_000 })
     const tables = tablesData ?? []
 
     const filteredTables = useMemo(() => tables.filter(t =>

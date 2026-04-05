@@ -29,6 +29,11 @@ export function usePollingResource<T>(
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const mounted = useRef(true)
   const hasLoadedRef = useRef(initialData != null)
+  const loaderRef = useRef(loader)
+
+  useEffect(() => {
+    loaderRef.current = loader
+  }, [loader])
 
   const runLoad = useCallback(async (reason: PollingReason) => {
     const firstLoad = reason === 'initial' && !hasLoadedRef.current
@@ -39,7 +44,7 @@ export function usePollingResource<T>(
     }
 
     try {
-      const next = await loader()
+      const next = await loaderRef.current()
       if (!mounted.current) return
       setData(next)
       setError(null)
@@ -53,7 +58,7 @@ export function usePollingResource<T>(
       setLoading(false)
       setRefreshing(false)
     }
-  }, [loader])
+  }, [])
 
   useEffect(() => {
     mounted.current = true

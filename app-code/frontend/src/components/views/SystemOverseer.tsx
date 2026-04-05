@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useCallback } from 'react'
 import { fetchOverseerSnapshots, fetchOverseerAlerts } from '../../api/client'
 import type { OverseerServiceMetrics } from '../../api/client'
 import { 
@@ -22,6 +22,14 @@ function titleCase(value: string): string {
 }
 
 export const SystemOverseer: React.FC = () => {
+    const loadOverseerData = useCallback(async () => {
+        const [snapshots, alerts] = await Promise.all([
+            fetchOverseerSnapshots(50),
+            fetchOverseerAlerts(20),
+        ])
+        return { snapshots, alerts }
+    }, [])
+
     const {
         data,
         loading,
@@ -30,16 +38,7 @@ export const SystemOverseer: React.FC = () => {
         lastUpdated,
         stale,
         refresh,
-    } = usePollingResource(
-        async () => {
-            const [snapshots, alerts] = await Promise.all([
-                fetchOverseerSnapshots(50),
-                fetchOverseerAlerts(20),
-            ])
-            return { snapshots, alerts }
-        },
-        { pollIntervalMs: 15_000 },
-    )
+    } = usePollingResource(loadOverseerData, { pollIntervalMs: 15_000 })
     const snapshots = data?.snapshots ?? []
     const alerts = data?.alerts ?? []
 
