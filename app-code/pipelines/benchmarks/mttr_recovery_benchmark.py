@@ -1,6 +1,7 @@
 import argparse
 import csv
 import json
+import random
 import statistics
 import time
 from datetime import datetime
@@ -22,8 +23,13 @@ DEFAULT_AGENT_CLASS = "SupportAgent"
 DEFAULT_AGENT_PREFIX = "SupportAgent-MTTR"
 DEFAULT_POLL_INTERVAL_SECONDS = 1.0
 DEFAULT_RECOVERY_TIMEOUT_SECONDS = 120.0
+DEFAULT_MANUAL_OPERATOR_DELAY_MODE = "uniform"
+DEFAULT_MANUAL_OPERATOR_DELAY_SECONDS = 10.0
+DEFAULT_MANUAL_OPERATOR_DELAY_MIN_SECONDS = 5.0
+DEFAULT_MANUAL_OPERATOR_DELAY_MAX_SECONDS = 15.0
 DEFAULT_MODE = "compare"
 VALID_MODES = {"compare", "overseer", "manual"}
+VALID_OPERATOR_DELAY_MODES = {"fixed", "uniform"}
 
 
 def _timestamp_slug() -> str:
@@ -173,6 +179,7 @@ def _run_manual_recovery(
     agent_class: str,
     poll_interval_seconds: float,
     timeout_seconds: float,
+    operator_delay_seconds: float,
     start_time: float,
 ) -> Dict[str, Any]:
     logger.info(f"[manual] checking deployment status for '{victim_name}'")
@@ -183,6 +190,11 @@ def _run_manual_recovery(
     )
 
     logger.info(f"[manual] confirmed outage for '{victim_name}'")
+    if operator_delay_seconds > 0:
+        logger.info(
+            f"[manual] waiting {operator_delay_seconds:.1f}s to simulate operator reaction time"
+        )
+        time.sleep(operator_delay_seconds)
     logger.info(f"[manual] redeploying '{victim_name}' via deploy_agent(...)")
     deploy_agent(agent_class, name=victim_name)
     logger.info(f"[manual] waiting for '{victim_name}' to become ready again")
@@ -197,8 +209,26 @@ def _run_manual_recovery(
         "final_health_status": state["health_status"],
         "final_recovery_state": state["recovery_state"],
         "probe_response": probe_response,
+        "operator_delay_seconds": operator_delay_seconds,
         "error": None,
     }
+
+
+def _sample_manual_operator_delay(
+    *,
+    rng: random.Random,
+    mode: str,
+    fixed_seconds: float,
+    min_seconds: float,
+    max_seconds: float,
+) -> float:
+    if mode == "fixed":
+        return max(0.0, fixed_seconds)
+    if mode == "uniform":
+        lower = max(0.0, min(min_seconds, max_seconds))
+        upper = max(lower, max(min_seconds, max_seconds))
+        return rng.uniform(lower, upper)
+    raise ValueError(f"Unsupported manual operator delay mode: {mode}")
 
 
 def _run_mttr_trial(
@@ -208,6 +238,11 @@ def _run_mttr_trial(
     victim_prefix: str,
     poll_interval_seconds: float,
     timeout_seconds: float,
+    manual_operator_delay_seconds: float,
+    manual_operator_delay_mode: str,
+    manual_operator_delay_min_seconds: float,
+    manual_operator_delay_max_seconds: float,
+    rng: random.Random,
 ) -> Dict[str, Any]:
     ensure_ray()
     victim_name = _victim_name(victim_prefix)
@@ -236,11 +271,19 @@ def _run_mttr_trial(
                 start_time=start_time,
             )
         elif mode == "manual":
+            operator_delay_seconds = _sample_manual_operator_delay(
+                rng=rng,
+                mode=manual_operator_delay_mode,
+                fixed_seconds=manual_operator_delay_seconds,
+                min_seconds=manual_operator_delay_min_seconds,
+                max_seconds=manual_operator_delay_max_seconds,
+            )
             result = _run_manual_recovery(
                 victim_name=victim_name,
                 agent_class=agent_class,
                 poll_interval_seconds=poll_interval_seconds,
                 timeout_seconds=timeout_seconds,
+                operator_delay_seconds=operator_delay_seconds,
                 start_time=start_time,
             )
         else:
@@ -314,6 +357,7 @@ def _write_trials_csv(trials_by_mode: Dict[str, List[Dict[str, Any]]], output_di
         "agent_class",
         "victim_name",
         "mttr_seconds",
+        "operator_delay_seconds",
         "final_observed_status",
         "final_health_status",
         "final_recovery_state",
@@ -332,6 +376,7 @@ def _write_trials_csv(trials_by_mode: Dict[str, List[Dict[str, Any]]], output_di
                         "agent_class": trial["agent_class"],
                         "victim_name": trial["victim_name"],
                         "mttr_seconds": trial["mttr_seconds"],
+                        "operator_delay_seconds": trial.get("operator_delay_seconds"),
                         "final_observed_status": trial["final_observed_status"],
                         "final_health_status": trial["final_health_status"],
                         "final_recovery_state": trial["final_recovery_state"],
@@ -496,11 +541,20 @@ def run_mttr_benchmark(
     victim_prefix: str = DEFAULT_AGENT_PREFIX,
     poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
     timeout_seconds: float = DEFAULT_RECOVERY_TIMEOUT_SECONDS,
+    manual_operator_delay_mode: str = DEFAULT_MANUAL_OPERATOR_DELAY_MODE,
+    manual_operator_delay_seconds: float = DEFAULT_MANUAL_OPERATOR_DELAY_SECONDS,
+    manual_operator_delay_min_seconds: float = DEFAULT_MANUAL_OPERATOR_DELAY_MIN_SECONDS,
+    manual_operator_delay_max_seconds: float = DEFAULT_MANUAL_OPERATOR_DELAY_MAX_SECONDS,
+    seed: int | None = None,
     output_root: str | Path = DEFAULT_OUTPUT_ROOT,
     mode: str = DEFAULT_MODE,
 ) -> Dict[str, Any]:
     if mode not in VALID_MODES:
         raise ValueError(f"Unsupported MTTR benchmark mode: {mode}")
+    if manual_operator_delay_mode not in VALID_OPERATOR_DELAY_MODES:
+        raise ValueError(
+            f"Unsupported manual operator delay mode: {manual_operator_delay_mode}"
+        )
 
     logger.info("=== COMPARATIVE MTTR RECOVERY BENCHMARK ===")
     logger.info(
@@ -510,6 +564,7 @@ def run_mttr_benchmark(
     selected_modes = ["overseer", "manual"] if mode == "compare" else [mode]
     output_dir = Path(output_root) / _timestamp_slug()
     output_dir.mkdir(parents=True, exist_ok=True)
+    rng = random.Random(seed)
 
     trials_by_mode: Dict[str, List[Dict[str, Any]]] = {}
     for active_mode in selected_modes:
@@ -523,6 +578,11 @@ def run_mttr_benchmark(
                     victim_prefix=victim_prefix,
                     poll_interval_seconds=poll_interval_seconds,
                     timeout_seconds=timeout_seconds,
+                    manual_operator_delay_seconds=manual_operator_delay_seconds,
+                    manual_operator_delay_mode=manual_operator_delay_mode,
+                    manual_operator_delay_min_seconds=manual_operator_delay_min_seconds,
+                    manual_operator_delay_max_seconds=manual_operator_delay_max_seconds,
+                    rng=rng,
                 )
             except Exception as exc:
                 logger.error(f"[MTTR/{active_mode}] Trial {trial_idx} failed: {exc}")
@@ -537,6 +597,7 @@ def run_mttr_benchmark(
                     "final_health_status": "unknown",
                     "final_recovery_state": "failed",
                     "probe_response": None,
+                    "operator_delay_seconds": None,
                     "error": str(exc),
                 }
             mode_trials.append(result)
@@ -562,6 +623,18 @@ def run_mttr_benchmark(
             "summary_json": str(json_path),
             "chart_svg": str(chart_path),
         },
+        "config": {
+            "trials": trials,
+            "agent_class": agent_class,
+            "victim_prefix": victim_prefix,
+            "poll_interval_seconds": poll_interval_seconds,
+            "timeout_seconds": timeout_seconds,
+            "manual_operator_delay_mode": manual_operator_delay_mode,
+            "manual_operator_delay_seconds": manual_operator_delay_seconds,
+            "manual_operator_delay_min_seconds": manual_operator_delay_min_seconds,
+            "manual_operator_delay_max_seconds": manual_operator_delay_max_seconds,
+            "seed": seed,
+        },
     }
 
 
@@ -572,6 +645,36 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--victim-prefix", default=DEFAULT_AGENT_PREFIX, help="Name prefix for trial deployments.")
     parser.add_argument("--poll-interval", type=float, default=DEFAULT_POLL_INTERVAL_SECONDS, help="Polling interval in seconds.")
     parser.add_argument("--timeout", type=float, default=DEFAULT_RECOVERY_TIMEOUT_SECONDS, help="Per-trial recovery timeout in seconds.")
+    parser.add_argument(
+        "--manual-operator-delay-mode",
+        choices=sorted(VALID_OPERATOR_DELAY_MODES),
+        default=DEFAULT_MANUAL_OPERATOR_DELAY_MODE,
+        help="How to model operator reaction time for manual recovery trials.",
+    )
+    parser.add_argument(
+        "--manual-operator-delay",
+        type=float,
+        default=DEFAULT_MANUAL_OPERATOR_DELAY_SECONDS,
+        help="Fixed operator delay in seconds when using fixed delay mode.",
+    )
+    parser.add_argument(
+        "--manual-operator-delay-min",
+        type=float,
+        default=DEFAULT_MANUAL_OPERATOR_DELAY_MIN_SECONDS,
+        help="Minimum operator delay in seconds when using uniform delay mode.",
+    )
+    parser.add_argument(
+        "--manual-operator-delay-max",
+        type=float,
+        default=DEFAULT_MANUAL_OPERATOR_DELAY_MAX_SECONDS,
+        help="Maximum operator delay in seconds when using uniform delay mode.",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Optional random seed for reproducible operator delay sampling.",
+    )
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_ROOT), help="Root directory for benchmark artifacts.")
     parser.add_argument("--mode", choices=sorted(VALID_MODES), default=DEFAULT_MODE, help="Benchmark mode to run.")
     parser.add_argument("--json", action="store_true", help="Print the final benchmark payload as JSON.")
@@ -587,6 +690,11 @@ if __name__ == "__main__":
             victim_prefix=args.victim_prefix,
             poll_interval_seconds=args.poll_interval,
             timeout_seconds=args.timeout,
+            manual_operator_delay_mode=args.manual_operator_delay_mode,
+            manual_operator_delay_seconds=args.manual_operator_delay,
+            manual_operator_delay_min_seconds=args.manual_operator_delay_min,
+            manual_operator_delay_max_seconds=args.manual_operator_delay_max,
+            seed=args.seed,
             output_root=args.output_dir,
             mode=args.mode,
         )
