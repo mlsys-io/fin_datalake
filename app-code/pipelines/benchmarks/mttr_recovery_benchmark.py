@@ -94,6 +94,63 @@ def _capture_state(name: str) -> Dict[str, str]:
     }
 
 
+def _serve_status_token(value: Any) -> str:
+    text = str(value or "").strip().upper()
+    if "." in text:
+        text = text.rsplit(".", 1)[-1]
+    return text
+
+
+def _get_live_serve_app_state(name: str) -> Dict[str, Any]:
+    try:
+        status = serve.status()
+        applications = getattr(status, "applications", {}) or {}
+        app = applications.get(name)
+        if app is None:
+            return {
+                "exists": False,
+                "app_status": "MISSING",
+                "deployment_statuses": [],
+            }
+
+        app_status = _serve_status_token(getattr(app, "status", "UNKNOWN"))
+        deployments = getattr(app, "deployments", {}) or {}
+        deployment_values = deployments.values() if isinstance(deployments, dict) else deployments
+        deployment_statuses = [
+            _serve_status_token(getattr(deployment, "status", "UNKNOWN"))
+            for deployment in deployment_values
+        ]
+        return {
+            "exists": True,
+            "app_status": app_status,
+            "deployment_statuses": deployment_statuses,
+        }
+    except Exception as exc:
+        return {
+            "exists": None,
+            "app_status": "UNKNOWN",
+            "deployment_statuses": [],
+            "error": str(exc),
+        }
+
+
+def _serve_app_unavailable(name: str) -> bool:
+    state = _get_live_serve_app_state(name)
+    if state["exists"] is False:
+        return True
+
+    app_status = str(state.get("app_status") or "UNKNOWN")
+    deployment_statuses = [str(value or "UNKNOWN") for value in state.get("deployment_statuses", [])]
+    unavailable_statuses = {"MISSING", "DELETING", "STOPPING", "STOPPED", "DELETE_FAILED"}
+    ready_statuses = {"RUNNING", "HEALTHY"}
+
+    if app_status in unavailable_statuses:
+        return True
+    if deployment_statuses and all(status not in ready_statuses for status in deployment_statuses):
+        return True
+    return False
+
+
 def _delete_for_outage(name: str) -> float:
     last_error = None
     for attempt in range(1, DEFAULT_DELETE_RETRIES + 1):
@@ -129,6 +186,12 @@ def _wait_for_overseer_recovery(
         state = _capture_state(victim_name)
         observed_status = state["observed_status"]
         observed_states.append(observed_status)
+
+        if not saw_outage and _serve_app_unavailable(victim_name):
+            saw_outage = True
+            logger.debug(
+                f"[MTTR] Outage confirmed for '{victim_name}' from live Serve status."
+            )
 
         try:
             handle = serve.get_app_handle(victim_name)
@@ -177,10 +240,7 @@ def _wait_for_manual_outage_detection(
         state = _capture_state(victim_name)
         observed_states.append(state["observed_status"])
 
-        try:
-            handle = serve.get_app_handle(victim_name)
-            resolve_serve_response(handle.chat.remote("manual outage detection probe"))
-        except Exception:
+        if _serve_app_unavailable(victim_name):
             return observed_states
 
     raise RuntimeError(f"Manual baseline never confirmed outage for '{victim_name}'.")

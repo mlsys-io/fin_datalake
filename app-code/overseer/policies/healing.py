@@ -67,7 +67,10 @@ class ActorHealthPolicy(BasePolicy):
             health_status = str(deployment.get("health_status") or "unknown")
             recovery_state = str(deployment.get("recovery_state") or "idle")
 
-            if observed_status in {"missing", "offline"} and recovery_state != "recovering":
+            if recovery_state == "recovering":
+                continue
+
+            if observed_status in {"missing", "offline"}:
                 actions.append(
                     OverseerAction(
                         type=ActionType.RESPAWN,

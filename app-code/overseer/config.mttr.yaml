@@ -1,12 +1,10 @@
 # ============================================================
-# Overseer Service Configuration
+# Overseer MTTR Benchmark Profile
 # ============================================================
-# Each entry defines a service the Overseer monitors.
-# Add a new service = add 4 lines here + one Collector class.
-#
-# Environment variable overrides:
-#   OVERSEER_RAY_HOST, OVERSEER_RAY_PORT, etc.
-# ============================================================
+# Recovery-only profile for MTTR benchmarking.
+# Keeps actor-health healing enabled while disabling unrelated
+# scaling and custom policy churn so benchmark trials observe
+# the respawn path in isolation.
 
 services:
   ray:
@@ -45,11 +43,9 @@ services:
     port: 9000
     protocol: s3
 
-# ============================================================
-# Overseer behaviour
-# ============================================================
 overseer:
   loop_interval_seconds: 5
+  cooldown_seconds: 120
   respawn_recovery_timeout_seconds: 60
   metrics_history_size: 200
   builtin_policies:
@@ -63,7 +59,7 @@ overseer:
     kafka_agent_class: SentimentAgent
 
   custom_policies:
-    enabled: true
+    enabled: false
     s3_uri: "s3://delta-lake/overseer-policies/"
     sync_interval_seconds: 60
     local_dir: "/tmp/overseer_custom_policies/"

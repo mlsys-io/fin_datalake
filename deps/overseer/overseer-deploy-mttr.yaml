@@ -1,0 +1,112 @@
+# =============================================================================
+# AI Lakehouse Overseer - MTTR Benchmark Deployment
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etl-overseer
+  namespace: etl-compute
+  labels:
+    app: etl-overseer
+    component: autonomic-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: etl-overseer
+  template:
+    metadata:
+      labels:
+        app: etl-overseer
+    spec:
+      containers:
+        - name: overseer
+          image: etl-overseer:latest
+          imagePullPolicy: Never
+          env:
+            - name: OVERSEER_CONFIG_PATH
+              value: "/app/app-code/overseer/config.mttr.yaml"
+            - name: OVERSEER_RAY_HOST
+              value: "etl-ray-head-svc.etl-compute.svc.cluster.local"
+            - name: OVERSEER_PREFECT_HOST
+              value: "prefect-server.etl-orchestrate.svc.cluster.local"
+            - name: OVERSEER_MINIO_HOST
+              value: "luyao-storage-head.ddns.comp.nus.edu.sg"
+            - name: OVERSEER_MINIO_PORT
+              value: "4000"
+            - name: OVERSEER_MINIO_PROTOCOL
+              value: "https"
+            - name: OVERSEER_GATEWAY_HOST
+              value: "etl-gateway-svc.etl-compute.svc.cluster.local"
+            - name: OVERSEER_GATEWAY_PORT
+              value: "8000"
+            - name: GATEWAY_INTERNAL_URL
+              value: "http://etl-gateway-svc.etl-compute.svc.cluster.local:8000"
+            - name: RAY_ADDRESS
+              value: "ray://etl-ray-head-svc.etl-compute.svc.cluster.local:10001"
+            - name: RAY_NAMESPACE
+              value: "serve"
+            - name: OVERSEER_AGENT_REGISTRY
+              value: '{"SupportAgent":"agents.dummy_agents:SupportAgent","SentimentModelAgent":"agents.dummy_agents:SentimentModelAgent","ForecastAgent":"agents.dummy_agents:ForecastAgent","RouterAgent":"agents.dummy_agents:RouterAgent"}'
+            - name: TSDB_HOST
+              value: "tsdb-ha.etl-data.svc.cluster.local"
+            - name: TSDB_PORT
+              value: "5432"
+            - name: TSDB_USER
+              value: "app"
+            - name: TSDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: TSDB_PASSWORD
+            - name: TSDB_DATABASE
+              value: "app"
+            - name: OVERSEER_REDIS_URL
+              value: "redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/1"
+            - name: AWS_ENDPOINT_URL
+              value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: GATEWAY_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: GATEWAY_INTERNAL_TOKEN
+            - name: AWS_CA_BUNDLE
+              value: "/opt/certs/public.crt"
+            - name: REQUESTS_CA_BUNDLE
+              value: "/opt/certs/public.crt"
+            - name: SSL_CERT_FILE
+              value: "/opt/certs/public.crt"
+            - name: CA_PATH
+              value: "/opt/certs/public.crt"
+            - name: OVERSEER_SSL_VERIFY
+              value: "false"
+
+          volumeMounts:
+            - mountPath: /opt/certs
+              name: minio-ca
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: minio-ca
+          configMap:
+            name: minio-ca
+---
+# Note: The Overseer does not require a Service/NodePort as it is
+# a purely internal worker that pulls metrics and pushes to Redis.

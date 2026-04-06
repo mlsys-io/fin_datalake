@@ -93,6 +93,7 @@ class Overseer:
         self.policies: list[BasePolicy] = list(self.builtin_policies)
 
         self.custom_policy_cfg = overseer_cfg.get("custom_policies", {})
+        self.custom_policies_enabled = self.custom_policy_cfg.get("enabled", True)
         self.s3_uri = self.custom_policy_cfg.get(
             "s3_uri", "s3://demo-lake/overseer-policies/"
         )
@@ -128,7 +129,10 @@ class Overseer:
             logger.info(f"--- Cycle {cycle} ---")
 
             current_time = asyncio.get_event_loop().time()
-            if current_time - self.last_sync_time >= self.sync_interval_seconds:
+            if (
+                self.custom_policies_enabled
+                and current_time - self.last_sync_time >= self.sync_interval_seconds
+            ):
                 self.last_sync_time = current_time
                 try:
                     await asyncio.to_thread(
@@ -193,7 +197,11 @@ class Overseer:
 
             for action in actions:
                 cooldown_scope = self._cooldown_scope(action)
-                if not self.cooldown.can_fire(action.type.value, cooldown_scope):
+                use_generic_cooldown = action.type != ActionType.RESPAWN
+                if (
+                    use_generic_cooldown
+                    and not self.cooldown.can_fire(action.type.value, cooldown_scope)
+                ):
                     logger.info(
                         f"  [SKIP] {action.type.value} - cooldown active for {cooldown_scope}"
                     )
@@ -229,7 +237,8 @@ class Overseer:
                         result = ActionResult(success=False, error=str(exc))
                         logger.error(f"  Actuator {action.target} crashed: {exc}")
 
-                self.cooldown.record(action.type.value, cooldown_scope)
+                if use_generic_cooldown:
+                    self.cooldown.record(action.type.value, cooldown_scope)
                 await self._apply_action_result(action, result)
                 await self.store.append_alert(self._build_action_alert(action, result))
 
@@ -348,6 +357,16 @@ class Overseer:
         previous_action = str(entry.get("last_action_type") or "").strip().lower()
         managed = bool(entry.get("managed_by_overseer", True))
         in_respawn_recovery_window = self._in_respawn_recovery_window(entry)
+        respawn_recovery_active = (
+            previous_recovery == "recovering"
+            and previous_action == ActionType.RESPAWN.value
+            and in_respawn_recovery_window
+        )
+        respawn_recovery_timed_out = (
+            previous_recovery == "recovering"
+            and previous_action == ActionType.RESPAWN.value
+            and not in_respawn_recovery_window
+        )
 
         running_replicas = int(app_state.get("running_replicas", 0) or 0)
         unhealthy_replicas = int(app_state.get("unhealthy_replicas", 0) or 0)
@@ -389,12 +408,7 @@ class Overseer:
         # Once Overseer starts a respawn, keep the deployment in a recovering
         # state until it either becomes ready or the recovery window expires.
         # This avoids racing transient delete/redeploy observations.
-        if (
-            in_respawn_recovery_window
-            and previous_recovery == "recovering"
-            and previous_action == ActionType.RESPAWN.value
-            and observed_status != "ready"
-        ):
+        if respawn_recovery_active and observed_status != "ready":
             observed_status = "recovering"
             health_status = "degraded"
             recovery_state = "recovering"
@@ -402,6 +416,22 @@ class Overseer:
             notes = (
                 "Deployment is within the respawn recovery window; "
                 "waiting for Ray Serve state to converge."
+            )
+        elif respawn_recovery_timed_out and observed_status != "ready":
+            if observed_status in {"recovering", "unknown", "stale"}:
+                observed_status = "missing" if not app_state else "degraded"
+            if observed_status in {"missing", "offline"}:
+                health_status = "offline"
+            else:
+                health_status = "degraded"
+            recovery_state = "failed"
+            failure_reason = (
+                failure_reason
+                or f"Respawn recovery timed out for deployment '{deployment_name}'."
+            )
+            notes = (
+                "Overseer recovery attempt exceeded the respawn recovery timeout; "
+                "the deployment is eligible for a fresh healing decision."
             )
 
         alive = (
@@ -487,7 +517,9 @@ class Overseer:
                     last_failure_reason=deployment.get("last_failure_reason"),
                     last_action_type=deployment.get("last_action_type"),
                     reconcile_notes=deployment.get("reconcile_notes"),
-                    reconciled=True,
+                    # last_reconciled_at is reserved for respawn-attempt start
+                    # tracking, so normal sync must not refresh it.
+                    reconciled=False,
                 )
             except Exception as exc:
                 logger.warning(
@@ -537,7 +569,7 @@ class Overseer:
                     last_failure_reason=None,
                     last_action_type=action.type.value,
                     reconcile_notes=result.detail or "Recovery command accepted by Ray.",
-                    reconciled=True,
+                    reconciled=False,
                 )
             else:
                 await asyncio.to_thread(
@@ -552,7 +584,7 @@ class Overseer:
                     last_failure_reason=None,
                     last_action_type=action.type.value,
                     reconcile_notes=result.detail or action.reason,
-                    reconciled=True,
+                    reconciled=False,
                 )
             return
 
@@ -568,7 +600,7 @@ class Overseer:
             last_failure_reason=result.error or result.detail or action.reason,
             last_action_type=action.type.value,
             reconcile_notes="Overseer action failed; manual inspection may be required.",
-            reconciled=True,
+            reconciled=False,
         )
 
     def _cooldown_scope(self, action: OverseerAction) -> str:

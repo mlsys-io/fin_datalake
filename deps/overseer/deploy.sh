@@ -6,6 +6,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NAMESPACE="etl-compute"
+MANIFEST="${SCRIPT_DIR}/overseer-deploy.yaml"
+
+if [[ "${1:-}" == "--mttr" ]]; then
+    MANIFEST="${SCRIPT_DIR}/overseer-deploy-mttr.yaml"
+fi
 
 echo "🔍 Checking cluster prerequisites..."
 
@@ -19,7 +24,7 @@ echo "✅ etl-secrets found."
 
 # 2. Apply manifests
 echo "🚀 Deploying Overseer to namespace '$NAMESPACE'..."
-kubectl apply -f "${SCRIPT_DIR}/overseer-deploy.yaml"
+kubectl apply -f "$MANIFEST"
 
 # 3. Wait for readiness
 echo "⏳ Waiting for Overseer pod to become ready (timeout: 90s)..."

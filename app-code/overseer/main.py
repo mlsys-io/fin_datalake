@@ -11,6 +11,7 @@ continuously monitoring Ray, Kafka, Prefect, and other services.
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 
 
@@ -27,7 +28,11 @@ def main():
 
     from overseer.loop import Overseer
 
-    overseer = Overseer()
+    config_path = os.environ.get("OVERSEER_CONFIG_PATH")
+    if config_path:
+        logger.info(f"Using Overseer config: {config_path}")
+
+    overseer = Overseer(config_path=config_path)
 
     try:
         asyncio.run(overseer.run())
