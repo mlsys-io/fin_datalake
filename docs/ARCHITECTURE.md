@@ -1,112 +1,167 @@
-# System Architecture & Design
-**Project**: AI-Native Lakehouse ETL Framework  
-**Status**: Active Development  
-**Last Updated**: February 17, 2026
+# AI-Native Lakehouse Architecture
 
----
+This document is the canonical architecture reference for the current repository state. It treats the codebase as the source of truth and uses the **five-layer model** as the primary framing:
 
-## 1. High-Level Architecture
-The system is designed as a **Hybrid Cloud-Native Platform** that unifies Data Engineering and AI Agents on a shared distributed substrate (Ray).
+- Data
+- Compute
+- Intelligence
+- Control
+- Interface
 
-```mermaid
-graph TD
-    subgraph Gateway ["Interface Layer (Gateway)"]
-        Registry[Interface Registry]
-        Adapters["REST / MCP / Direct Connectors"]
-        Registry --> Adapters
-    end
+It is intentionally different from older repo notes and from `final_report/main.tex` where the draft report still reflects earlier design assumptions in several places.
 
-    subgraph Compute ["Compute Layer (Ray Cluster)"]
-        Head["Ray Head (Driver)"]
-        Workers["Ray Workers (Distributed)"]
-        
-        Orch[Prefect Agent]
-        Bus[MessageBus Actor]
-        Agents[AI Agents]
-        Overseer[System Overseer]
-        
-        Head --> Workers
-        Head --- Orch
-        Workers --- Bus
-        Workers --- Agents
-        Workers --- Overseer
-    end
+## Architecture Summary
 
-    subgraph Storage ["Storage Layer"]
-        MinIO[("MinIO S3")]
-        Delta[("Delta Lake")]
-        Hive[("Hive Metastore")]
-        Milvus[("Milvus Vector DB")]
-        
-        MinIO --- Delta
-        Delta -.-> Hive
-    end
+The platform co-locates ETL workloads and Serve-backed agents on shared Ray infrastructure, then wraps that runtime with a durable control and access layer:
 
-    Adapters --> Orch
-    Adapters --> Bus
-    Workers --> MinIO
-    Workers --> Milvus
-```
+- The **Data layer** standardizes ingestion and storage contracts around `DataSource` and `DataSink`.
+- The **Compute layer** runs Prefect flows, Ray tasks, and distributed or local execution paths depending on workload needs.
+- The **Intelligence layer** hosts long-lived Ray Serve agents, with AgentHub providing live discovery and the durable catalog preserving deployment memory.
+- The **Control layer** runs Overseer as an out-of-band reconciliation loop that compares desired catalog state with normalized live Serve state.
+- The **Interface layer** exposes the system through REST and MCP, with shared dispatch, RBAC, audit logging, and dashboard-oriented APIs.
 
----
+## Layer Model
 
-## 2. Implemented Design (What Works Now)
+### Data Layer
 
-### 2.1 Infrastructure Layer (The Foundation)
--   **K0s Kubernetes**: Production-grade k8s distro on bare-metal.
-    -   *Justification*: Lightweight vs EKS, but strictly compliant.
--   **MinIO + TLS**: Secure Object Storage mimicking production cloud S3.
-    -   *Implementation*: Custom CA injection into all Ray Worker pods via ConfigMaps.
--   **KubeRay**: Ray Operator handling the distributed compute cluster lifecycle.
+The data layer is the ingestion and storage contract surface. Its main responsibilities are:
 
-### 2.2 The ETL Framework
--   **Hybrid Execution Model**: 
-    -   **Problem**: Rust `tokio` runtime conflict between Ray and `deltalake`.
-    -   **Solution**: "Split-Brain" Execution. Heavy transformations run on Ray Workers (Distributed), but final storage I/O runs on the Head Node (Local) to guarantee stability.
--   **Standardized Abstractions**:
-    -   `DataSource`: Common interface for Kafka, REST, WebSocket.
-    -   `DataSink`: Common interface for Delta Lake, TimescaleDB.
+- source abstraction through `DataSource`
+- sink abstraction through `DataSink`
+- Delta Lake writes
+- optional downstream sinks such as TimescaleDB and Milvus
+- Hive metastore registration where configured
 
-### 2.3 The Agent Core (Internal Interaction)
--   **Hub-and-Spoke Coordination**:
-    -   **Registry**: Service Discovery for agents (`find_by_capability`).
-    -   **Message Bus**: Push-based, Fire-and-Forget event system.
-    -   **Context Store**: Distributed Key-Value store for shared state.
--   **Data-Native Design**: Agents live on the same cluster as the data, enabling Zero-Copy memory access via Plasma Store (in theory/future).
+Current implementation notes:
 
----
+- The repo contains concrete sources for REST, WebSocket, Kafka, files, Delta Lake, and RisingWave.
+- The repo contains sinks for Delta Lake, TimescaleDB, HTTP, DLQ, and Milvus.
+- Some older report language around adaptive schema evolution is directionally consistent, but the exact behavior should be described from the sink implementations that exist now.
 
-## 3. To-Be-Implemented Design (Roadmap)
+### Compute Layer
 
-### 3.1 The Unified Interface Gateway
-*Goal: Decouple User Access from Internal Logic*
--   **Design**: A "Protocol-Agnostic" Registry that vends adapters.
--   **Connectors**:
-    1.  **Data Connector**: Pass-through SQL/Arrow access to Delta Lake.
-    2.  **Compute Connector**: Submit ETL jobs to Prefect/Ray.
-    3.  **Intelligence Connector**: Chat interface for Agents.
--   **Key Feature**: **MCP (Model Context Protocol)** support to allow external IDEs (Cursor/Claude) to "drive" the lakehouse.
+The compute layer is the execution substrate for ETL and orchestration. It includes:
 
-### 3.2 System Overseer (Autonomic Computing)
-*Goal: Self-Managing Platform*
--   **Design**: A specialized "Super-Agent" that monitors system health.
--   **Capabilities**:
-    -   **Observability**: Monitor Kafka Lag and Ray Actor status.
-    -   **Auto-Scaling**: Provision new Agent Actors if lag spikes.
-    -   **Self-Healing**: Restart crashed Actors automatically.
+- Ray runtime and Ray client connectivity
+- Ray Serve deployment hosting
+- Prefect flows and task runners
+- BaseTask helpers for distributed and local execution
 
-### 3.3 Advanced Agent Capabilities
--   **RAG Integration**: Deep connection between `MilvusSink` (Vector Store) and Agent Context.
--   **Tool Use**: Formalizing the `Tool` interface so Agents can securely execute safe python code sandbox style (future).
+Current implementation notes:
 
----
+- Prefect is present, but the repo does **not** use Ray in one universal way. Some flows use `RayTaskRunner`, while others use Prefect-only concurrency such as `ConcurrentTaskRunner`.
+- The hybrid execution story should be described carefully. The repo still supports explicit local execution via `BaseTask.local()` and `DeltaLakeWriteTask.local()`, but it also supports distributed Delta writes through Ray Data.
+- It is therefore more accurate to describe the compute layer as supporting **multiple execution patterns on the same platform**, not as a single universal Prefect-plus-Ray path.
 
-## 4. Component Justification Summary
+### Intelligence Layer
 
-| Component | Justification | Alternatives Considered |
-| :--- | :--- | :--- |
-| **Ray** | Unifies Batch ETL and Stateful Agents in one runtime. | **Spark** (Good for ETL, bad for Agents) |
-| **Delta Lake** | ACID transactions, Time Travel, Open Standard. | **Iceberg** (more complex setup) / **Hudi** |
-| **MinIO** | S3-API Standard, High Performance. | **Ceph** (Too complex for this scope) |
-| **Prefect** | Pure Python flows, Hybrid Execution support. | **Airflow** (Too rigid, DAG-only) |
-| **K0s** | Zero-friction K8s on bare metal. | **K3s** / **MicroK8s** |
+The intelligence layer is the long-lived agent runtime. It includes:
+
+- `BaseAgent` as the Serve-backed agent container
+- Ray Serve application deployment with stable app names
+- typed capability registration
+- direct invoke, chat, event, and delegation paths
+- ContextStore for shared short-lived state
+- AgentHub for live discovery and liveness-oriented metadata
+- the durable agent catalog for deployment memory across failures
+
+Current implementation notes:
+
+- The repo does **not** match the stronger claim that AgentHub has been fully displaced by a decentralized service mesh.
+- The current model is better described as **centralized live discovery plus direct Serve invocation**:
+  - AgentHub remains the live capability registry and liveness-oriented discovery surface.
+  - Delegation resolves candidates through AgentHub.
+  - Invocation then happens directly against Ray Serve handles.
+- ContextStore remains relevant for shared ephemeral state such as published signals.
+
+### Control Layer
+
+The control layer is the out-of-band autonomic management plane. It includes:
+
+- Overseer collectors
+- policy evaluation
+- cooldown handling
+- action execution through actuators
+- snapshot and alert persistence
+- catalog reconciliation
+
+Current implementation notes:
+
+- Overseer is out-of-band from the managed workloads, but it does **not** communicate only through the Ray HTTP dashboard API. It also uses Ray runtime/client helpers and writes back to the durable catalog.
+- The live configured polling interval is currently **5 seconds** in `app-code/overseer/config.yaml`, not 15 seconds.
+- The code clearly implements:
+  - deployment state normalization from Ray collector output
+  - agent deployment reconciliation
+  - same-name respawn for missing managed Serve apps
+  - alert logging and status reporting
+  - gateway circuit-breaker actions
+- The docs should not overstate this as full cluster-level recovery orchestration unless such behavior is actually implemented and verified in code.
+
+### Interface Layer
+
+The interface layer is the governed access surface for users, dashboards, and AI clients. It includes:
+
+- FastAPI REST API
+- MCP server and tool exposure
+- shared dispatch pipeline
+- adapter registry
+- auth and RBAC
+- audit logging
+- readiness and system endpoints
+- frontend-facing routes and dashboard support
+
+Current implementation notes:
+
+- The repo clearly implements **REST and MCP** as gateway interfaces.
+- The repo also contains operator CLIs such as `etl-agents`, but that is not the same as a generic gateway CLI translator peer to REST and MCP.
+- The gateway registry currently exposes these domains:
+  - `data`
+  - `compute`
+  - `agent`
+  - `broker`
+  - `system`
+- `BrokerAdapter` currently vends environment-backed credentials and connection strings. It should not be described as already issuing short-lived scoped credentials because the code still marks that as future work.
+
+## Cross-Layer State Model
+
+Two registries are central to the current design:
+
+- **AgentHub** is the live runtime registry inside Ray.
+- The **durable agent catalog** is the deployment memory used by gateway and Overseer.
+
+They serve different purposes:
+
+- AgentHub answers live discovery and liveness questions.
+- The durable catalog preserves desired state, observed state, reconciliation notes, and respawn metadata across failures and restarts.
+
+This distinction is one of the most important differences between the current implementation and older documentation that treated runtime coordination as the only source of truth.
+
+## Operator View vs Canonical View
+
+Some existing docs and scripts use a narrower operational framing of:
+
+- compute
+- gateway
+- overseer
+
+That view is still useful for day-to-day operations, but it is a **projection** of the canonical five-layer model rather than a competing architecture:
+
+- `gateway` primarily implements the **Interface layer**
+- `overseer` primarily implements the **Control layer**
+- `app-code/etl`, `pipelines`, and Ray infrastructure collectively span the **Data**, **Compute**, and **Intelligence** layers
+
+## Current Boundaries And Non-Claims
+
+The current repo documentation should explicitly avoid these overstatements:
+
+- claiming a fully implemented generic gateway CLI peer interface
+- claiming short-lived scoped broker credentials when the implementation still uses static/env-backed values
+- claiming AgentHub is no longer central to live discovery
+- claiming Overseer only talks to the Ray dashboard API
+- claiming verified cluster-wide recovery orchestration when the implemented and demonstrated recovery path is deployment-level reconciliation and respawn
+
+## Related Documents
+
+- [architecture/compute-gateway-overseer.md](architecture/compute-gateway-overseer.md): implementation-focused interaction model for compute, interface, and control components
+- [FINAL_DEMO_PLAN.md](FINAL_DEMO_PLAN.md): final demo narrative and operator sequence
+- [REPORT_ARCHITECTURE_DELTA.md](REPORT_ARCHITECTURE_DELTA.md): report-draft discrepancy note for external editing support

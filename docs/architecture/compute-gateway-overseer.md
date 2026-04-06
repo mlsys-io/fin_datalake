@@ -1,6 +1,12 @@
 # Compute, Gateway, And Overseer Interaction
 
-This document describes the current interaction model between the compute plane, the gateway, and the overseer. It is the best single reference for understanding how deployment state moves through the platform.
+This document describes the current interaction model between the compute plane, the gateway, and the overseer. It is an implementation-focused companion to the canonical 5-layer architecture in [../ARCHITECTURE.md](../ARCHITECTURE.md), not a competing architecture framing.
+
+Within the 5-layer model:
+
+- `compute` here primarily maps to the **Compute** and **Intelligence** layers
+- `gateway` primarily maps to the **Interface** layer
+- `overseer` primarily maps to the **Control** layer
 
 ## Layer Responsibilities
 
