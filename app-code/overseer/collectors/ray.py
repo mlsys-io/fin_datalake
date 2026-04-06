@@ -278,6 +278,60 @@ def map_serve_applications_by_name(
     }
 
 
+def extract_actor_rows(payload: Mapping[str, object] | None) -> list[dict[str, object]]:
+    raw = payload or {}
+    data = raw.get("data")
+
+    # Older dashboard shape: {"data": {"actors": {actor_id: {...}}}}
+    if isinstance(data, Mapping):
+        actors_map = data.get("actors")
+        if isinstance(actors_map, Mapping):
+            rows: list[dict[str, object]] = []
+            for actor_id, info in actors_map.items():
+                if not isinstance(info, Mapping):
+                    continue
+                rows.append(
+                    {
+                        "actor_id": str(actor_id),
+                        "name": info.get("name", "unknown"),
+                        "class_name": info.get("className") or info.get("class_name") or "unknown",
+                        "state": info.get("state", "UNKNOWN"),
+                        "pid": info.get("pid"),
+                        "serve_app_name": _extract_serve_app_name(str(info.get("name", ""))),
+                    }
+                )
+            return rows
+
+        # Newer Ray shape: {"data": {"result": {"result": [{...}, ...]}}}
+        result = data.get("result")
+        if isinstance(result, Mapping):
+            actor_list = result.get("result")
+            if isinstance(actor_list, list):
+                rows = []
+                for info in actor_list:
+                    if not isinstance(info, Mapping):
+                        continue
+                    actor_name = str(info.get("name") or "unknown")
+                    class_name = str(
+                        info.get("class_name")
+                        or info.get("className")
+                        or "unknown"
+                    )
+                    rows.append(
+                        {
+                            "actor_id": str(info.get("actor_id") or ""),
+                            "name": actor_name,
+                            "class_name": class_name,
+                            "state": str(info.get("state") or "UNKNOWN"),
+                            "pid": info.get("pid"),
+                            "serve_app_name": _extract_serve_app_name(actor_name),
+                        }
+                    )
+                return rows
+
+    return []
+
+
 class RayCollector(BaseCollector):
 
     async def collect(self) -> ServiceMetrics:
@@ -296,18 +350,8 @@ class RayCollector(BaseCollector):
                 serve_resp = await client.get(f"{base}/api/serve/applications/")
                 serve_raw = serve_resp.json() if serve_resp.status_code == 200 else {}
 
-            # Parse actors into a clean summary
-            actors = []
-            for actor_id, info in actors_raw.get("data", {}).get("actors", {}).items():
-                actor_name = info.get("name", "unknown")
-                actors.append({
-                    "actor_id": actor_id,
-                    "name": actor_name,
-                    "class_name": info.get("className", "unknown"),
-                    "state": info.get("state", "UNKNOWN"),
-                    "pid": info.get("pid"),
-                    "serve_app_name": _extract_serve_app_name(actor_name),
-                })
+            # Parse actors into a clean summary across Ray dashboard API shapes.
+            actors = extract_actor_rows(actors_raw)
 
             alive = sum(1 for a in actors if a["state"] == "ALIVE")
             dead = sum(1 for a in actors if a["state"] == "DEAD")
