@@ -23,6 +23,9 @@ DEFAULT_AGENT_CLASS = "SupportAgent"
 DEFAULT_AGENT_PREFIX = "SupportAgent-MTTR"
 DEFAULT_POLL_INTERVAL_SECONDS = 1.0
 DEFAULT_RECOVERY_TIMEOUT_SECONDS = 120.0
+DEFAULT_DELETE_RETRIES = 5
+DEFAULT_DELETE_RETRY_DELAY_SECONDS = 2.0
+DEFAULT_INTER_TRIAL_DELAY_SECONDS = 10.0
 DEFAULT_MANUAL_OPERATOR_DELAY_MODE = "uniform"
 DEFAULT_MANUAL_OPERATOR_DELAY_SECONDS = 10.0
 DEFAULT_MANUAL_OPERATOR_DELAY_MIN_SECONDS = 5.0
@@ -92,10 +95,22 @@ def _capture_state(name: str) -> Dict[str, str]:
 
 
 def _delete_for_outage(name: str) -> float:
-    delete_result = delete_agent(name, clean_catalog=False)
-    if not delete_result["serve_deleted"]:
-        raise RuntimeError(f"Failed to delete Serve app '{name}' for MTTR trial.")
-    return time.perf_counter()
+    last_error = None
+    for attempt in range(1, DEFAULT_DELETE_RETRIES + 1):
+        delete_result = delete_agent(name, clean_catalog=False)
+        if delete_result["serve_deleted"]:
+            return time.perf_counter()
+        last_error = (
+            f"Serve deletion not confirmed on attempt {attempt}/{DEFAULT_DELETE_RETRIES} "
+            f"for '{name}'."
+        )
+        logger.warning(f"[MTTR] {last_error}")
+        if attempt < DEFAULT_DELETE_RETRIES:
+            time.sleep(DEFAULT_DELETE_RETRY_DELAY_SECONDS)
+    raise RuntimeError(
+        f"Failed to delete Serve app '{name}' for MTTR trial after "
+        f"{DEFAULT_DELETE_RETRIES} attempts. Last error: {last_error}"
+    )
 
 
 def _wait_for_overseer_recovery(
@@ -541,6 +556,7 @@ def run_mttr_benchmark(
     victim_prefix: str = DEFAULT_AGENT_PREFIX,
     poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
     timeout_seconds: float = DEFAULT_RECOVERY_TIMEOUT_SECONDS,
+    inter_trial_delay_seconds: float = DEFAULT_INTER_TRIAL_DELAY_SECONDS,
     manual_operator_delay_mode: str = DEFAULT_MANUAL_OPERATOR_DELAY_MODE,
     manual_operator_delay_seconds: float = DEFAULT_MANUAL_OPERATOR_DELAY_SECONDS,
     manual_operator_delay_min_seconds: float = DEFAULT_MANUAL_OPERATOR_DELAY_MIN_SECONDS,
@@ -601,6 +617,11 @@ def run_mttr_benchmark(
                     "error": str(exc),
                 }
             mode_trials.append(result)
+            if trial_idx < trials:
+                logger.info(
+                    f"[MTTR/{active_mode}] waiting {inter_trial_delay_seconds:.1f}s before next trial"
+                )
+                time.sleep(max(0.0, inter_trial_delay_seconds))
         trials_by_mode[active_mode] = mode_trials
 
     summary = _build_summary(trials_by_mode)
@@ -629,6 +650,7 @@ def run_mttr_benchmark(
             "victim_prefix": victim_prefix,
             "poll_interval_seconds": poll_interval_seconds,
             "timeout_seconds": timeout_seconds,
+            "inter_trial_delay_seconds": inter_trial_delay_seconds,
             "manual_operator_delay_mode": manual_operator_delay_mode,
             "manual_operator_delay_seconds": manual_operator_delay_seconds,
             "manual_operator_delay_min_seconds": manual_operator_delay_min_seconds,
@@ -645,6 +667,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--victim-prefix", default=DEFAULT_AGENT_PREFIX, help="Name prefix for trial deployments.")
     parser.add_argument("--poll-interval", type=float, default=DEFAULT_POLL_INTERVAL_SECONDS, help="Polling interval in seconds.")
     parser.add_argument("--timeout", type=float, default=DEFAULT_RECOVERY_TIMEOUT_SECONDS, help="Per-trial recovery timeout in seconds.")
+    parser.add_argument(
+        "--inter-trial-delay",
+        type=float,
+        default=DEFAULT_INTER_TRIAL_DELAY_SECONDS,
+        help="Delay in seconds between trials to let Overseer, Serve, and catalog state settle.",
+    )
     parser.add_argument(
         "--manual-operator-delay-mode",
         choices=sorted(VALID_OPERATOR_DELAY_MODES),
@@ -690,6 +718,7 @@ if __name__ == "__main__":
             victim_prefix=args.victim_prefix,
             poll_interval_seconds=args.poll_interval,
             timeout_seconds=args.timeout,
+            inter_trial_delay_seconds=args.inter_trial_delay,
             manual_operator_delay_mode=args.manual_operator_delay_mode,
             manual_operator_delay_seconds=args.manual_operator_delay,
             manual_operator_delay_min_seconds=args.manual_operator_delay_min,
