@@ -55,7 +55,7 @@ overseer:
   builtin_policies:
     enabled: true
     actor_health_enabled: true
-    kafka_lag_enabled: true
+    kafka_lag_enabled: false
     kafka_scale_up_threshold: 500
     kafka_scale_up_count: 1
     kafka_scale_down_idle_threshold: 0
