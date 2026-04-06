@@ -89,11 +89,6 @@ def _summarize_serve_application(
         else:
             unhealthy_replicas += count
 
-    # The Serve applications endpoint can briefly lag behind deletes/redeploys.
-    # Cross-check against live replica actors so a stale application record is
-    # not treated as healthy when no actual Serve replicas remain.
-    effective_running_replicas = min(running_replicas, alive_actor_replicas) if running_replicas > 0 else alive_actor_replicas
-
     deployment_states = [str(deployment.get("status") or "").upper() for deployment in deployments]
     healthy_statuses = {"RUNNING", "HEALTHY"}
     recovering_statuses = {"DEPLOYING", "UPDATING", "STARTING", "RESTARTING"}
@@ -109,6 +104,22 @@ def _summarize_serve_application(
     any_degraded = app_status in degraded_statuses or any(
         state in degraded_statuses for state in deployment_states
     )
+    serve_explicitly_healthy = (
+        running_replicas > 0
+        and app_status in healthy_statuses.union(recovering_statuses, {""})
+    )
+
+    # Ray's actor listing can lag or transiently miss freshly started Serve
+    # replicas even when the Serve applications endpoint already reports a
+    # healthy running replica set. Treat explicit healthy Serve replica state
+    # as authoritative enough to avoid repeated false respawns, while still
+    # using actor cross-checks to catch stale deleting application summaries.
+    if serve_explicitly_healthy:
+        effective_running_replicas = running_replicas
+    elif running_replicas > 0:
+        effective_running_replicas = min(running_replicas, alive_actor_replicas)
+    else:
+        effective_running_replicas = alive_actor_replicas
 
     if any_deleting:
         observed_status = "missing"
