@@ -50,6 +50,7 @@ services:
 # ============================================================
 overseer:
   loop_interval_seconds: 5
+  respawn_recovery_timeout_seconds: 60
   metrics_history_size: 200
   builtin_policies:
     enabled: true

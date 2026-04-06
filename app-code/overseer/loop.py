@@ -8,6 +8,7 @@ Completely standalone from Ray - connects to services via their external APIs.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from loguru import logger
@@ -76,6 +77,9 @@ class Overseer:
         overseer_cfg = raw_config.get("overseer", {})
 
         self.loop_interval = overseer_cfg.get("loop_interval_seconds", 15)
+        self.respawn_recovery_timeout_seconds = float(
+            overseer_cfg.get("respawn_recovery_timeout_seconds", 60)
+        )
         self.store = MetricsStore(
             max_snapshots=overseer_cfg.get("metrics_history_size", 200),
         )
@@ -111,7 +115,8 @@ class Overseer:
         logger.info(
             f"Overseer initialized: {len(self.collectors)} collectors, "
             f"{len(self.policies)} policies, {len(self.actuators)} actuators. "
-            f"Loop interval: {self.loop_interval}s"
+            f"Loop interval: {self.loop_interval}s, "
+            f"Respawn recovery timeout: {self.respawn_recovery_timeout_seconds}s"
         )
 
     async def run(self) -> None:
@@ -340,7 +345,9 @@ class Overseer:
         previous_observed = str(entry.get("observed_status") or "unknown")
         previous_health = str(entry.get("health_status") or "unknown")
         previous_recovery = str(entry.get("recovery_state") or "idle")
+        previous_action = str(entry.get("last_action_type") or "").strip().lower()
         managed = bool(entry.get("managed_by_overseer", True))
+        in_respawn_recovery_window = self._in_respawn_recovery_window(entry)
 
         running_replicas = int(app_state.get("running_replicas", 0) or 0)
         unhealthy_replicas = int(app_state.get("unhealthy_replicas", 0) or 0)
@@ -379,6 +386,24 @@ class Overseer:
             failure_reason = f"Deployment '{deployment_name}' is absent from live Serve state."
             notes = "Deployment is expected but currently missing."
 
+        # Once Overseer starts a respawn, keep the deployment in a recovering
+        # state until it either becomes ready or the recovery window expires.
+        # This avoids racing transient delete/redeploy observations.
+        if (
+            in_respawn_recovery_window
+            and previous_recovery == "recovering"
+            and previous_action == ActionType.RESPAWN.value
+            and observed_status != "ready"
+        ):
+            observed_status = "recovering"
+            health_status = "degraded"
+            recovery_state = "recovering"
+            failure_reason = None
+            notes = (
+                "Deployment is within the respawn recovery window; "
+                "waiting for Ray Serve state to converge."
+            )
+
         alive = (
             desired_status == "running"
             and observed_status in {"ready", "degraded", "recovering"}
@@ -404,6 +429,23 @@ class Overseer:
                 "dead_replicas": unhealthy_replicas,
             },
         }
+
+    def _in_respawn_recovery_window(self, entry: dict[str, Any]) -> bool:
+        if self.respawn_recovery_timeout_seconds <= 0:
+            return False
+        raw = entry.get("last_reconciled_at")
+        if not raw:
+            return False
+        try:
+            reconciled_at = datetime.fromisoformat(str(raw))
+        except ValueError:
+            return False
+        if reconciled_at.tzinfo is None:
+            reconciled_at = reconciled_at.replace(tzinfo=timezone.utc)
+        age_seconds = (
+            datetime.now(timezone.utc) - reconciled_at.astimezone(timezone.utc)
+        ).total_seconds()
+        return age_seconds <= self.respawn_recovery_timeout_seconds
 
     def _is_agent_control_healthy(
         self,
