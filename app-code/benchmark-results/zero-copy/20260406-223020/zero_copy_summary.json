@@ -1,0 +1,77 @@
+{
+  "benchmark": "zero_copy_handoff",
+  "trials_per_size": 30,
+  "dataset_sizes": [
+    10000,
+    100000,
+    500000,
+    1000000
+  ],
+  "results": [
+    {
+      "dataset_size": 10000,
+      "serialized": {
+        "mean_ms": 524.0197147553166,
+        "std_ms": 215.3306948283809,
+        "median_ms": 483.5311556234956,
+        "mean_peak_mem_mb": 5.419283231099446
+      },
+      "zero_copy": {
+        "mean_ms": 60.65037275354067,
+        "std_ms": 11.877451130152869,
+        "median_ms": 60.51480304449797,
+        "mean_peak_mem_mb": 1.3818819999694825
+      },
+      "speedup": 8.640008147760726
+    },
+    {
+      "dataset_size": 100000,
+      "serialized": {
+        "mean_ms": 3660.8832207818828,
+        "std_ms": 115.08981888207997,
+        "median_ms": 3648.1667775660753,
+        "mean_peak_mem_mb": 53.806755701700844
+      },
+      "zero_copy": {
+        "mean_ms": 264.121066344281,
+        "std_ms": 15.439105392412234,
+        "median_ms": 266.7589792981744,
+        "mean_peak_mem_mb": 13.741507085164388
+      },
+      "speedup": 13.860625626923422
+    },
+    {
+      "dataset_size": 500000,
+      "serialized": {
+        "mean_ms": 17594.120043391984,
+        "std_ms": 283.9786867219349,
+        "median_ms": 17562.11876217276,
+        "mean_peak_mem_mb": 254.35746835072834
+      },
+      "zero_copy": {
+        "mean_ms": 1176.1723902076483,
+        "std_ms": 32.081179428540196,
+        "median_ms": 1173.7136077135801,
+        "mean_peak_mem_mb": 55.784004592895506
+      },
+      "speedup": 14.958793617222911
+    },
+    {
+      "dataset_size": 1000000,
+      "serialized": {
+        "mean_ms": 35135.60603993634,
+        "std_ms": 1327.6475484737048,
+        "median_ms": 34782.22428727895,
+        "mean_peak_mem_mb": 509.9392562866211
+      },
+      "zero_copy": {
+        "mean_ms": 2338.788313791156,
+        "std_ms": 41.318106309139154,
+        "median_ms": 2343.430378474295,
+        "mean_peak_mem_mb": 101.56129290262858
+      },
+      "speedup": 15.022995383016013
+    }
+  ],
+  "headline_speedup": 15.022995383016013
+}
