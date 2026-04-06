@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: benchmark-spark-runner
+  namespace: etl-compute
+  labels:
+    app: benchmark-spark-runner
+    benchmark-role: baseline-runner
+    benchmark-scenario: spark-glue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: benchmark-spark-runner
+  template:
+    metadata:
+      labels:
+        app: benchmark-spark-runner
+        benchmark-role: baseline-runner
+        benchmark-scenario: spark-glue
+    spec:
+      containers:
+        - name: spark-runner
+          image: docker.io/library/etl-spark-benchmark:latest-py312
+          imagePullPolicy: Never
+          command: ["/bin/bash", "-lc", "trap : TERM INT; sleep infinity & wait"]
+          workingDir: /home/ray
+          envFrom:
+            - secretRef:
+                name: etl-secrets
+                optional: false
+          env:
+            - name: PYTHONPATH
+              value: /home/ray/app-code
+            - name: CA_PATH
+              value: /opt/certs/public.crt
+            - name: SSL_CERT_FILE
+              value: /opt/certs/public.crt
+            - name: AWS_EC2_METADATA_DISABLED
+              value: "true"
+            - name: AWS_ENDPOINT_URL
+              value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
+            - name: OVERSEER_REDIS_URL
+              value: "redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/0"
+            - name: TSDB_HOST
+              value: "tsdb-ha.etl-data.svc.cluster.local"
+            - name: TSDB_PORT
+              value: "5432"
+            - name: TSDB_USER
+              value: "app"
+            - name: TSDB_DATABASE
+              value: "app"
+            - name: RISINGWAVE_HOST
+              value: "risingwave.etl-data.svc.cluster.local"
+            - name: RISINGWAVE_PORT
+              value: "4566"
+            - name: RISINGWAVE_USER
+              value: "root"
+            - name: RISINGWAVE_DATABASE
+              value: "dev"
+            - name: JAVA_HOME
+              value: /usr/lib/jvm/java-17-openjdk-amd64
+            - name: SPARK_LOCAL_DIRS
+              value: /tmp/spark-local
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          volumeMounts:
+            - mountPath: /opt/certs
+              name: minio-ca
+              readOnly: true
+            - mountPath: /tmp/baseline
+              name: baseline-tmp
+            - mountPath: /tmp/spark-local
+              name: spark-local
+      volumes:
+        - name: minio-ca
+          configMap:
+            name: minio-ca
+        - name: baseline-tmp
+          emptyDir: {}
+        - name: spark-local
+          emptyDir: {}
