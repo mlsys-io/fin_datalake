@@ -7,6 +7,7 @@ without needing to be inside the Ray cluster.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Mapping
 import httpx
 
@@ -78,6 +79,7 @@ def _summarize_serve_application(
     route_prefix,
     deployments: list[dict[str, object]],
     replica_counts: dict[str, int],
+    alive_actor_replicas: int = 0,
 ) -> dict[str, object]:
     running_replicas = 0
     unhealthy_replicas = 0
@@ -87,36 +89,59 @@ def _summarize_serve_application(
         else:
             unhealthy_replicas += count
 
+    # The Serve applications endpoint can briefly lag behind deletes/redeploys.
+    # Cross-check against live replica actors so a stale application record is
+    # not treated as healthy when no actual Serve replicas remain.
+    effective_running_replicas = min(running_replicas, alive_actor_replicas) if running_replicas > 0 else alive_actor_replicas
+
     deployment_states = [str(deployment.get("status") or "").upper() for deployment in deployments]
     healthy_statuses = {"RUNNING", "HEALTHY"}
     recovering_statuses = {"DEPLOYING", "UPDATING", "STARTING", "RESTARTING"}
+    deleting_statuses = {"DELETING", "STOPPING", "STOPPED", "DELETING_APP"}
     degraded_statuses = {"UNHEALTHY", "DEPLOY_FAILED", "FAILED"}
 
     any_recovering = app_status in recovering_statuses or any(
         state in recovering_statuses for state in deployment_states
     )
+    any_deleting = app_status in deleting_statuses or any(
+        state in deleting_statuses for state in deployment_states
+    )
     any_degraded = app_status in degraded_statuses or any(
         state in degraded_statuses for state in deployment_states
     )
 
-    if any_recovering and running_replicas <= 0:
+    if any_deleting:
+        observed_status = "missing"
+        health_status = "offline"
+        recovery_state = "idle"
+        failure_reason = f"Deployment '{name}' is being deleted or stopped by Ray Serve."
+        notes = "Ray Serve reports the application as deleting or stopped."
+    elif any_recovering and effective_running_replicas <= 0:
         observed_status = "recovering"
         health_status = "degraded"
         recovery_state = "recovering"
         failure_reason = None
         notes = "Deployment is actively being reconciled by Ray Serve."
-    elif running_replicas > 0 and (unhealthy_replicas > 0 or any_recovering or any_degraded):
+    elif effective_running_replicas > 0 and (unhealthy_replicas > 0 or any_recovering or any_degraded):
         observed_status = "degraded"
         health_status = "degraded"
         recovery_state = "idle"
         failure_reason = None
         notes = "Deployment is partially available in Ray Serve."
-    elif running_replicas > 0 and app_status in healthy_statuses.union(recovering_statuses, {""}):
+    elif effective_running_replicas > 0 and app_status in healthy_statuses.union(recovering_statuses, {""}):
         observed_status = "ready"
         health_status = "healthy"
         recovery_state = "idle"
         failure_reason = None
         notes = "Deployment is healthy in Ray Serve."
+    elif running_replicas > 0 and alive_actor_replicas <= 0 and not any_recovering:
+        observed_status = "missing"
+        health_status = "offline"
+        recovery_state = "idle"
+        failure_reason = (
+            f"Serve reported application '{name}', but no live replica actors were found."
+        )
+        notes = "Serve application summary appears stale relative to the live actor list."
     elif any_degraded:
         observed_status = "degraded"
         health_status = "degraded"
@@ -136,7 +161,9 @@ def _summarize_serve_application(
         "route_prefix": route_prefix,
         "deployments": deployments,
         "replica_counts": replica_counts,
-        "running_replicas": running_replicas,
+        "running_replicas": effective_running_replicas,
+        "reported_running_replicas": running_replicas,
+        "alive_actor_replicas": alive_actor_replicas,
         "unhealthy_replicas": unhealthy_replicas,
         "observed_status": observed_status,
         "health_status": health_status,
@@ -227,6 +254,20 @@ def parse_serve_applications(payload: Mapping[str, object] | None) -> list[dict[
     return normalized
 
 
+def count_alive_serve_replica_actors(
+    actors: list[dict[str, object]],
+) -> dict[str, int]:
+    counts: dict[str, int] = defaultdict(int)
+    for actor in actors:
+        if str(actor.get("state") or "").upper() != "ALIVE":
+            continue
+        serve_app_name = str(actor.get("serve_app_name") or "").strip()
+        if not serve_app_name:
+            continue
+        counts[serve_app_name] += 1
+    return dict(counts)
+
+
 def map_serve_applications_by_name(
     applications: list[dict[str, object]],
 ) -> dict[str, dict[str, object]]:
@@ -270,7 +311,22 @@ class RayCollector(BaseCollector):
 
             alive = sum(1 for a in actors if a["state"] == "ALIVE")
             dead = sum(1 for a in actors if a["state"] == "DEAD")
-            serve_applications = parse_serve_applications(serve_raw)
+            alive_serve_replica_counts = count_alive_serve_replica_actors(actors)
+            serve_applications = [
+                _summarize_serve_application(
+                    name=str(app.get("name") or "").strip(),
+                    app_status=str(app.get("status") or "").strip().upper(),
+                    route_prefix=app.get("route_prefix"),
+                    deployments=list(app.get("deployments") or []),
+                    replica_counts=dict(app.get("replica_counts") or {}),
+                    alive_actor_replicas=alive_serve_replica_counts.get(
+                        str(app.get("name") or "").strip(),
+                        0,
+                    ),
+                )
+                for app in parse_serve_applications(serve_raw)
+                if str(app.get("name") or "").strip()
+            ]
 
             return ServiceMetrics(
                 service="ray",
@@ -280,6 +336,7 @@ class RayCollector(BaseCollector):
                     "actors_alive": alive,
                     "actors_dead": dead,
                     "serve_applications": serve_applications,
+                    "serve_actor_replica_counts": alive_serve_replica_counts,
                     "serve_applications_by_name": map_serve_applications_by_name(
                         serve_applications
                     ),
