@@ -103,6 +103,7 @@ class RayActuator(BaseActuator):
             num_replicas=num_replicas,
             num_cpus=num_cpus,
             serve_options=serve_options,
+            wait_for_post_deploy_sync=False,
         )
         return class_name, deployment_name
 
@@ -131,6 +132,7 @@ class RayActuator(BaseActuator):
         num_replicas: int = 1,
         num_cpus: float = 0.5,
         serve_options: dict | None = None,
+        wait_for_post_deploy_sync: bool = True,
     ) -> None:
         """Deploy an agent via its deploy() helper when available."""
         if hasattr(agent_cls, "deploy") and callable(getattr(agent_cls, "deploy")):
@@ -139,6 +141,7 @@ class RayActuator(BaseActuator):
                 num_replicas=num_replicas,
                 num_cpus=num_cpus,
                 config=config,
+                wait_for_post_deploy_sync=wait_for_post_deploy_sync,
                 **(serve_options or {}),
             )
         else:

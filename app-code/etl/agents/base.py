@@ -32,6 +32,7 @@ class BaseAgent(ABC, ConversationManagerMixin):
         num_replicas: int = 1,
         num_cpus: float = 0.5,
         config: Optional[Dict[str, Any]] = None,
+        wait_for_post_deploy_sync: bool = True,
         **serve_options,
     ):
         import ray
@@ -68,9 +69,14 @@ class BaseAgent(ABC, ConversationManagerMixin):
         )
         logger.info(f"Deployed Agent '{actor_name}' to Ray Serve")
 
-        resolve_serve_response(handle.set_app_name.remote(actor_name))
-        resolve_serve_response(handle.set_runtime_metadata.remote(runtime_metadata))
-        resolve_serve_response(handle.setup.remote())
+        set_name_ref = handle.set_app_name.remote(actor_name)
+        set_metadata_ref = handle.set_runtime_metadata.remote(runtime_metadata)
+        setup_ref = handle.setup.remote()
+
+        if wait_for_post_deploy_sync:
+            resolve_serve_response(set_name_ref)
+            resolve_serve_response(set_metadata_ref)
+            resolve_serve_response(setup_ref)
 
         return handle
 
