@@ -11,36 +11,81 @@ class LangChainMixin:
     on the agent, allowing for cleaner Ray orchestration.
     """
 
-    def _get_llm(self, model_name: str = "gpt-3.5-turbo", temperature: float = 0.0, json_mode: bool = False) -> Any:
+    def _get_llm(self, model_name: str | None = None, temperature: float = 0.0, json_mode: bool = False) -> Any:
         """
-        Dynamically initializes a LangChain ChatOpenAI model.
-        Requires OPENAI_API_KEY in the environment.
+        Resolve a chat model with Gemini-first preference.
+
+        Resolution order:
+        1. ``LLM_PROVIDER`` / ``AGENT_LLM_PROVIDER`` explicit override
+        2. Gemini when ``GOOGLE_API_KEY`` is available
+        3. OpenAI when ``OPENAI_API_KEY`` is available
         """
+        provider = str(
+            os.environ.get("AGENT_LLM_PROVIDER")
+            or os.environ.get("LLM_PROVIDER")
+            or "gemini"
+        ).strip().lower()
+
+        preferred_model = str(
+            model_name
+            or os.environ.get("AGENT_LLM_MODEL")
+            or os.environ.get("LLM_MODEL")
+            or os.environ.get("GEMINI_MODEL")
+            or "gemini-2.5-flash"
+        ).strip()
+
+        if provider in {"gemini", "google", "auto"}:
+            llm = self._get_gemini_llm(
+                model_name=preferred_model if provider != "auto" or preferred_model.startswith("gemini") else None,
+                temperature=temperature,
+                json_mode=json_mode,
+            )
+            if llm:
+                return llm
+            if provider != "auto":
+                return None
+
+        if provider in {"openai", "auto"}:
+            fallback_model = preferred_model
+            if fallback_model.startswith("gemini"):
+                fallback_model = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
+            llm = self._get_openai_llm(
+                model_name=fallback_model,
+                temperature=temperature,
+                json_mode=json_mode,
+            )
+            if llm:
+                return llm
+
+        return None
+
+    def _get_openai_llm(self, model_name: str = "gpt-4.1-mini", temperature: float = 0.0, json_mode: bool = False) -> Any:
+        """Optional OpenAI fallback for teams that prefer that provider."""
         try:
             from langchain_openai import ChatOpenAI
             api_key = os.environ.get("OPENAI_API_KEY")
-            
+
             if api_key and api_key.lower() not in ["dummy", "test", "demo"]:
                 kwargs = {
                     "api_key": api_key,
                     "model": model_name,
-                    "temperature": temperature
+                    "temperature": temperature,
                 }
                 if json_mode:
                     kwargs["model_kwargs"] = {"response_format": {"type": "json_object"}}
                 return ChatOpenAI(**kwargs)
         except ImportError:
-            logger.warning("[LangChainMixin] Could not import langchain_openai.")
-            
+            logger.warning("[LangChainMixin] langchain_openai is not installed; skipping OpenAI fallback.")
+
         return None
 
-    def _get_gemini_llm(self, model_name: str = "gemini-2.0-flash", temperature: float = 0.0) -> Any:
+    def _get_gemini_llm(self, model_name: str | None = None, temperature: float = 0.0, json_mode: bool = False) -> Any:
         """
         Dynamically initialises a LangChain-compatible Gemini ChatModel.
         Requires GOOGLE_API_KEY in the environment.
 
         Args:
-            model_name: Gemini model identifier (e.g. "gemini-2.0-flash", "gemini-1.5-pro").
+            model_name: Gemini model identifier (e.g. "gemini-2.5-flash").
             temperature: Sampling temperature (0.0 = deterministic).
 
         Returns:
@@ -49,13 +94,17 @@ class LangChainMixin:
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
             api_key = os.environ.get("GOOGLE_API_KEY")
+            resolved_model = str(model_name or os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash").strip()
 
             if api_key and api_key.lower() not in ["dummy", "test", "demo"]:
-                return ChatGoogleGenerativeAI(
-                    model=model_name,
-                    temperature=temperature,
-                    google_api_key=api_key,
-                )
+                kwargs = {
+                    "model": resolved_model,
+                    "temperature": temperature,
+                    "google_api_key": api_key,
+                }
+                if json_mode:
+                    kwargs["convert_system_message_to_human"] = True
+                return ChatGoogleGenerativeAI(**kwargs)
             else:
                 logger.warning("[LangChainMixin] GOOGLE_API_KEY not set or is a placeholder.")
         except ImportError:

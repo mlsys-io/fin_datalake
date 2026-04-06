@@ -5,6 +5,7 @@ Handles read-oriented operations against the Lakehouse storage layer.
 
 Supported Actions:
     - run_sql:      Execute a DuckDB SQL query against Delta Lake.
+    - query_stream: Execute a SQL query against RisingWave.
     - get_schema:   Return the schema of a specific Delta table.
     - list_tables:  List available Delta tables in the Lakehouse.
     - preview:      Return the first N rows of a table as JSON.
@@ -27,6 +28,7 @@ from loguru import logger
 
 # Single-threaded executor serializes all DuckDB calls — avoids thread-safety issues
 _duckdb_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+_streamdb_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
 
 class DataAdapter(BaseAdapter):
@@ -54,6 +56,7 @@ class DataAdapter(BaseAdapter):
 
         dispatch = {
             "run_sql": self._run_sql,
+            "query_stream": self._query_stream,
             "get_schema": self._get_schema,
             "list_tables": self._list_tables,
             "preview": self._preview,
@@ -135,6 +138,51 @@ class DataAdapter(BaseAdapter):
         return {"table_path": table_path, "fields": [
             {"name": f.name, "type": str(f.type)} for f in schema.fields
         ]}
+
+    async def _query_stream(self, intent: UserIntent) -> dict:
+        """Execute a SQL query against RisingWave via the ETL source abstraction."""
+        sql = intent.parameters.get("sql")
+        if not sql:
+            raise ValueError("Parameter 'sql' is required.")
+
+        def _execute_risingwave():
+            from etl.config import config
+            from etl.io.sources.risingwave import RisingWaveSource
+
+            source = RisingWaveSource(
+                host=config.RISINGWAVE_HOST,
+                port=config.RISINGWAVE_PORT,
+                user=config.RISINGWAVE_USER,
+                password=config.RISINGWAVE_PASSWORD,
+                database=config.RISINGWAVE_DATABASE,
+                query=sql,
+            )
+            rows = []
+            with source.open() as reader:
+                for batch in reader.read_batch():
+                    rows.extend(batch)
+            return rows
+
+        try:
+            loop = asyncio.get_event_loop()
+            rows = await loop.run_in_executor(_streamdb_executor, _execute_risingwave)
+            columns = list(rows[0].keys()) if rows else []
+            values = [[row.get(column) for column in columns] for row in rows]
+            return {
+                "success": True,
+                "mode": "json",
+                "backend": "risingwave",
+                "columns": columns,
+                "rows": values,
+                "row_count": len(rows),
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "backend": "risingwave",
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+            }
 
     async def _list_tables(self, intent: UserIntent) -> dict:
         """List available Delta tables from Hive Metastore with Redis caching."""

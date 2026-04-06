@@ -2,7 +2,13 @@
 ETL I/O Module - Sources, Sinks, and I/O Tasks.
 """
 from etl.io.base import DataSource, DataSink, DataReader, DataWriter
-from etl.io.tasks import DeltaLakeWriteTask
+
+try:
+    from etl.io.tasks import DeltaLakeWriteTask
+    from etl.io.tasks import RisingWaveWriteTask
+except ImportError:
+    DeltaLakeWriteTask = None
+    RisingWaveWriteTask = None
 
 __all__ = [
     # Base classes
@@ -12,4 +18,5 @@ __all__ = [
     "DataWriter",
     # Tasks
     "DeltaLakeWriteTask",
+    "RisingWaveWriteTask",
 ]

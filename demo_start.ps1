@@ -96,5 +96,5 @@ Write-Host "`nYou can now run the following scripts:" -ForegroundColor Cyan
 Write-Host "1. Ingest Data:   uv run python -m pipelines.market_pulse_ingest"
 Write-Host "2. Run Full Demo: uv run python -m pipelines.market_pulse_demo"
 Write-Host "3. Self-Healing:  uv run python -m pipelines.self_healing_demo"
-Write-Host "4. Benchmarks:    uv run python -m pipelines.benchmark_market_pulse"
+Write-Host "4. Benchmarks:    uv run python -m pipelines.benchmarks.benchmark_market_pulse"
 Write-Host "`nPress Ctrl+C to terminate background processes (or use Task Manager)."

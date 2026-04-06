@@ -97,7 +97,7 @@ etl-agents = "etl.agents.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["agents*", "etl*", "pipelines*", "transformations*", "gateway*", "overseer*"]
+include = ["agents*", "etl*", "pipelines*", "sample_agents*", "transformations*", "gateway*", "overseer*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.json"]

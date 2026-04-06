@@ -35,7 +35,7 @@ def resolve_agent_class(class_name: str):
     if resolved is not None:
         return resolved
 
-    for module_name in ("agents", "etl.agents"):
+    for module_name in ("agents", "etl.agents", "sample_agents"):
         try:
             module = importlib.import_module(module_name)
         except ImportError:

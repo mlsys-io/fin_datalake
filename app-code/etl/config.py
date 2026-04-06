@@ -8,33 +8,48 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Find and load .env file from project root (zdb_deployment/)
-# Search upward from this file's location
-def _find_env_file() -> Path | None:
-    """Find .env file by searching upward from current directory."""
-    # Start from app-code directory
+def _candidate_env_roots() -> list[Path]:
+    """Return likely directories that may contain .env files."""
     current = Path(__file__).parent.parent
-    
-    # Check app-code directory first
-    if (current / ".env").exists():
-        return current / ".env"
-    
-    # Then check parent (zdb_deployment)
     parent = current.parent
-    if (parent / ".env").exists():
-        return parent / ".env"
-    
-    # Check current working directory as fallback
     cwd = Path.cwd()
-    if (cwd / ".env").exists():
-        return cwd / ".env"
-    
-    return None
+
+    roots: list[Path] = []
+    for candidate in (current, parent, cwd):
+        resolved = candidate.resolve()
+        if resolved not in roots:
+            roots.append(resolved)
+    return roots
 
 
-# Load .env file on module import
-_env_file = _find_env_file()
-if _env_file:
+def _find_env_files() -> list[Path]:
+    """
+    Find environment files to load.
+
+    Load order matters:
+    1. .env
+    2. .env.user
+
+    Later files override earlier ones.
+    """
+    discovered: list[Path] = []
+    for root in _candidate_env_roots():
+        for name in (".env", ".env.user"):
+            path = root / name
+            if path.exists():
+                discovered.append(path)
+
+    unique: list[Path] = []
+    for path in discovered:
+        resolved = path.resolve()
+        if resolved not in unique:
+            unique.append(resolved)
+    return unique
+
+
+# Load environment files on module import
+_env_files = _find_env_files()
+for _env_file in _env_files:
     load_dotenv(_env_file)
 
 
@@ -89,6 +104,10 @@ class Config:
     # RisingWave
     RISINGWAVE_HOST: str = os.environ.get("RISINGWAVE_HOST", "")
     RISINGWAVE_PORT: int = int(os.environ.get("RISINGWAVE_PORT", "4566"))
+    RISINGWAVE_USER: str = os.environ.get("RISINGWAVE_USER", "root")
+    RISINGWAVE_PASSWORD: str = os.environ.get("RISINGWAVE_PASSWORD", "")
+    RISINGWAVE_DATABASE: str = os.environ.get("RISINGWAVE_DATABASE", "dev")
+    RISINGWAVE_SCHEMA: str = os.environ.get("RISINGWAVE_SCHEMA", "public")
     
     # Redis
     REDIS_URL: str = os.environ.get("OVERSEER_REDIS_URL", "")
@@ -102,8 +121,8 @@ class Config:
     @classmethod
     def reload(cls):
         """Reload configuration from environment."""
-        if _env_file:
-            load_dotenv(_env_file, override=True)
+        for env_file in _env_files:
+            load_dotenv(env_file, override=True)
             
         # Re-read all values
         cls.NODE_IP = os.environ.get("NODE_IP", "localhost")
@@ -134,6 +153,10 @@ class Config:
         cls.HIVE_PORT = int(os.environ.get("HIVE_PORT", "9083"))
         cls.RISINGWAVE_HOST = os.environ.get("RISINGWAVE_HOST", "")
         cls.RISINGWAVE_PORT = int(os.environ.get("RISINGWAVE_PORT", "4566"))
+        cls.RISINGWAVE_USER = os.environ.get("RISINGWAVE_USER", "root")
+        cls.RISINGWAVE_PASSWORD = os.environ.get("RISINGWAVE_PASSWORD", "")
+        cls.RISINGWAVE_DATABASE = os.environ.get("RISINGWAVE_DATABASE", "dev")
+        cls.RISINGWAVE_SCHEMA = os.environ.get("RISINGWAVE_SCHEMA", "public")
         
         cls.REDIS_URL = os.environ.get("OVERSEER_REDIS_URL", "")
         cls.INPUT_PATH = os.environ.get("INPUT_PATH", "/mnt/data")

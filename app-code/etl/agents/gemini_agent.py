@@ -13,7 +13,7 @@ Usage:
 
 Environment:
     GOOGLE_API_KEY  - required for live Gemini inference
-    GEMINI_MODEL    - optional override (default: gemini-2.0-flash)
+    GEMINI_MODEL    - optional override (default: gemini-2.5-flash)
 """
 
 import os

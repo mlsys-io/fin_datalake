@@ -14,6 +14,8 @@ from overseer.policies.base import BasePolicy
 
 DEFAULT_MANAGED_AGENTS = {
     "SentimentAgent",
+    "MarketAnalystAgent",
+    "StrategyAgent",
     "TraderAgent",
     "MarketAnalyst",
     "Coordinator",

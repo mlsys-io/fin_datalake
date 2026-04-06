@@ -154,6 +154,19 @@ SET
 WHERE name = %(name)s;
 """
 
+_UPDATE_CONTROL_SQL = """
+UPDATE agent_definitions
+SET
+    managed_by_overseer = COALESCE(%(managed_by_overseer)s, managed_by_overseer),
+    desired_status = COALESCE(%(desired_status)s, desired_status),
+    reconcile_notes = CASE
+        WHEN %(set_reconcile_notes)s THEN %(reconcile_notes)s
+        ELSE reconcile_notes
+    END,
+    updated_at = %(updated_at)s
+WHERE name = %(name)s;
+"""
+
 _LIST_AGENTS_SQL = """
 SELECT
     name,
@@ -375,6 +388,47 @@ def update_agent_catalog_status(
             with conn.cursor() as cursor:
                 _ensure_schema(cursor)
                 cursor.execute(_UPDATE_STATUS_SQL, payload)
+        return True
+    finally:
+        conn.close()
+
+
+def update_agent_catalog_control(
+    *,
+    name: str,
+    managed_by_overseer: bool | None = None,
+    desired_status: str | None = None,
+    reconcile_notes: str | None | object = _UNSET,
+) -> bool:
+    """
+    Update durable control-plane fields for an already-registered agent.
+
+    This is intended for cases where orchestration behavior itself needs to be
+    changed, such as temporarily disabling Overseer management for a manual
+    recovery benchmark.
+    """
+    dsn = _get_dsn()
+    if not dsn:
+        return False
+
+    import psycopg2
+
+    now = _now()
+    payload = {
+        "name": name,
+        "managed_by_overseer": managed_by_overseer,
+        "desired_status": desired_status,
+        "reconcile_notes": None if reconcile_notes is _UNSET else reconcile_notes,
+        "set_reconcile_notes": reconcile_notes is not _UNSET,
+        "updated_at": now,
+    }
+
+    conn = psycopg2.connect(dsn)
+    try:
+        with conn:
+            with conn.cursor() as cursor:
+                _ensure_schema(cursor)
+                cursor.execute(_UPDATE_CONTROL_SQL, payload)
         return True
     finally:
         conn.close()
