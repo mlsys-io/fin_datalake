@@ -122,7 +122,7 @@ def _wait_for_overseer_recovery(
 ) -> Dict[str, Any]:
     deadline = start_time + timeout_seconds
     observed_states: List[str] = []
-    saw_non_ready_state = False
+    saw_outage = False
 
     while time.perf_counter() < deadline:
         time.sleep(poll_interval_seconds)
@@ -130,16 +130,15 @@ def _wait_for_overseer_recovery(
         observed_status = state["observed_status"]
         observed_states.append(observed_status)
 
-        if observed_status in {"missing", "recovering", "degraded", "offline"}:
-            saw_non_ready_state = True
-
-        if observed_status != "ready":
-            continue
-
         try:
-            probe_response = _wait_for_probe_ready(victim_name, timeout_seconds=5.0, message="mttr probe")
-            if not saw_non_ready_state:
-                raise RuntimeError("Trial reached ready without observing an outage state.")
+            handle = serve.get_app_handle(victim_name)
+            probe_response = resolve_serve_response(handle.chat.remote("mttr probe"))
+            if not saw_outage:
+                logger.debug(
+                    f"[MTTR] Catalog is {observed_status} for '{victim_name}', "
+                    "but outage has not yet been confirmed by probe failure."
+                )
+                continue
 
             return {
                 "success": True,
@@ -148,13 +147,12 @@ def _wait_for_overseer_recovery(
                 "final_observed_status": state["observed_status"],
                 "final_health_status": state["health_status"],
                 "final_recovery_state": state["recovery_state"],
-                "probe_response": probe_response,
+                "probe_response": str(probe_response),
                 "error": None,
             }
         except Exception as exc:
-            logger.debug(
-                f"[MTTR] Catalog is ready for '{victim_name}', but Serve handle still not usable: {exc}"
-            )
+            saw_outage = True
+            logger.debug(f"[MTTR] Outage confirmed for '{victim_name}': {exc}")
 
     state = _capture_state(victim_name)
     raise RuntimeError(
