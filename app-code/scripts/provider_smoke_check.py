@@ -6,6 +6,7 @@ import os
 import time
 from typing import Any, Dict, List
 
+import certifi
 import requests
 from loguru import logger
 
@@ -53,13 +54,11 @@ def _probe_binance(*, websocket_url: str) -> Dict[str, Any]:
     try:
         import websocket
         sslopt: Dict[str, Any] = {}
-        ca_file = str(
-            os.environ.get("SSL_CERT_FILE")
-            or os.environ.get("CA_PATH")
-            or ""
-        ).strip()
+        ca_file = str(os.environ.get("WEBSOCKET_CA_CERT") or "").strip()
         if ca_file:
             sslopt["ca_certs"] = ca_file
+        else:
+            sslopt["ca_certs"] = certifi.where()
 
         ws = websocket.create_connection(websocket_url, timeout=10, sslopt=sslopt or None)
         try:

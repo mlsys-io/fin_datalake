@@ -40,14 +40,14 @@ class WebSocketReader(DataReader):
             return
             
         import websocket
+        import certifi
         sslopt = dict(self.source.sslopt)
-        ca_file = str(
-            os.environ.get("SSL_CERT_FILE")
-            or os.environ.get("CA_PATH")
-            or ""
-        ).strip()
+        ca_file = str(os.environ.get("WEBSOCKET_CA_CERT") or "").strip()
         if ca_file and "ca_certs" not in sslopt:
             sslopt["ca_certs"] = ca_file
+        elif "ca_certs" not in sslopt:
+            # Prefer the standard public CA bundle for internet-facing sockets.
+            sslopt["ca_certs"] = certifi.where()
         # Note: websocket-client connect is synchronous
         self._ws = websocket.create_connection(
             self.source.url, 
