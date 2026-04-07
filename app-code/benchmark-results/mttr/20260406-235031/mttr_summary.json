@@ -1,0 +1,80 @@
+{
+  "benchmark": "mttr_recovery_comparison",
+  "selected_mode": "compare",
+  "summary": {
+    "modes": {
+      "overseer": {
+        "trial_count": 1,
+        "success_count": 1,
+        "failure_count": 0,
+        "mean_mttr_seconds": 13.29764461889863,
+        "std_mttr_seconds": 0.0,
+        "min_mttr_seconds": 13.29764461889863,
+        "max_mttr_seconds": 13.29764461889863,
+        "p95_mttr_seconds": 13.29764461889863
+      },
+      "manual": {
+        "trial_count": 1,
+        "success_count": 1,
+        "failure_count": 0,
+        "mean_mttr_seconds": 4.109841646626592,
+        "std_mttr_seconds": 0.0,
+        "min_mttr_seconds": 4.109841646626592,
+        "max_mttr_seconds": 4.109841646626592,
+        "p95_mttr_seconds": 4.109841646626592
+      }
+    },
+    "comparison": {
+      "manual_over_overseer_ratio": 0.3090653844655827,
+      "overseer_improvement_pct": -223.55613092328022
+    }
+  },
+  "trials": {
+    "overseer": [
+      {
+        "success": true,
+        "mttr_seconds": 13.29764461889863,
+        "observed_states": [
+          "unknown",
+          "unknown",
+          "unknown",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "ready"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-6436c4d8",
+        "agent_class": "SupportAgent"
+      }
+    ],
+    "manual": [
+      {
+        "success": true,
+        "mttr_seconds": 4.109841646626592,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-3144c224",
+        "agent_class": "SupportAgent"
+      }
+    ]
+  }
+}

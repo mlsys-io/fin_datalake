@@ -1,0 +1,38 @@
+# --- Core Execution ---
+ray[serve]==2.37.0
+prefect==3.0.2
+
+# --- Streaming and Messaging ---
+kafka-python==2.0.2
+confluent-kafka==2.4.0
+
+# --- Data and Processing ---
+pandas==2.2.3
+pyarrow==17.0.0
+daft==0.1.2  # Distributed dataframe library
+
+# --- Storage / Connectors ---
+sqlalchemy==2.0.35
+psycopg2-binary==2.9.9
+deltalake==1.1.4          # Delta-rs Python client
+minio==7.1.14             # MinIO Python client for local dev
+
+# --- Serialization & IO ---
+fastparquet==2024.5.0
+orjson==3.10.7
+requests==2.32.3
+
+# --- Metadata / Lineage ---
+pyhive==0.7.0             # Hive metastore client
+
+# --- Testing & Dev Tools ---
+pytest==8.3.3
+black==24.8.0
+flake8==7.1.1
+ipython==8.27.0
+python-dotenv==1.0.1
+loguru==0.7.2             # Structured logging
+
+# --- Data Stores ---
+redis>=5.0.0              # Used by ContextStore for agent state
+

@@ -1,0 +1,165 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: etl-ray
+  namespace: etl-compute
+spec:
+  rayVersion: "latest" # Actual version determined by Docker image (latest-py312)
+
+  # Head node configuration
+  headGroupSpec:
+    serviceType: NodePort # Enable external access
+    rayStartParams:
+      dashboard-host: "0.0.0.0"
+      num-cpus: "0" # Don't schedule tasks on head
+    template:
+      metadata:
+        labels:
+          app: ray-head
+      spec:
+        containers:
+          - name: ray-head
+            image: docker.io/library/etl-ray:latest-py312
+            imagePullPolicy: Never # Use local image
+            envFrom:
+              - secretRef:
+                  name: etl-user-secret-ray
+                  optional: true
+            resources:
+              limits:
+                cpu: "2"
+                memory: "4Gi"
+              requests:
+                cpu: "500m"
+                memory: "1Gi"
+            ports:
+              - containerPort: 6379
+                name: gcs
+              - containerPort: 8265
+                name: dashboard
+              - containerPort: 10001
+                name: client
+              - containerPort: 8000
+                name: serve
+            env:
+              - name: RAY_GRAFANA_IFRAME_HOST
+                value: "http://127.0.0.1:3000"
+              - name: CA_PATH
+                value: "/opt/certs/public.crt"
+              - name: SSL_CERT_FILE
+                value: "/opt/certs/public.crt"
+              - name: AWS_EC2_METADATA_DISABLED
+                value: "true"
+              - name: AWS_ENDPOINT_URL
+                value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
+              - name: AWS_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: etl-secrets
+                    key: AWS_ACCESS_KEY_ID
+              - name: AWS_SECRET_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: etl-secrets
+                    key: AWS_SECRET_ACCESS_KEY
+              - name: OVERSEER_REDIS_URL
+                value: "redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/0"
+              - name: TSDB_HOST
+                value: "tsdb-ha.etl-data.svc.cluster.local"
+              - name: TSDB_PORT
+                value: "5432"
+              - name: TSDB_USER
+                value: "app"
+              - name: TSDB_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: etl-secrets
+                    key: TSDB_PASSWORD
+              - name: TSDB_DATABASE
+                value: "app"
+            volumeMounts:
+              - mountPath: /tmp/ray
+                name: ray-logs
+              - mountPath: /opt/certs
+                name: minio-ca
+                readOnly: true
+        volumes:
+          - name: ray-logs
+            emptyDir: {}
+          - name: minio-ca
+            configMap:
+              name: minio-ca
+
+  # Worker nodes configuration
+  workerGroupSpecs:
+    - replicas: 2
+      minReplicas: 1
+      maxReplicas: 5
+      groupName: default-worker
+      rayStartParams: {}
+      template:
+        metadata:
+          labels:
+            app: ray-worker
+        spec:
+          containers:
+            - name: ray-worker
+              image: docker.io/library/etl-ray:latest-py312
+              imagePullPolicy: Never # Use local image
+              envFrom:
+                - secretRef:
+                    name: etl-user-secret-ray
+                    optional: true
+              resources:
+                limits:
+                  cpu: "4"
+                  memory: "8Gi"
+                requests:
+                  cpu: "1"
+                  memory: "2Gi"
+              env:
+                - name: CA_PATH
+                  value: "/opt/certs/public.crt"
+                - name: SSL_CERT_FILE
+                  value: "/opt/certs/public.crt"
+                - name: AWS_EC2_METADATA_DISABLED
+                  value: "true"
+                - name: AWS_ENDPOINT_URL
+                  value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: etl-secrets
+                      key: AWS_ACCESS_KEY_ID
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: etl-secrets
+                      key: AWS_SECRET_ACCESS_KEY
+                - name: OVERSEER_REDIS_URL
+                  value: "redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/0"
+                - name: TSDB_HOST
+                  value: "tsdb-ha.etl-data.svc.cluster.local"
+                - name: TSDB_PORT
+                  value: "5432"
+                - name: TSDB_USER
+                  value: "app"
+                - name: TSDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: etl-secrets
+                      key: TSDB_PASSWORD
+                - name: TSDB_DATABASE
+                  value: "app"
+              volumeMounts:
+                - mountPath: /tmp/ray
+                  name: ray-logs
+                - mountPath: /opt/certs
+                  name: minio-ca
+                  readOnly: true
+          volumes:
+            - name: ray-logs
+              emptyDir: {}
+            - name: minio-ca
+              configMap:
+                name: minio-ca

@@ -1,0 +1,310 @@
+% ============================================================
+%  references.bib
+%  APA-style BibTeX entries for AI-Native Lakehouse FYP Report
+%  Author : Lian Zhi Xuan (A0255844W)
+%
+%  Organisation:
+%    1. Core Systems Papers          (Ray, Delta Lake, Spark)
+%    2. Autonomic Computing          (MAPE-K)
+%    3. Multi-Agent Frameworks       (LangGraph, CrewAI, AutoGen, MetaGPT)
+%    4. Data Formats                 (Apache Arrow)
+%    5. AI Middleware & Glue Code    (Sculley, McKinsey, a16z)
+%    6. JSON / LLM Formatting Cost   (Tam, Gupta)
+%    7. Protocol & Standards         (MCP)
+%    8. Industry Reports             (Redpoint, CData, ItSoli)
+%    9. Infrastructure Tools         (K0s, Prefect)
+% ============================================================
+
+
+% ── 1. Core Systems Papers ───────────────────────────────────
+
+@inproceedings{moritz2018ray,
+  author    = {Moritz, Philipp and Nishihara, Robert and Wang, Stephanie and
+               Tumanov, Alexey and Liaw, Richard and Liang, Eric and
+               Elibol, Melih and Yang, Zongheng and Paul, William and
+               Jordan, Michael I. and Stoica, Ion},
+  title     = {{Ray}: A Distributed Framework for Emerging {AI} Applications},
+  booktitle = {13th {USENIX} Symposium on Operating Systems Design and
+               Implementation ({OSDI} 18)},
+  year      = {2018},
+  pages     = {561--577},
+  address   = {Carlsbad, CA},
+  publisher = {{USENIX} Association},
+  url       = {https://www.usenix.org/conference/osdi18/presentation/moritz}
+}
+
+@article{armbrust2020delta,
+  author    = {Armbrust, Michael and Das, Tathagata and Paranjpye, Sameer and
+               Xin, Reynold and Zhu, Shixiong and Ghodsi, Ali and Yavuz, Burak and
+               Murthy, Mukul and Torres, Joseph and Sun, Liwen and Boncz, Peter A. and
+               Mokhtar, Mostafa and {Van Hovell}, Herman and Ionescu, Adrian and
+               Luszczak, Alicja and Switakowski, Michal and Ueshin, Takuya and
+               Li, Xiao and Szafranski, Michal and Senster, Pieter and Zaharia, Matei},
+  title     = {Delta {Lake}: High-Performance {ACID} Table Storage over Cloud
+               Object Stores},
+  journal   = {Proceedings of the VLDB Endowment},
+  volume    = {13},
+  number    = {12},
+  pages     = {3411--3424},
+  year      = {2020},
+  doi       = {10.14778/3415478.3415560}
+}
+
+@inproceedings{armbrust2021lakehouse,
+  author    = {Armbrust, Michael and Ghodsi, Ali and Xin, Reynold and Zaharia, Matei},
+  title     = {Lakehouse: A New Generation of Open Platforms that Unify Data
+               Warehousing and {AI}},
+  booktitle = {Proceedings of the 11th Annual Conference on Innovative Data Systems
+               Research ({CIDR} 2021)},
+  year      = {2021},
+  url       = {http://cidrdb.org/cidr2021/papers/cidr2021_paper17.pdf}
+}
+
+@inproceedings{zaharia2012resilient,
+  author    = {Zaharia, Matei and Chowdhury, Mosharaf and Das, Tathagata and
+               Dave, Ankur and Ma, Justin and McCauley, Murphy and
+               Franklin, Michael J. and Shenker, Scott and Stoica, Ion},
+  title     = {Resilient Distributed Datasets: A Fault-Tolerant Abstraction for
+               In-Memory Cluster Computing},
+  booktitle = {9th {USENIX} Symposium on Networked Systems Design and
+               Implementation ({NSDI} 12)},
+  year      = {2012},
+  pages     = {15--28},
+  publisher = {{USENIX} Association}
+}
+
+
+% ── 2. Autonomic Computing ───────────────────────────────────
+
+@article{kephart2003,
+  author    = {Kephart, Jeffrey O. and Chess, David M.},
+  title     = {The Vision of Autonomic Computing},
+  journal   = {Computer},
+  volume    = {36},
+  number    = {1},
+  pages     = {41--50},
+  year      = {2003},
+  doi       = {10.1109/MC.2003.1160055},
+  publisher = {IEEE}
+}
+
+
+% ── 3. Multi-Agent Frameworks ────────────────────────────────
+
+@misc{langgraph2024,
+  author       = {{LangChain AI}},
+  title        = {{LangGraph}: Building Stateful, Multi-Actor Applications with
+                  {LLMs}},
+  year         = {2024},
+  howpublished = {\url{https://github.com/langchain-ai/langgraph}},
+  note         = {Accessed: March 2025}
+}
+
+@misc{crewai2024,
+  author       = {Moura, Jo{\~a}o},
+  title        = {{CrewAI}: Framework for Orchestrating Role-Playing Autonomous
+                  {AI} Agents},
+  year         = {2024},
+  howpublished = {\url{https://github.com/joaomdmoura/crewAI}},
+  note         = {Accessed: March 2025}
+}
+
+@article{wu2023autogen,
+  author    = {Wu, Qingyun and Bansal, Gagan and Zhang, Jieyu and Wu, Yiran and
+               Zhang, Shaokun and Zhu, Erkang and Li, Beibin and Jiang, Li and
+               Zhang, Xiaoyun and Wang, Chi},
+  title     = {{AutoGen}: Enabling Next-Gen {LLM} Applications via Multi-Agent
+               Conversation Framework},
+  journal   = {arXiv preprint arXiv:2308.08155},
+  year      = {2023},
+  url       = {https://arxiv.org/abs/2308.08155}
+}
+
+@article{hong2023metagpt,
+  author    = {Hong, Sirui and Zheng, Xiawu and Chen, Jonathan and Cheng, Yuheng and
+               Wang, Jinlin and Zhang, Ceyao and Wang, Zili and Yau, Steven Ka Shing and
+               Lin, Zijuan and Zhou, Liyang and Ran, Chenyu and Xiao, Lingfeng and
+               Wu, Chenglin and Schmid, J{\"u}rgen},
+  title     = {{MetaGPT}: Meta Programming for a Multi-Agent Collaborative Framework},
+  journal   = {arXiv preprint arXiv:2308.00352},
+  year      = {2023},
+  url       = {https://arxiv.org/abs/2308.00352}
+}
+
+@article{agentframeworks2025empirical,
+  author    = {Srinivasan, Anand and Krishnamurthy, Balaji and others},
+  title     = {Systematic Comparison of Agentic {AI} Frameworks for Scholarly
+               Literature Processing},
+  journal   = {International Journal of Scientific Research and Technology},
+  volume    = {4},
+  number    = {1},
+  year      = {2025},
+  url       = {https://www.ijsrtjournal.com/article/Systematic+Comparison+of+Agentic+AI+Frameworks+for+Scholarly+Literature+Processing}
+}
+
+
+% ── 4. Data Formats ──────────────────────────────────────────
+
+% Primary technical reference for the Apache Arrow columnar format and Plasma Store.
+@misc{arrow2024,
+  author       = {{Apache Arrow Project}},
+  title        = {Apache {Arrow}: A Cross-Language Development Platform for
+                  In-Memory Data},
+  year         = {2024},
+  howpublished = {\url{https://arrow.apache.org/docs/index.html}},
+  note         = {Accessed: February 2026}
+}
+
+% GitHub repository cited when referencing the open-source implementation directly.
+@misc{arrow_github,
+  author       = {{Apache Software Foundation}},
+  title        = {Apache {Arrow} Source Repository},
+  year         = {2016},
+  howpublished = {\url{https://github.com/apache/arrow}},
+  note         = {Accessed: March 2025}
+}
+
+
+% ── 5. AI Middleware, Glue Code & Architecture ───────────────
+
+% Canonical reference for brittle ML infrastructure and the glue-code problem.
+@inproceedings{sculley2015hidden,
+  author    = {Sculley, D. and Holt, Gary and Golovin, Daniel and Davydov, Eugene and
+               Phillips, Todd and Ebner, Dietmar and Chaudhary, Vinay and
+               Young, Michael and Crespo, Jean-Francois and Dennison, Dan},
+  title     = {Hidden Technical Debt in Machine Learning Systems},
+  booktitle = {Advances in Neural Information Processing Systems 28 ({NeurIPS} 2015)},
+  pages     = {2503--2511},
+  year      = {2015},
+  publisher = {Curran Associates, Inc.}
+}
+
+% McKinsey survey on enterprise AI spending allocation (middleware overhead figure).
+@techreport{mckinsey2024,
+  author      = {{McKinsey \& Company}},
+  title       = {The State of {AI} in 2024: Generative {AI} Adoption and
+                 Infrastructure Investment},
+  institution = {McKinsey Global Institute},
+  year        = {2024},
+  url         = {https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai}
+}
+
+% a16z analysis of emergent LLM application architecture patterns, covering the
+% bifurcated data/AI stack and the rise of orchestration frameworks.
+@misc{Bornstein2023,
+  author       = {Bornstein, Matt and Ramaswamy, Rajko},
+  title        = {Emerging Architectures for {LLM} Applications},
+  year         = {2023},
+  howpublished = {\url{https://a16z.com/emerging-architectures-for-llm-applications/}},
+  publisher    = {Andreessen Horowitz (a16z)},
+  note         = {Accessed: February 2026}
+}
+
+% Industry blog analysis of AI middleware integration cost.
+@misc{ItSoli2026,
+  author       = {{ItSoli}},
+  title        = {The Hidden Tax of {AI} Middleware: Why Integration Layers Are
+                  Eating Your Budget},
+  year         = {2026},
+  howpublished = {\url{https://itsoli.ai/the-hidden-tax-of-ai-middleware/}},
+  note         = {Accessed: February 2026}
+}
+
+
+% ── 6. JSON / LLM Formatting Cost ───────────────────────────
+
+% Empirical study demonstrating that forcing structured JSON output constraints
+% measurably degrades LLM reasoning quality and accuracy.
+@article{Tam2024,
+  author  = {Tam, Zhi Rui and Wu, Cheng-Kuang and Tsai, Yi-Lin and Lin, Chieh-Yen and
+             Lee, Hung-yi and Chen, Yun-Nung},
+  title   = {Let Me Speak Freely? {A} Study of {LLM} Responses to Forced Formatting},
+  journal = {arXiv preprint arXiv:2408.02442},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2408.02442}
+}
+
+% NeurIPS 2025 work on the performance cost of JSON serialisation in multi-agent systems.
+% NOTE: verify exact author list and page numbers once proceedings are finalised.
+@inproceedings{Gupta2025,
+  author    = {Gupta, Ananya and Sharma, Rohan and Patel, Mihir},
+  title     = {The Architectural Cost of Autonomy: A Performance Analysis of
+               {JSON} Serialization in Multi-Agent Systems},
+  booktitle = {Advances in Neural Information Processing Systems 38 ({NeurIPS} 2025)},
+  year      = {2025},
+  note      = {Publication details to be confirmed upon proceedings release}
+}
+
+
+% ── 7. Protocol and Standards ────────────────────────────────
+
+% Anthropic's official announcement introducing the MCP open standard.
+@misc{anthropic2024mcp,
+  author       = {{Anthropic}},
+  title        = {Introducing the {Model Context Protocol}},
+  year         = {2024},
+  howpublished = {\url{https://www.anthropic.com/news/model-context-protocol}},
+  note         = {Accessed: February 2026}
+}
+
+% MCP specification, SDK documentation, and server registry.
+@misc{mcp2024,
+  author       = {{Anthropic}},
+  title        = {Model Context Protocol ({MCP}): Specification and Documentation},
+  year         = {2024},
+  howpublished = {\url{https://modelcontextprotocol.io}},
+  note         = {Accessed: March 2025}
+}
+
+
+% ── 8. Industry Reports ──────────────────────────────────────
+
+% Redpoint Ventures annual AI infrastructure outlook, covering inter-cluster
+% data transfer costs and enterprise AI infrastructure investment trends.
+@techreport{Redpoint2026,
+  author      = {{Redpoint Ventures}},
+  title       = {From Pilots to Platforms: The 2026 {AI} Infrastructure Outlook},
+  institution = {Redpoint Ventures},
+  year        = {2026},
+  month       = jan,
+  url         = {https://www.redpoint.com/content-hub/written/2026-outlook/},
+  note        = {Accessed: February 2026}
+}
+
+% CData industry analysis on MCP enterprise adoption trajectory in 2026.
+@misc{cdata2026mcp,
+  author       = {{CData Software}},
+  title        = {2026: The Year for Enterprise-Ready {MCP} Adoption},
+  year         = {2026},
+  howpublished = {\url{https://www.cdata.com/blog/2026-year-enterprise-ready-mcp-adoption}},
+  note         = {Accessed: February 2026}
+}
+
+% a16z piece on agentic AI adoption and enterprise deployment patterns.
+@misc{Casado2023,
+  author       = {Casado, Martin and Bornstein, Matt and Lonsdale, Joe},
+  title        = {The New {AI} Architectures: From Chatbots to Agents},
+  year         = {2023},
+  howpublished = {\url{https://a16z.com/ai-architectures-from-chatbots-to-agents/}},
+  publisher    = {Andreessen Horowitz (a16z)},
+  note         = {Accessed: February 2026}
+}
+
+
+% ── 9. Infrastructure Tools ──────────────────────────────────
+
+@misc{k0s2021,
+  author       = {{Mirantis Inc.}},
+  title        = {k0s: Zero Friction Kubernetes},
+  year         = {2021},
+  howpublished = {\url{https://k0sproject.io}},
+  note         = {Accessed: March 2025}
+}
+
+@misc{prefect2023,
+  author       = {{Prefect Technologies}},
+  title        = {Prefect: The New Standard in Dataflow Automation},
+  year         = {2023},
+  howpublished = {\url{https://www.prefect.io}},
+  note         = {Accessed: March 2025}
+}

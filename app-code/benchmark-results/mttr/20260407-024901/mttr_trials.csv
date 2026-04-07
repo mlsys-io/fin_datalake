@@ -1,0 +1,7 @@
+trial,mode,success,agent_class,victim_name,mttr_seconds,operator_delay_seconds,final_observed_status,final_health_status,final_recovery_state,error
+1,overseer,False,SupportAgent,SupportAgent-MTTR-ebb3e21a,,,failed,unknown,failed,"Recovery timed out. Last observed=ready, health=healthy, recovery=idle."
+2,overseer,False,SupportAgent,SupportAgent-MTTR-fe45ff0c,,,failed,unknown,failed,"Recovery timed out. Last observed=ready, health=healthy, recovery=idle."
+3,overseer,False,SupportAgent,SupportAgent-MTTR-26386509,,,failed,unknown,failed,"Recovery timed out. Last observed=ready, health=healthy, recovery=idle."
+1,manual,True,SupportAgent,SupportAgent-MTTR-669f1e26,15.418877916410565,11.394267984578837,ready,healthy,idle,
+2,manual,True,SupportAgent,SupportAgent-MTTR-79b78d14,9.291062219068408,5.25010755222667,ready,healthy,idle,
+3,manual,True,SupportAgent,SupportAgent-MTTR-bf6a15dc,11.728483766317368,7.750293183691193,ready,healthy,idle,

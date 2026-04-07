@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etl-gateway
+  namespace: etl-compute
+  labels:
+    app: etl-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: etl-gateway
+  template:
+    metadata:
+      labels:
+        app: etl-gateway
+    spec:
+      containers:
+        - name: gateway
+          image: etl-gateway:latest
+          imagePullPolicy: Never # Use image built locally and imported to k0s
+          envFrom:
+            - secretRef:
+                name: etl-user-secret-gateway
+                optional: true
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            # GATEWAY_DATABASE_URL is sourced from 'etl-gateway-secret' in THIS namespace.
+            # The deploy.sh script creates this secret by extracting creds from 'tsdb-pguser-app'
+            # in the 'etl-data' namespace (cross-namespace secret refs are not supported in K8s).
+            - name: GATEWAY_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: etl-gateway-secret
+                  key: GATEWAY_DATABASE_URL
+
+            - name: GATEWAY_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: GATEWAY_INTERNAL_TOKEN
+            
+            - name: GATEWAY_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: GATEWAY_JWT_SECRET
+            
+            # External Storage / Lakehouse Connection
+            - name: MINIO_ENDPOINT
+              value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: AWS_SECRET_ACCESS_KEY
+            
+            # Redis Connection (Required for RBAC Policies)
+            - name: OVERSEER_REDIS_URL
+              value: "redis://:redis-lakehouse-pass@redis-master.etl-storage.svc.cluster.local:6379/0"
+
+            # Application Settings
+            - name: LOG_LEVEL
+              value: "info"
+            - name: PREFECT_UI_URL
+              value: "http://prefect-server.etl-orchestrate.svc.cluster.local:4200"
+            - name: RAY_ADDRESS
+              value: "ray://etl-ray-head-svc.etl-compute.svc.cluster.local:10001"
+            - name: RAY_NAMESPACE
+              value: "serve"
+            - name: RAY_DASHBOARD_URL
+              value: "http://etl-ray-head-svc.etl-compute.svc.cluster.local:8265"
+            - name: MINIO_CONSOLE_URL
+              value: "https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
+            - name: SSL_CERT_FILE
+              value: "/opt/certs/public.crt"
+            - name: CA_PATH
+              value: "/opt/certs/public.crt"
+              
+          volumeMounts:
+            - mountPath: /opt/certs
+              name: minio-ca
+              readOnly: true
+              
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: minio-ca
+          configMap:
+            name: minio-ca
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: etl-gateway-svc
+  namespace: etl-compute
+spec:
+  type: NodePort
+  selector:
+    app: etl-gateway
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
+      nodePort: 30801 # External Access: <node-ip>:30801

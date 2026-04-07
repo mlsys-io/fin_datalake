@@ -1,0 +1,125 @@
+{
+  "benchmark": "mttr_recovery_comparison",
+  "selected_mode": "compare",
+  "summary": {
+    "modes": {
+      "overseer": {
+        "trial_count": 3,
+        "success_count": 0,
+        "failure_count": 3,
+        "mean_mttr_seconds": 0.0,
+        "std_mttr_seconds": 0.0,
+        "min_mttr_seconds": null,
+        "max_mttr_seconds": null,
+        "p95_mttr_seconds": null
+      },
+      "manual": {
+        "trial_count": 3,
+        "success_count": 3,
+        "failure_count": 0,
+        "mean_mttr_seconds": 12.14614130059878,
+        "std_mttr_seconds": 3.085183895184331,
+        "min_mttr_seconds": 9.291062219068408,
+        "max_mttr_seconds": 15.418877916410565,
+        "p95_mttr_seconds": 15.418877916410565
+      }
+    },
+    "comparison": {}
+  },
+  "trials": {
+    "overseer": [
+      {
+        "mode": "overseer",
+        "success": false,
+        "victim_name": "SupportAgent-MTTR-ebb3e21a",
+        "agent_class": "SupportAgent",
+        "mttr_seconds": null,
+        "observed_states": [],
+        "final_observed_status": "failed",
+        "final_health_status": "unknown",
+        "final_recovery_state": "failed",
+        "probe_response": null,
+        "operator_delay_seconds": null,
+        "error": "Recovery timed out. Last observed=ready, health=healthy, recovery=idle."
+      },
+      {
+        "mode": "overseer",
+        "success": false,
+        "victim_name": "SupportAgent-MTTR-fe45ff0c",
+        "agent_class": "SupportAgent",
+        "mttr_seconds": null,
+        "observed_states": [],
+        "final_observed_status": "failed",
+        "final_health_status": "unknown",
+        "final_recovery_state": "failed",
+        "probe_response": null,
+        "operator_delay_seconds": null,
+        "error": "Recovery timed out. Last observed=ready, health=healthy, recovery=idle."
+      },
+      {
+        "mode": "overseer",
+        "success": false,
+        "victim_name": "SupportAgent-MTTR-26386509",
+        "agent_class": "SupportAgent",
+        "mttr_seconds": null,
+        "observed_states": [],
+        "final_observed_status": "failed",
+        "final_health_status": "unknown",
+        "final_recovery_state": "failed",
+        "probe_response": null,
+        "operator_delay_seconds": null,
+        "error": "Recovery timed out. Last observed=ready, health=healthy, recovery=idle."
+      }
+    ],
+    "manual": [
+      {
+        "success": true,
+        "mttr_seconds": 15.418877916410565,
+        "observed_states": [
+          "ready"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 11.394267984578837,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-669f1e26",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 9.291062219068408,
+        "observed_states": [
+          "ready"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 5.25010755222667,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-79b78d14",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 11.728483766317368,
+        "observed_states": [
+          "ready"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 7.750293183691193,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-bf6a15dc",
+        "agent_class": "SupportAgent"
+      }
+    ]
+  }
+}

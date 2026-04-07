@@ -1,0 +1,26 @@
+{
+  "benchmark": "zero_copy_handoff",
+  "trials_per_size": 1,
+  "dataset_sizes": [
+    10000
+  ],
+  "results": [
+    {
+      "dataset_size": 10000,
+      "serialized": {
+        "mean_ms": 480.4457612335682,
+        "std_ms": 0.0,
+        "median_ms": 480.4457612335682,
+        "mean_peak_mem_mb": 5.423525810241699
+      },
+      "zero_copy": {
+        "mean_ms": 71.10088877379894,
+        "std_ms": 0.0,
+        "median_ms": 71.10088877379894,
+        "mean_peak_mem_mb": 1.3817005157470703
+      },
+      "speedup": 6.757239881516291
+    }
+  ],
+  "headline_speedup": 6.757239881516291
+}

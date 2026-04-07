@@ -1,0 +1,3 @@
+trial,mode,success,agent_class,victim_name,mttr_seconds,operator_delay_seconds,final_observed_status,final_health_status,final_recovery_state,error
+1,overseer,True,SupportAgent,SupportAgent-MTTR-0b1a6a7c,10.235081547871232,,ready,healthy,idle,
+1,manual,True,SupportAgent,SupportAgent-MTTR-65b23bdc,15.442827608436346,11.394267984578837,ready,healthy,idle,

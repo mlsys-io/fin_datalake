@@ -1,0 +1,64 @@
+# =============================================================================
+# Lakehouse Nginx Ingress - Deployment and Service
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etl-nginx
+  namespace: etl-compute
+  labels:
+    app: etl-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: etl-nginx
+  template:
+    metadata:
+      labels:
+        app: etl-nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx-frontend:latest
+          imagePullPolicy: Never # Image is built locally and imported to k0s
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-conf-volume
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+            - name: minio-ca
+              mountPath: /etc/nginx/certs
+              readOnly: true
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      volumes:
+        - name: nginx-conf-volume
+          configMap:
+            name: nginx-config
+        - name: minio-ca
+          configMap:
+            name: minio-ca
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: etl-nginx-svc
+  namespace: etl-compute
+spec:
+  type: NodePort
+  selector:
+    app: etl-nginx
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 30800 # Access the UI at <node-ip>:30800

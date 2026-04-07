@@ -1,0 +1,109 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "etl-framework"
+version = "0.1.0"
+description = "Distributed ETL framework using Prefect and Ray"
+readme = "README.md"
+requires-python = ">=3.11"
+
+# Core dependencies - minimal for package structure
+# Full deps are in requirements-client.txt and requirements-worker.txt
+dependencies = [
+    "redis>=7.2.0",
+    "numpy>=2.0.0",
+    "typer>=0.12.0",
+]
+
+[project.optional-dependencies]
+client = [
+    # Orchestration
+    "ray[default]==2.54.0",
+    "prefect>=2.14",
+    "prefect-ray>=0.3",
+    "python-dotenv>=1.0",
+    "pydantic>=2.0",
+    "loguru>=0.7",
+    "requests>=2.28",
+    # Data processing (for local tasks like Delta Lake writes)
+    "pandas>=2.0,<3.0.0",
+    "pyarrow>=14.0",
+    "deltalake>=0.14",
+    # LLM integrations
+    "langchain-core>=0.3.0",
+    "langchain-google-genai>=2.0.0",
+]
+worker = [
+    "pandas>=2.0,<3.0.0",
+    "pyarrow>=14.0",
+    "deltalake>=0.14",
+    "loguru>=0.7",
+    "requests>=2.28",
+    "websocket-client>=1.6",
+    "confluent-kafka>=2.3",
+    "psycopg2-binary>=2.9",
+    "pymilvus>=2.3",
+    "thrift>=0.16",
+]
+gateway = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlalchemy>=2.0",
+    "asyncpg>=0.29.0",
+    "aiosqlite>=0.20.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt<4.0.0",
+    "mcp>=1.0.0",
+    "typer>=0.12.0",
+    "rich>=13.0.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.0",
+    "loguru>=0.7",
+    "python-dotenv>=1.0",
+    "requests>=2.28",
+    # Data Adapter dependencies (needed for local execution)
+    "duckdb>=1.0.0",
+    "deltalake>=0.14",
+    "pandas>=2.0,<3.0.0",
+    "pyarrow>=14.0",
+    "ray[default]==2.54.0",
+    "thrift>=0.16",
+]
+overseer = [
+    "httpx>=0.27.0",
+    "pyyaml>=6.0",
+    "boto3>=1.34",
+    "pydantic>=2.0",
+    "loguru>=0.7",
+    "python-dotenv>=1.0",
+    "redis>=7.2.0",
+    "deltalake>=0.14",
+    "confluent-kafka>=2.3",
+    "ray[serve]==2.54.0",
+    "psycopg2-binary>=2.9",
+]
+hive = [
+    "thrift>=0.16",
+]
+
+[project.scripts]
+gateway-api = "gateway.api.main:app"
+gateway-mcp = "gateway.mcp.server:main"
+overseer = "overseer.main:main"
+etl-agents = "etl.agents.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agents*", "etl*", "pipelines*", "sample_agents*", "transformations*", "gateway*", "overseer*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.json"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+]

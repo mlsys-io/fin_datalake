@@ -1,0 +1,15 @@
+# Prefect Server Helm values
+# NodePort enabled for external access.
+# The UI is served behind the Nginx bouncer at /prefect/ so all client-side
+# routes and API calls must use the prefixed path instead of direct :4200 access.
+
+service:
+  type: NodePort
+  nodePort: 30420
+
+server:
+  uiConfig:
+    prefectUiApiUrl: /prefect/api
+  env:
+    - name: PREFECT_UI_SERVE_BASE
+      value: /prefect/

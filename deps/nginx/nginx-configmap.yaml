@@ -1,0 +1,176 @@
+# =============================================================================
+# Lakehouse Nginx Ingress Config - Production Mode
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: etl-compute
+data:
+  nginx.conf: |
+    worker_processes 1;
+    events { worker_connections 1024; }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+        sendfile        on;
+        keepalive_timeout  65;
+
+        # Internal service hostnames (K8s DNS)
+        upstream gateway_backend {
+            server etl-gateway-svc.etl-compute.svc.cluster.local:8000;
+        }
+
+        upstream prefect_backend {
+            server prefect-server.etl-orchestrate.svc.cluster.local:4200;
+        }
+
+        upstream ray_backend {
+            server etl-ray-head-svc.etl-compute.svc.cluster.local:8265;
+        }
+
+        # For MinIO we use the external DDNS hostname
+        upstream minio_backend {
+            server luyao-storage-head.ddns.comp.nus.edu.sg:4000;
+        }
+
+        server {
+            listen 80;
+            server_name localhost;
+
+            # Increase proxy buffer sizes for large UIs (Prefect / Ray)
+            proxy_buffer_size           128k;
+            proxy_buffers               4 256k;
+            proxy_busy_buffers_size     256k;
+
+            # Forwarding headers
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # WebSockets support
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+
+            # 1. Auth Verify
+            location = /auth-verify {
+                internal;
+                proxy_pass              http://gateway_backend/api/v1/auth/verify;
+                proxy_pass_request_body off;
+                proxy_set_header        Content-Length "";
+                proxy_set_header        X-Original-URI $request_uri;
+            }
+
+            # 2. Gateway API
+            location /api/ {
+                proxy_pass http://gateway_backend;
+            }
+
+            # 3a. Prefect API — handles runtime JS fetch() calls from Prefect UI
+            #     Must be declared BEFORE /prefect/ to take priority
+            location /prefect/api/ {
+                auth_request /auth-verify;
+                error_page 401 = @login_redirect;
+                rewrite ^/prefect/api/(.*)$ /api/$1 break;
+                proxy_pass http://prefect_backend;
+            }
+
+            # 3b. Prefect UI — serves the App shell (HTML/JS/CSS)
+            location /prefect/ {
+                auth_request /auth-verify;
+                auth_request_set $auth_user $upstream_http_x_remote_user;
+                proxy_set_header X-Remote-User $auth_user;
+                error_page 401 = @login_redirect;
+
+                proxy_pass http://prefect_backend;
+            }
+
+            # 4a. Ray API — handles runtime JS fetch() and WebSocket calls
+            location /ray/api/ {
+                auth_request /auth-verify;
+                error_page 401 = @login_redirect;
+                rewrite ^/ray/api/(.*)$ /api/$1 break;
+                proxy_pass http://ray_backend;
+            }
+
+            # 4b. Ray WebSocket — for live log streaming
+            location /ray/ws/ {
+                auth_request /auth-verify;
+                error_page 401 = @login_redirect;
+                rewrite ^/ray/ws/(.*)$ /ws/$1 break;
+                proxy_pass http://ray_backend;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+            }
+
+            # 4c. Ray Dashboard UI — serves the App shell
+            location /ray/ {
+                auth_request /auth-verify;
+                auth_request_set $auth_user $upstream_http_x_remote_user;
+                proxy_set_header X-Remote-User $auth_user;
+                error_page 401 = @login_redirect;
+
+                rewrite ^/ray/(.*)$ /$1 break;
+                proxy_pass http://ray_backend;
+
+                # Global root prefixing for Ray
+                proxy_set_header Accept-Encoding "";
+                sub_filter_once off;
+                sub_filter_types *;
+
+                sub_filter '="/' '="/ray/';
+                sub_filter "='/" "='/ray/";
+
+                sub_filter '"/assets/'  '"/ray/assets/';
+                sub_filter "'/assets/"  "'/ray/assets/";
+            }
+
+            # 5. MinIO Console
+            location /minio/ {
+                auth_request /auth-verify;
+                auth_request_set $auth_user $upstream_http_x_remote_user;
+                proxy_set_header X-Remote-User $auth_user;
+                error_page 401 = @login_redirect;
+                rewrite ^/minio/(.*)$ /$1 break;
+                proxy_pass https://minio_backend;
+                proxy_ssl_server_name on;
+                proxy_ssl_name luyao-storage-head.ddns.comp.nus.edu.sg;
+                proxy_set_header Host luyao-storage-head.ddns.comp.nus.edu.sg;
+                proxy_ssl_trusted_certificate /etc/nginx/certs/public.crt;
+                proxy_ssl_verify on;
+            }
+
+            # 6. Dynamic Asset Fallback (Fixes MIME type errors)
+            # Vite apps (Prefect/Ray) dynamically fetch modules from root (/assets/...). 
+            # This catches those requests and routes them back to the correct location block.
+            location ~ ^/(assets/|ico/|static/|vite\.svg) {
+                if ($http_referer ~* "prefect") {
+                    rewrite ^/(.*)$ /prefect/$1 last;
+                }
+                if ($http_referer ~* "ray") {
+                    rewrite ^/(.*)$ /ray/$1 last;
+                }
+                
+                # If the Gateway React App (or normal page) requests it, serve locally.
+                root /usr/share/nginx/html;
+                try_files $uri =404;
+            }
+
+            # 7. React App (Built from Front-end package)
+
+            location / {
+                root /usr/share/nginx/html;
+                index index.html index.htm;
+                try_files $uri $uri/ /index.html;
+            }
+
+            # Catch-all for auth failures (redirect back to login)
+            location @login_redirect {
+                return 302 /?redirect=$request_uri;
+            }
+        }
+    }
