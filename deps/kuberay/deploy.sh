@@ -32,6 +32,9 @@ echo "⏳ Waiting for operator to be ready..."
 kubectl wait --for=condition=available --timeout=120s deployment/kuberay-operator -n "$NAMESPACE"
 
 echo "🌟 Deploying Ray cluster..."
+if kubectl get secret etl-user-secret-ray -n "$NAMESPACE" >/dev/null 2>&1; then
+    echo "🔐 Optional scoped secret 'etl-user-secret-ray' found and will be mounted into Ray pods."
+fi
 kubectl apply -f "$SCRIPT_DIR/ray-cluster.yaml"
 
 echo "⏳ Waiting for Ray cluster to start..."

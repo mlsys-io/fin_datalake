@@ -21,6 +21,10 @@ spec:
           - name: ray-head
             image: docker.io/library/etl-ray:latest-py312
             imagePullPolicy: Never # Use local image
+            envFrom:
+              - secretRef:
+                  name: etl-user-secret-ray
+                  optional: true
             resources:
               limits:
                 cpu: "2"
@@ -102,6 +106,10 @@ spec:
             - name: ray-worker
               image: docker.io/library/etl-ray:latest-py312
               imagePullPolicy: Never # Use local image
+              envFrom:
+                - secretRef:
+                    name: etl-user-secret-ray
+                    optional: true
               resources:
                 limits:
                   cpu: "4"

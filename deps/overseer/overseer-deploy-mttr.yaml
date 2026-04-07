@@ -23,6 +23,10 @@ spec:
         - name: overseer
           image: etl-overseer:latest
           imagePullPolicy: Never
+          envFrom:
+            - secretRef:
+                name: etl-user-secret-overseer
+                optional: true
           env:
             - name: OVERSEER_CONFIG_PATH
               value: "/app/app-code/overseer/config.mttr.yaml"

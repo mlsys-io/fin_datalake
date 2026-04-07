@@ -17,6 +17,9 @@ if ! kubectl get secret etl-secrets -n "$NAMESPACE" &> /dev/null; then
     exit 1
 fi
 echo "✅ etl-secrets found."
+if kubectl get secret etl-user-secret-gateway -n "$NAMESPACE" >/dev/null 2>&1; then
+    echo "✅ Optional scoped secret 'etl-user-secret-gateway' found."
+fi
 
 # =============================================================================
 # NOTE: This script assumes the image has already been imported into k0s containerd.

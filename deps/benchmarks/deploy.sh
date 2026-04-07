@@ -20,6 +20,10 @@ require_prereqs() {
         echo "[ERROR] Missing configmap 'minio-ca' in namespace '${NAMESPACE}'."
         exit 1
     fi
+
+    if kubectl get secret etl-user-secret-benchmarks -n "$NAMESPACE" >/dev/null 2>&1; then
+        log_info "Optional scoped secret 'etl-user-secret-benchmarks' found and will be mounted into benchmark runners."
+    fi
 }
 
 deploy_plain() {

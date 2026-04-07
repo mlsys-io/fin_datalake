@@ -29,6 +29,9 @@ spec:
             - secretRef:
                 name: etl-secrets
                 optional: false
+            - secretRef:
+                name: etl-user-secret-benchmarks
+                optional: true
           env:
             - name: PYTHONPATH
               value: /home/ray/app-code

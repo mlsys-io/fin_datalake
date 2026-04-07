@@ -21,6 +21,9 @@ if ! kubectl get secret etl-secrets -n "$NAMESPACE" >/dev/null 2>&1; then
     exit 1
 fi
 echo "✅ etl-secrets found."
+if kubectl get secret etl-user-secret-overseer -n "$NAMESPACE" >/dev/null 2>&1; then
+    echo "✅ Optional scoped secret 'etl-user-secret-overseer' found."
+fi
 
 # 2. Apply manifests
 echo "🚀 Deploying Overseer to namespace '$NAMESPACE'..."

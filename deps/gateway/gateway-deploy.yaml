@@ -19,6 +19,10 @@ spec:
         - name: gateway
           image: etl-gateway:latest
           imagePullPolicy: Never # Use image built locally and imported to k0s
+          envFrom:
+            - secretRef:
+                name: etl-user-secret-gateway
+                optional: true
           ports:
             - containerPort: 8000
               name: http

@@ -23,6 +23,10 @@ spec:
         - name: overseer
           image: etl-overseer:latest
           imagePullPolicy: Never
+          envFrom:
+            - secretRef:
+                name: etl-user-secret-overseer
+                optional: true
           env:
             # 1. Core Service Discovery (Internal K8s DNS)
             - name: OVERSEER_RAY_HOST
