@@ -9,8 +9,8 @@ from pipelines.benchmarks.shared import (
     capture_trial_input,
     compute_market_state_from_ohlc,
     extract_headlines,
-    heuristic_market_news_analysis,
-    heuristic_signal_result,
+    llm_market_news_analysis,
+    llm_strategy_signal_result,
     persist_signal_history_direct,
 )
 from pipelines.market_pulse_ingest import DEFAULT_PROVIDER, DEFAULT_SYMBOL
@@ -40,8 +40,9 @@ def run_plain_baseline(
         market_state = compute_market_state_from_ohlc(list(trial_input.get("ohlc") or []))
         trial_input["market_state"] = market_state
 
-    analyst_result = heuristic_market_news_analysis(extract_headlines(list(trial_input.get("news") or [])))
-    signal = heuristic_signal_result(
+    headlines = extract_headlines(list(trial_input.get("news") or []))
+    analyst_result = llm_market_news_analysis(headlines, market_state)
+    signal = llm_strategy_signal_result(
         symbol=str(trial_input.get("symbol") or symbol),
         market_state=market_state,
         analyst_result=analyst_result,
@@ -51,7 +52,11 @@ def run_plain_baseline(
     persistence_started = time.perf_counter()
     persistence_meta = persist_signal_history_direct(signal)
     persistence_meta["mode"] = "direct_in_process"
-    persistence_meta["notes"] = "Signal generated and persisted directly in a single-process baseline path."
+    persistence_meta["notes"] = (
+        "Signal generated and persisted directly in a single-process baseline path. "
+        "The analyst and strategy reasoning use the same local LLM prompt logic as the integrated agents, "
+        "but without Ray-hosted deployment or remote delegation."
+    )
     persistence_duration = time.perf_counter() - persistence_started
 
     total_duration = time.perf_counter() - total_started

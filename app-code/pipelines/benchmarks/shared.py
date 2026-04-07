@@ -4,6 +4,8 @@ import json
 import time
 from typing import Any, Dict, List
 
+from loguru import logger
+
 from etl.config import config
 from etl.io.tasks.delta_lake_write_task import DeltaLakeWriteTask
 from etl.io.tasks.risingwave_write_task import RisingWaveWriteTask
@@ -158,6 +160,19 @@ def heuristic_market_news_analysis(headlines: List[str]) -> Dict[str, Any]:
     }
 
 
+def llm_market_news_analysis(headlines: List[str], market_state: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    from sample_agents.market_analyst import MarketAnalystAgent
+
+    analyst = MarketAnalystAgent(config={})
+    llm = analyst._get_llm(model_name="gemini-2.5-flash", temperature=0.0, json_mode=True)
+    if llm:
+        try:
+            return analyst._analyze_with_llm(headlines, dict(market_state or {}), llm)
+        except Exception as exc:
+            logger.warning(f"[BenchmarkShared] Market analyst LLM path failed, using heuristic fallback: {exc}")
+    return analyst._heuristic_analysis(headlines)
+
+
 def heuristic_signal_result(
     *,
     symbol: str,
@@ -181,6 +196,51 @@ def heuristic_signal_result(
         "confidence": round(min(abs(final_score), 1.0), 2),
         "trend_score": round(trend_score, 2),
         "sentiment_label": str(analyst_result.get("label", "neutral")).lower(),
+        "sentiment_score": round(sentiment_score, 2),
+        "analyst_summary": str(analyst_result.get("summary", "")),
+        "analyst_headlines": list(analyst_result.get("headlines") or []),
+        "market_state": dict(market_state),
+        "timestamp_ms": int(time.time() * 1000),
+    }
+
+
+def llm_strategy_signal_result(
+    *,
+    symbol: str,
+    market_state: Dict[str, Any],
+    analyst_result: Dict[str, Any],
+) -> Dict[str, Any]:
+    from sample_agents.strategy_agent import StrategyAgent
+
+    strategy = StrategyAgent(config={})
+    trend_score = compute_trend_score_from_state(market_state)
+    sentiment_label = str(analyst_result.get("label", "neutral")).lower()
+    sentiment_score = float(analyst_result.get("score", 0.0))
+
+    llm = strategy._get_llm(temperature=0.1, json_mode=True)
+    if llm:
+        try:
+            action, confidence = strategy._generate_signal_llm(
+                symbol=str(symbol).upper(),
+                trend_score=trend_score,
+                sentiment_label=sentiment_label,
+                sentiment_score=sentiment_score,
+                market_state=dict(market_state),
+                analyst_summary=str(analyst_result.get("summary", "")),
+                llm=llm,
+            )
+        except Exception as exc:
+            logger.warning(f"[BenchmarkShared] Strategy LLM path failed, using heuristic fallback: {exc}")
+            action, confidence = strategy._generate_signal_heuristic(trend_score, sentiment_score)
+    else:
+        action, confidence = strategy._generate_signal_heuristic(trend_score, sentiment_score)
+
+    return {
+        "symbol": str(symbol).upper(),
+        "action": action,
+        "confidence": round(min(max(float(confidence), 0.0), 1.0), 2),
+        "trend_score": round(trend_score, 2),
+        "sentiment_label": sentiment_label,
         "sentiment_score": round(sentiment_score, 2),
         "analyst_summary": str(analyst_result.get("summary", "")),
         "analyst_headlines": list(analyst_result.get("headlines") or []),

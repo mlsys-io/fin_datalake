@@ -11,8 +11,8 @@ from pipelines.benchmarks.shared import (
     capture_trial_input,
     deserialize_json_payload,
     extract_headlines,
-    heuristic_market_news_analysis,
-    heuristic_signal_result,
+    llm_market_news_analysis,
+    llm_strategy_signal_result,
     persist_signal_history_direct,
     serialize_json_payload,
 )
@@ -150,9 +150,12 @@ def run_spark_glue_baseline(
         headlines_payload = serialize_json_payload(headlines)
         market_state_payload = serialize_json_payload(market_state)
 
-        analyst_result = heuristic_market_news_analysis(extract_headlines([{"headline": item} for item in deserialize_json_payload(headlines_payload)]))
+        analyst_result = llm_market_news_analysis(
+            extract_headlines([{"headline": item} for item in deserialize_json_payload(headlines_payload)]),
+            deserialize_json_payload(market_state_payload),
+        )
         analyst_payload = serialize_json_payload(analyst_result)
-        signal = heuristic_signal_result(
+        signal = llm_strategy_signal_result(
             symbol=str(trial_input.get("symbol") or symbol),
             market_state=deserialize_json_payload(market_state_payload),
             analyst_result=deserialize_json_payload(analyst_payload),
@@ -162,7 +165,11 @@ def run_spark_glue_baseline(
         persistence_started = time.perf_counter()
         persistence_meta = persist_signal_history_direct(signal)
         persistence_meta["mode"] = "spark_glue_direct"
-        persistence_meta["notes"] = "Spark used for data shaping and metric aggregation, with manual Python glue between stages."
+        persistence_meta["notes"] = (
+            "Spark used for data shaping and metric aggregation, with manual Python glue between stages. "
+            "The analyst and strategy reasoning use the same local LLM prompt logic as the integrated agents, "
+            "but without Ray-hosted deployment or remote delegation."
+        )
         persistence_meta["glue_payload_bytes"] = len(headlines_payload) + len(market_state_payload) + len(analyst_payload)
         persistence_duration = time.perf_counter() - persistence_started
 
