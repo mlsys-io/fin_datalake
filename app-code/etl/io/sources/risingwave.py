@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List, Iterator
+import os
 from etl.io.base import DataSource, DataReader
 
 @dataclass
@@ -12,7 +13,8 @@ class RisingWaveSource(DataSource):
     password: str
     database: str
     query: str
-    port: int = 4566
+    port: int = 4567
+    connect_timeout: int = 5
     
     def open(self) -> 'RisingWaveReader':
         return RisingWaveReader(self)
@@ -43,7 +45,8 @@ class RisingWaveReader(DataReader):
             port=self.source.port,
             user=self.source.user,
             password=self.source.password,
-            dbname=self.source.database
+            dbname=self.source.database,
+            connect_timeout=int(self.source.connect_timeout or os.environ.get("RISINGWAVE_CONNECT_TIMEOUT", "5")),
         )
         self._cursor = self._conn.cursor(cursor_factory=RealDictCursor)
 

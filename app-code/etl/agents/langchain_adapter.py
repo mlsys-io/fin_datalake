@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from typing import Any
 import os
 from loguru import logger
@@ -10,6 +11,39 @@ class LangChainMixin:
     This avoids forcing a specific execution flow or inheritance 
     on the agent, allowing for cleaner Ray orchestration.
     """
+
+    @contextmanager
+    def _public_llm_ssl_env(self):
+        """
+        Use the public CA bundle for internet-facing LLM APIs without
+        permanently overriding the MinIO/internal CA settings used elsewhere.
+        """
+        import certifi
+
+        ca_file = str(os.environ.get("PUBLIC_CA_CERT") or certifi.where()).strip()
+        keys = (
+            "SSL_CERT_FILE",
+            "REQUESTS_CA_BUNDLE",
+            "CURL_CA_BUNDLE",
+            "GRPC_DEFAULT_SSL_ROOTS_FILE_PATH",
+        )
+        previous = {key: os.environ.get(key) for key in keys}
+
+        for key in keys:
+            os.environ[key] = ca_file
+
+        try:
+            yield
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+    def _llm_invoke(self, llm: Any, payload: Any) -> Any:
+        with self._public_llm_ssl_env():
+            return llm.invoke(payload)
 
     def _get_llm(self, model_name: str | None = None, temperature: float = 0.0, json_mode: bool = False) -> Any:
         """

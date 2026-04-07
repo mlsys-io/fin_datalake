@@ -56,7 +56,9 @@ spec:
             - name: RISINGWAVE_HOST
               value: "risingwave.etl-data.svc.cluster.local"
             - name: RISINGWAVE_PORT
-              value: "4566"
+              value: "4567"
+            - name: RISINGWAVE_CONNECT_TIMEOUT
+              value: "5"
             - name: RISINGWAVE_USER
               value: "root"
             - name: RISINGWAVE_DATABASE

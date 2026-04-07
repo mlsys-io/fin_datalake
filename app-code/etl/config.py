@@ -103,7 +103,7 @@ class Config:
     
     # RisingWave
     RISINGWAVE_HOST: str = os.environ.get("RISINGWAVE_HOST", "")
-    RISINGWAVE_PORT: int = int(os.environ.get("RISINGWAVE_PORT", "4566"))
+    RISINGWAVE_PORT: int = int(os.environ.get("RISINGWAVE_PORT", "4567"))
     RISINGWAVE_USER: str = os.environ.get("RISINGWAVE_USER", "root")
     RISINGWAVE_PASSWORD: str = os.environ.get("RISINGWAVE_PASSWORD", "")
     RISINGWAVE_DATABASE: str = os.environ.get("RISINGWAVE_DATABASE", "dev")
@@ -152,7 +152,7 @@ class Config:
         cls.HIVE_HOST = os.environ.get("HIVE_HOST", "")
         cls.HIVE_PORT = int(os.environ.get("HIVE_PORT", "9083"))
         cls.RISINGWAVE_HOST = os.environ.get("RISINGWAVE_HOST", "")
-        cls.RISINGWAVE_PORT = int(os.environ.get("RISINGWAVE_PORT", "4566"))
+        cls.RISINGWAVE_PORT = int(os.environ.get("RISINGWAVE_PORT", "4567"))
         cls.RISINGWAVE_USER = os.environ.get("RISINGWAVE_USER", "root")
         cls.RISINGWAVE_PASSWORD = os.environ.get("RISINGWAVE_PASSWORD", "")
         cls.RISINGWAVE_DATABASE = os.environ.get("RISINGWAVE_DATABASE", "dev")

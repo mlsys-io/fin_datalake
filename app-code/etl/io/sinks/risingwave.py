@@ -4,6 +4,7 @@ RisingWave sink for writing rows over the PostgreSQL wire protocol.
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 import json
+import os
 
 from etl.io.base import DataSink, DataWriter
 
@@ -21,10 +22,11 @@ class RisingWaveSink(DataSink):
     password: str
     database: str
     table_name: str
-    port: int = 4566
+    port: int = 4567
     schema: str = "public"
     ddl: Optional[str] = None
     on_conflict_clause: Optional[str] = None
+    connect_timeout: int = 5
 
     def open(self) -> "RisingWaveWriter":
         return RisingWaveWriter(self)
@@ -52,6 +54,7 @@ class RisingWaveWriter(DataWriter):
             user=self.sink.user,
             password=self.sink.password,
             dbname=self.sink.database,
+            connect_timeout=int(self.sink.connect_timeout or os.environ.get("RISINGWAVE_CONNECT_TIMEOUT", "5")),
         )
         self._cursor = self._conn.cursor()
 
