@@ -1,0 +1,979 @@
+{
+  "benchmark": "market_pulse_end_to_end_comparative",
+  "summary": {
+    "trial_count": 5,
+    "row_count": 15,
+    "systems": {
+      "plain_sequential": {
+        "trial_count": 5,
+        "success_count": 5,
+        "failure_count": 0,
+        "mode_counts": {
+          "fully_live": 5,
+          "partial_fallback": 0,
+          "fully_fallback": 0
+        },
+        "stages": {
+          "total": {
+            "mean_seconds": 55.34108367972076,
+            "std_seconds": 39.4588452093548,
+            "median_seconds": 42.41187244839966,
+            "min_seconds": 26.08795790374279,
+            "max_seconds": 122.17916700430214,
+            "p95_seconds": 122.17916700430214
+          },
+          "ingest": {
+            "mean_seconds": 5.963924681767821,
+            "std_seconds": 7.012292188745581,
+            "median_seconds": 2.9697164092212915,
+            "min_seconds": 1.7278730757534504,
+            "max_seconds": 18.420447040349245,
+            "p95_seconds": 18.420447040349245
+          },
+          "agent_setup": {
+            "mean_seconds": 0.0,
+            "std_seconds": 0.0,
+            "median_seconds": 0.0,
+            "min_seconds": 0.0,
+            "max_seconds": 0.0,
+            "p95_seconds": 0.0
+          },
+          "signal": {
+            "mean_seconds": 49.139554276689886,
+            "std_seconds": 40.728122820762295,
+            "median_seconds": 25.16807622089982,
+            "min_seconds": 23.77638658694923,
+            "max_seconds": 118.01073597744107,
+            "p95_seconds": 118.01073597744107
+          },
+          "persistence": {
+            "mean_seconds": 0.23760184794664382,
+            "std_seconds": 0.1941762033208645,
+            "median_seconds": 0.16233915090560913,
+            "min_seconds": 0.12564807943999767,
+            "max_seconds": 0.5836952179670334,
+            "p95_seconds": 0.5836952179670334
+          },
+          "visibility": {
+            "mean_seconds": 0.0,
+            "std_seconds": 0.0,
+            "median_seconds": 0.0,
+            "min_seconds": 0.0,
+            "max_seconds": 0.0,
+            "p95_seconds": 0.0
+          }
+        },
+        "per_mode": {
+          "fully_live": {
+            "trial_count": 5,
+            "stages": {
+              "total": {
+                "mean_seconds": 55.34108367972076,
+                "std_seconds": 39.4588452093548,
+                "median_seconds": 42.41187244839966,
+                "min_seconds": 26.08795790374279,
+                "max_seconds": 122.17916700430214,
+                "p95_seconds": 122.17916700430214
+              },
+              "ingest": {
+                "mean_seconds": 5.963924681767821,
+                "std_seconds": 7.012292188745581,
+                "median_seconds": 2.9697164092212915,
+                "min_seconds": 1.7278730757534504,
+                "max_seconds": 18.420447040349245,
+                "p95_seconds": 18.420447040349245
+              },
+              "agent_setup": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "signal": {
+                "mean_seconds": 49.139554276689886,
+                "std_seconds": 40.728122820762295,
+                "median_seconds": 25.16807622089982,
+                "min_seconds": 23.77638658694923,
+                "max_seconds": 118.01073597744107,
+                "p95_seconds": 118.01073597744107
+              },
+              "persistence": {
+                "mean_seconds": 0.23760184794664382,
+                "std_seconds": 0.1941762033208645,
+                "median_seconds": 0.16233915090560913,
+                "min_seconds": 0.12564807943999767,
+                "max_seconds": 0.5836952179670334,
+                "p95_seconds": 0.5836952179670334
+              },
+              "visibility": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              }
+            }
+          },
+          "partial_fallback": {
+            "trial_count": 0,
+            "stages": {
+              "total": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "ingest": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "agent_setup": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "signal": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "persistence": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "visibility": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              }
+            }
+          },
+          "fully_fallback": {
+            "trial_count": 0,
+            "stages": {
+              "total": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "ingest": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "agent_setup": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "signal": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "persistence": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "visibility": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              }
+            }
+          }
+        }
+      },
+      "spark_glue": {
+        "trial_count": 5,
+        "success_count": 5,
+        "failure_count": 0,
+        "mode_counts": {
+          "fully_live": 5,
+          "partial_fallback": 0,
+          "fully_fallback": 0
+        },
+        "stages": {
+          "total": {
+            "mean_seconds": 48.38371748998761,
+            "std_seconds": 9.834690250313097,
+            "median_seconds": 46.73620295338333,
+            "min_seconds": 39.54011548124254,
+            "max_seconds": 63.98608283139765,
+            "p95_seconds": 63.98608283139765
+          },
+          "ingest": {
+            "mean_seconds": 7.87562290020287,
+            "std_seconds": 0.09575212743875958,
+            "median_seconds": 7.840339947491884,
+            "min_seconds": 7.75248640589416,
+            "max_seconds": 7.981198476627469,
+            "p95_seconds": 7.981198476627469
+          },
+          "agent_setup": {
+            "mean_seconds": 0.0,
+            "std_seconds": 0.0,
+            "median_seconds": 0.0,
+            "min_seconds": 0.0,
+            "max_seconds": 0.0,
+            "p95_seconds": 0.0
+          },
+          "signal": {
+            "mean_seconds": 37.95097845196724,
+            "std_seconds": 10.219326104069339,
+            "median_seconds": 36.80577289685607,
+            "min_seconds": 29.233782107010484,
+            "max_seconds": 54.100625578314066,
+            "p95_seconds": 54.100625578314066
+          },
+          "persistence": {
+            "mean_seconds": 0.20914659984409809,
+            "std_seconds": 0.13000061186583434,
+            "median_seconds": 0.1511346772313118,
+            "min_seconds": 0.1411878578364849,
+            "max_seconds": 0.44110457599163055,
+            "p95_seconds": 0.44110457599163055
+          },
+          "visibility": {
+            "mean_seconds": 0.0,
+            "std_seconds": 0.0,
+            "median_seconds": 0.0,
+            "min_seconds": 0.0,
+            "max_seconds": 0.0,
+            "p95_seconds": 0.0
+          }
+        },
+        "per_mode": {
+          "fully_live": {
+            "trial_count": 5,
+            "stages": {
+              "total": {
+                "mean_seconds": 48.38371748998761,
+                "std_seconds": 9.834690250313097,
+                "median_seconds": 46.73620295338333,
+                "min_seconds": 39.54011548124254,
+                "max_seconds": 63.98608283139765,
+                "p95_seconds": 63.98608283139765
+              },
+              "ingest": {
+                "mean_seconds": 7.87562290020287,
+                "std_seconds": 0.09575212743875958,
+                "median_seconds": 7.840339947491884,
+                "min_seconds": 7.75248640589416,
+                "max_seconds": 7.981198476627469,
+                "p95_seconds": 7.981198476627469
+              },
+              "agent_setup": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "signal": {
+                "mean_seconds": 37.95097845196724,
+                "std_seconds": 10.219326104069339,
+                "median_seconds": 36.80577289685607,
+                "min_seconds": 29.233782107010484,
+                "max_seconds": 54.100625578314066,
+                "p95_seconds": 54.100625578314066
+              },
+              "persistence": {
+                "mean_seconds": 0.20914659984409809,
+                "std_seconds": 0.13000061186583434,
+                "median_seconds": 0.1511346772313118,
+                "min_seconds": 0.1411878578364849,
+                "max_seconds": 0.44110457599163055,
+                "p95_seconds": 0.44110457599163055
+              },
+              "visibility": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              }
+            }
+          },
+          "partial_fallback": {
+            "trial_count": 0,
+            "stages": {
+              "total": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "ingest": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "agent_setup": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "signal": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "persistence": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "visibility": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              }
+            }
+          },
+          "fully_fallback": {
+            "trial_count": 0,
+            "stages": {
+              "total": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "ingest": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "agent_setup": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "signal": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "persistence": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "visibility": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              }
+            }
+          }
+        }
+      },
+      "market_pulse_integrated": {
+        "trial_count": 5,
+        "success_count": 5,
+        "failure_count": 0,
+        "mode_counts": {
+          "fully_live": 5,
+          "partial_fallback": 0,
+          "fully_fallback": 0
+        },
+        "stages": {
+          "total": {
+            "mean_seconds": 30.469623394683005,
+            "std_seconds": 1.7441080983573438,
+            "median_seconds": 30.25605912320316,
+            "min_seconds": 28.565210819244385,
+            "max_seconds": 33.034191804006696,
+            "p95_seconds": 33.034191804006696
+          },
+          "ingest": {
+            "mean_seconds": 13.175504901260137,
+            "std_seconds": 1.5508521845611951,
+            "median_seconds": 12.713055316358805,
+            "min_seconds": 11.6721105966717,
+            "max_seconds": 15.678679004311562,
+            "p95_seconds": 15.678679004311562
+          },
+          "agent_setup": {
+            "mean_seconds": 13.90073370113969,
+            "std_seconds": 0.6335104032018669,
+            "median_seconds": 14.195399016141891,
+            "min_seconds": 12.786621358245611,
+            "max_seconds": 14.284978788346052,
+            "p95_seconds": 14.284978788346052
+          },
+          "signal": {
+            "mean_seconds": 1.0235072873532771,
+            "std_seconds": 0.028920235348677985,
+            "median_seconds": 1.020911119878292,
+            "min_seconds": 0.9911123123019934,
+            "max_seconds": 1.069303810596466,
+            "p95_seconds": 1.069303810596466
+          },
+          "persistence": {
+            "mean_seconds": 0.2587929252535105,
+            "std_seconds": 0.020244937331398063,
+            "median_seconds": 0.2557507697492838,
+            "min_seconds": 0.23729966953396797,
+            "max_seconds": 0.2841642163693905,
+            "p95_seconds": 0.2841642163693905
+          },
+          "visibility": {
+            "mean_seconds": 0.5675237189978362,
+            "std_seconds": 0.7741686857165149,
+            "median_seconds": 0.22255725041031837,
+            "min_seconds": 0.21647336333990097,
+            "max_seconds": 1.9523706808686256,
+            "p95_seconds": 1.9523706808686256
+          }
+        },
+        "per_mode": {
+          "fully_live": {
+            "trial_count": 5,
+            "stages": {
+              "total": {
+                "mean_seconds": 30.469623394683005,
+                "std_seconds": 1.7441080983573438,
+                "median_seconds": 30.25605912320316,
+                "min_seconds": 28.565210819244385,
+                "max_seconds": 33.034191804006696,
+                "p95_seconds": 33.034191804006696
+              },
+              "ingest": {
+                "mean_seconds": 13.175504901260137,
+                "std_seconds": 1.5508521845611951,
+                "median_seconds": 12.713055316358805,
+                "min_seconds": 11.6721105966717,
+                "max_seconds": 15.678679004311562,
+                "p95_seconds": 15.678679004311562
+              },
+              "agent_setup": {
+                "mean_seconds": 13.90073370113969,
+                "std_seconds": 0.6335104032018669,
+                "median_seconds": 14.195399016141891,
+                "min_seconds": 12.786621358245611,
+                "max_seconds": 14.284978788346052,
+                "p95_seconds": 14.284978788346052
+              },
+              "signal": {
+                "mean_seconds": 1.0235072873532771,
+                "std_seconds": 0.028920235348677985,
+                "median_seconds": 1.020911119878292,
+                "min_seconds": 0.9911123123019934,
+                "max_seconds": 1.069303810596466,
+                "p95_seconds": 1.069303810596466
+              },
+              "persistence": {
+                "mean_seconds": 0.2587929252535105,
+                "std_seconds": 0.020244937331398063,
+                "median_seconds": 0.2557507697492838,
+                "min_seconds": 0.23729966953396797,
+                "max_seconds": 0.2841642163693905,
+                "p95_seconds": 0.2841642163693905
+              },
+              "visibility": {
+                "mean_seconds": 0.5675237189978362,
+                "std_seconds": 0.7741686857165149,
+                "median_seconds": 0.22255725041031837,
+                "min_seconds": 0.21647336333990097,
+                "max_seconds": 1.9523706808686256,
+                "p95_seconds": 1.9523706808686256
+              }
+            }
+          },
+          "partial_fallback": {
+            "trial_count": 0,
+            "stages": {
+              "total": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "ingest": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "agent_setup": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "signal": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "persistence": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "visibility": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              }
+            }
+          },
+          "fully_fallback": {
+            "trial_count": 0,
+            "stages": {
+              "total": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "ingest": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "agent_setup": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "signal": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "persistence": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              },
+              "visibility": {
+                "mean_seconds": 0.0,
+                "std_seconds": 0.0,
+                "median_seconds": 0.0,
+                "min_seconds": 0.0,
+                "max_seconds": 0.0,
+                "p95_seconds": 0.0
+              }
+            }
+          }
+        }
+      }
+    },
+    "comparison": {
+      "fastest_mean_system": "market_pulse_integrated",
+      "plain_over_integrated_ratio": 1.8162706825374764,
+      "spark_glue_over_integrated_ratio": 1.587932901672511
+    }
+  },
+  "trials": [
+    {
+      "trial": 1,
+      "system_name": "plain_sequential",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 122.17916700430214,
+      "ingest_duration_seconds": 4.04278027266264,
+      "agent_setup_duration_seconds": 0.0,
+      "signal_duration_seconds": 118.01073597744107,
+      "persistence_duration_seconds": 0.12564807943999767,
+      "visibility_duration_seconds": 0.0,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 1,
+      "system_name": "spark_glue",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 39.54011548124254,
+      "ingest_duration_seconds": 7.839900016784668,
+      "agent_setup_duration_seconds": 0.0,
+      "signal_duration_seconds": 29.33644788712263,
+      "persistence_duration_seconds": 0.1411878578364849,
+      "visibility_duration_seconds": 0.0,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 1,
+      "system_name": "market_pulse_integrated",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 28.565210819244385,
+      "ingest_duration_seconds": 12.30009706877172,
+      "agent_setup_duration_seconds": 12.786621358245611,
+      "signal_duration_seconds": 1.069303810596466,
+      "persistence_duration_seconds": 0.2841642163693905,
+      "visibility_duration_seconds": 0.22884502820670605,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 2,
+      "system_name": "plain_sequential",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 57.74090033583343,
+      "ingest_duration_seconds": 2.65880661085248,
+      "agent_setup_duration_seconds": 0.0,
+      "signal_duration_seconds": 54.913489025086164,
+      "persistence_duration_seconds": 0.16860168427228928,
+      "visibility_duration_seconds": 0.0,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 2,
+      "system_name": "spark_glue",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 50.80125568062067,
+      "ingest_duration_seconds": 7.96418965421617,
+      "agent_setup_duration_seconds": 0.0,
+      "signal_duration_seconds": 40.27826379053295,
+      "persistence_duration_seconds": 0.14626090787351131,
+      "visibility_duration_seconds": 0.0,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 2,
+      "system_name": "market_pulse_integrated",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 31.199879432097077,
+      "ingest_duration_seconds": 13.513582520186901,
+      "agent_setup_duration_seconds": 14.284978788346052,
+      "signal_duration_seconds": 1.020911119878292,
+      "persistence_duration_seconds": 0.2745639234781265,
+      "visibility_duration_seconds": 0.21737227216362953,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 3,
+      "system_name": "plain_sequential",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 26.08795790374279,
+      "ingest_duration_seconds": 1.7278730757534504,
+      "agent_setup_duration_seconds": 0.0,
+      "signal_duration_seconds": 23.77638658694923,
+      "persistence_duration_seconds": 0.5836952179670334,
+      "visibility_duration_seconds": 0.0,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 3,
+      "system_name": "spark_glue",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 63.98608283139765,
+      "ingest_duration_seconds": 7.75248640589416,
+      "agent_setup_duration_seconds": 0.0,
+      "signal_duration_seconds": 54.100625578314066,
+      "persistence_duration_seconds": 0.16604498028755188,
+      "visibility_duration_seconds": 0.0,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 3,
+      "system_name": "market_pulse_integrated",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 30.25605912320316,
+      "ingest_duration_seconds": 12.713055316358805,
+      "agent_setup_duration_seconds": 14.195399016141891,
+      "signal_duration_seconds": 0.9911123123019934,
+      "persistence_duration_seconds": 0.2421860471367836,
+      "visibility_duration_seconds": 1.9523706808686256,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 4,
+      "system_name": "plain_sequential",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 42.41187244839966,
+      "ingest_duration_seconds": 18.420447040349245,
+      "agent_setup_duration_seconds": 0.0,
+      "signal_duration_seconds": 23.82908357307315,
+      "persistence_duration_seconds": 0.16233915090560913,
+      "visibility_duration_seconds": 0.0,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 4,
+      "system_name": "spark_glue",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 40.85493050329387,
+      "ingest_duration_seconds": 7.981198476627469,
+      "agent_setup_duration_seconds": 0.0,
+      "signal_duration_seconds": 29.233782107010484,
+      "persistence_duration_seconds": 0.1511346772313118,
+      "visibility_duration_seconds": 0.0,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 4,
+      "system_name": "market_pulse_integrated",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 29.2927757948637,
+      "ingest_duration_seconds": 11.6721105966717,
+      "agent_setup_duration_seconds": 14.250476852059364,
+      "signal_duration_seconds": 1.0262791272252798,
+      "persistence_duration_seconds": 0.23729966953396797,
+      "visibility_duration_seconds": 0.22255725041031837,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 5,
+      "system_name": "plain_sequential",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 28.28552070632577,
+      "ingest_duration_seconds": 2.9697164092212915,
+      "agent_setup_duration_seconds": 0.0,
+      "signal_duration_seconds": 25.16807622089982,
+      "persistence_duration_seconds": 0.14772510714828968,
+      "visibility_duration_seconds": 0.0,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 5,
+      "system_name": "spark_glue",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 46.73620295338333,
+      "ingest_duration_seconds": 7.840339947491884,
+      "agent_setup_duration_seconds": 0.0,
+      "signal_duration_seconds": 36.80577289685607,
+      "persistence_duration_seconds": 0.44110457599163055,
+      "visibility_duration_seconds": 0.0,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    },
+    {
+      "trial": 5,
+      "system_name": "market_pulse_integrated",
+      "success": true,
+      "error": "",
+      "provider_requested": "fmp",
+      "symbol": "BTCUSD",
+      "shared_input_capture_duration_seconds": 0.0,
+      "total_duration_seconds": 33.034191804006696,
+      "ingest_duration_seconds": 15.678679004311562,
+      "agent_setup_duration_seconds": 13.986192490905523,
+      "signal_duration_seconds": 1.0099300667643547,
+      "persistence_duration_seconds": 0.2557507697492838,
+      "visibility_duration_seconds": 0.21647336333990097,
+      "news_mode": "live_fmp",
+      "price_mode": "live_stream",
+      "news_fallback_used": false,
+      "price_fallback_used": false,
+      "mode_classification": "fully_live"
+    }
+  ]
+}

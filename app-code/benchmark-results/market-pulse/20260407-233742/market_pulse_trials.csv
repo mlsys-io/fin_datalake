@@ -1,0 +1,16 @@
+trial,system_name,success,error,provider_requested,symbol,shared_input_capture_duration_seconds,total_duration_seconds,ingest_duration_seconds,agent_setup_duration_seconds,signal_duration_seconds,persistence_duration_seconds,visibility_duration_seconds,news_mode,price_mode,news_fallback_used,price_fallback_used,mode_classification
+1,plain_sequential,True,,fmp,BTCUSD,0.0,122.17916700430214,4.04278027266264,0.0,118.01073597744107,0.12564807943999767,0.0,live_fmp,live_stream,False,False,fully_live
+1,spark_glue,True,,fmp,BTCUSD,0.0,39.54011548124254,7.839900016784668,0.0,29.33644788712263,0.1411878578364849,0.0,live_fmp,live_stream,False,False,fully_live
+1,market_pulse_integrated,True,,fmp,BTCUSD,0.0,28.565210819244385,12.30009706877172,12.786621358245611,1.069303810596466,0.2841642163693905,0.22884502820670605,live_fmp,live_stream,False,False,fully_live
+2,plain_sequential,True,,fmp,BTCUSD,0.0,57.74090033583343,2.65880661085248,0.0,54.913489025086164,0.16860168427228928,0.0,live_fmp,live_stream,False,False,fully_live
+2,spark_glue,True,,fmp,BTCUSD,0.0,50.80125568062067,7.96418965421617,0.0,40.27826379053295,0.14626090787351131,0.0,live_fmp,live_stream,False,False,fully_live
+2,market_pulse_integrated,True,,fmp,BTCUSD,0.0,31.199879432097077,13.513582520186901,14.284978788346052,1.020911119878292,0.2745639234781265,0.21737227216362953,live_fmp,live_stream,False,False,fully_live
+3,plain_sequential,True,,fmp,BTCUSD,0.0,26.08795790374279,1.7278730757534504,0.0,23.77638658694923,0.5836952179670334,0.0,live_fmp,live_stream,False,False,fully_live
+3,spark_glue,True,,fmp,BTCUSD,0.0,63.98608283139765,7.75248640589416,0.0,54.100625578314066,0.16604498028755188,0.0,live_fmp,live_stream,False,False,fully_live
+3,market_pulse_integrated,True,,fmp,BTCUSD,0.0,30.25605912320316,12.713055316358805,14.195399016141891,0.9911123123019934,0.2421860471367836,1.9523706808686256,live_fmp,live_stream,False,False,fully_live
+4,plain_sequential,True,,fmp,BTCUSD,0.0,42.41187244839966,18.420447040349245,0.0,23.82908357307315,0.16233915090560913,0.0,live_fmp,live_stream,False,False,fully_live
+4,spark_glue,True,,fmp,BTCUSD,0.0,40.85493050329387,7.981198476627469,0.0,29.233782107010484,0.1511346772313118,0.0,live_fmp,live_stream,False,False,fully_live
+4,market_pulse_integrated,True,,fmp,BTCUSD,0.0,29.2927757948637,11.6721105966717,14.250476852059364,1.0262791272252798,0.23729966953396797,0.22255725041031837,live_fmp,live_stream,False,False,fully_live
+5,plain_sequential,True,,fmp,BTCUSD,0.0,28.28552070632577,2.9697164092212915,0.0,25.16807622089982,0.14772510714828968,0.0,live_fmp,live_stream,False,False,fully_live
+5,spark_glue,True,,fmp,BTCUSD,0.0,46.73620295338333,7.840339947491884,0.0,36.80577289685607,0.44110457599163055,0.0,live_fmp,live_stream,False,False,fully_live
+5,market_pulse_integrated,True,,fmp,BTCUSD,0.0,33.034191804006696,15.678679004311562,13.986192490905523,1.0099300667643547,0.2557507697492838,0.21647336333990097,live_fmp,live_stream,False,False,fully_live
