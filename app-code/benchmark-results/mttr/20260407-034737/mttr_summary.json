@@ -1,0 +1,998 @@
+{
+  "benchmark": "mttr_recovery_comparison",
+  "selected_mode": "compare",
+  "summary": {
+    "modes": {
+      "overseer": {
+        "trial_count": 30,
+        "success_count": 30,
+        "failure_count": 0,
+        "mean_mttr_seconds": 4.607650421621899,
+        "std_mttr_seconds": 0.10187113923731873,
+        "min_mttr_seconds": 4.370245195925236,
+        "max_mttr_seconds": 4.913234621286392,
+        "p95_mttr_seconds": 4.747218003496528
+      },
+      "manual": {
+        "trial_count": 30,
+        "success_count": 30,
+        "failure_count": 0,
+        "mean_mttr_seconds": 13.38866267496099,
+        "std_mttr_seconds": 3.0594834326432063,
+        "min_mttr_seconds": 9.228059144690633,
+        "max_mttr_seconds": 18.839838549494743,
+        "p95_mttr_seconds": 18.00899103656411
+      }
+    },
+    "comparison": {
+      "manual_over_overseer_ratio": 2.905746193793965,
+      "overseer_improvement_pct": 65.58543199210654
+    }
+  },
+  "trials": {
+    "overseer": [
+      {
+        "success": true,
+        "mttr_seconds": 4.370245195925236,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-c94bc1fa",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.55661828070879,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-09cd51bf",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.619891794398427,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-aa91be7f",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.5351373720914125,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-cdaf1bc3",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.578085917979479,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-b0cb1303",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.593006834387779,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-4503a590",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.67523954808712,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-a6e1bdbc",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.612342173233628,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-a67410c5",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.599317092448473,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-f28acec5",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.55882722325623,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-57dde793",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.535360032692552,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-7069a716",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.580961715430021,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-5d982aae",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.599595280364156,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-689be011",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.564940512180328,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-71a482e0",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.913234621286392,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-7c436459",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.46538214199245,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-387545d4",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.602219760417938,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-365bd5d7",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.56398206576705,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-7f4377a5",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.664423767477274,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-f7e2285c",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.747218003496528,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-83aa8d30",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.545985944569111,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-fb5d4b44",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.700884595513344,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-18ccbfc1",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.643183508887887,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-3c74da1e",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.428421372547746,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-303bcfa8",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.716680204495788,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-efceeee5",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.6765576377511024,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-1cd84698",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.736302979290485,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-e097edd0",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.658068090677261,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-400fa6f9",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.6071460004895926,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-d05d57a4",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 4.580252980813384,
+        "observed_states": [
+          "ready",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-ce5f6c98",
+        "agent_class": "SupportAgent"
+      }
+    ],
+    "manual": [
+      {
+        "success": true,
+        "mttr_seconds": 15.5084937363863,
+        "observed_states": [
+          "ready"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 11.394267984578837,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-ed5b803e",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 9.267417188733816,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 5.25010755222667,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-950d0076",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 11.84830965474248,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 7.750293183691193,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-2a5e1128",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 11.36368440464139,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 7.232107381488228,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-6c08aa36",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 16.515889098867774,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 12.364712141640124,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-20208734",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 15.843140959739685,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 11.766994874229113,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-0cd0a9ae",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 18.00899103656411,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 13.921795677048454,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-196745d3",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 9.960153693333268,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 5.869388326294161,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-572661da",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 13.280022179707885,
+        "observed_states": [
+          "ready"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 9.219218196852704,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-4c54d416",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 9.382918814197183,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 5.297972194380703,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-12ced1bc",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 11.24554736725986,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 7.186379748036034,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-ba210cfd",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 14.203658187761903,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 10.053552881033625,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-04251a26",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 9.307482082396746,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 5.265359696838637,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-c72cca75",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 11.061496540904045,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 6.988376506866485,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-df0dadaf",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 15.643877377733588,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 11.498844377795232,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-0630c7c2",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 14.625784603878856,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 10.449414806032166,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-79ecc530",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 11.321907974779606,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 7.204406220406967,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-2777e320",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 14.937172865495086,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 10.892656838759088,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-f9523522",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 17.421074060723186,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 13.094304566778266,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-d2a64055",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 9.228059144690633,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 5.06498759678061,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-3e2ef866",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 17.332549476996064,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 13.05819251832808,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-338e0622",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 16.169196654111147,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 11.981393949882268,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-f3c33c7a",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 13.23414133861661,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 8.40250516517992,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-91da9762",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 10.663357293233275,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 6.554794998117815,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-24b110db",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 18.839838549494743,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 14.572130722067811,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-a7212531",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 12.499830059707165,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 8.365945451126269,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-472528d7",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 9.948696510866284,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 5.927458433801479,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-26365198",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 10.22663675993681,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 5.96716376833464,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-08e4b8d5",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 17.673353374004364,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 13.474943663474598,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-9bbc782a",
+        "agent_class": "SupportAgent"
+      },
+      {
+        "success": true,
+        "mttr_seconds": 15.097199259325862,
+        "observed_states": [
+          "missing"
+        ],
+        "final_observed_status": "ready",
+        "final_health_status": "healthy",
+        "final_recovery_state": "idle",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: manual mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "operator_delay_seconds": 11.037260313668911,
+        "error": null,
+        "mode": "manual",
+        "victim_name": "SupportAgent-MTTR-4a138173",
+        "agent_class": "SupportAgent"
+      }
+    ]
+  }
+}

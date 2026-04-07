@@ -1,0 +1,2 @@
+trial,mode,success,agent_class,victim_name,mttr_seconds,operator_delay_seconds,final_observed_status,final_health_status,final_recovery_state,error
+1,overseer,True,SupportAgent,SupportAgent-MTTR-512c726b,7.833377964794636,,recovering,degraded,recovering,

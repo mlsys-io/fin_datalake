@@ -1,0 +1,66 @@
+{
+  "benchmark": "mttr_recovery_comparison",
+  "selected_mode": "overseer",
+  "summary": {
+    "modes": {
+      "overseer": {
+        "trial_count": 1,
+        "success_count": 1,
+        "failure_count": 0,
+        "mean_mttr_seconds": 33.03335642814636,
+        "std_mttr_seconds": 0.0,
+        "min_mttr_seconds": 33.03335642814636,
+        "max_mttr_seconds": 33.03335642814636,
+        "p95_mttr_seconds": 33.03335642814636
+      }
+    },
+    "comparison": {}
+  },
+  "trials": {
+    "overseer": [
+      {
+        "success": true,
+        "mttr_seconds": 33.03335642814636,
+        "observed_states": [
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "recovering",
+          "missing",
+          "missing",
+          "missing",
+          "missing",
+          "missing",
+          "recovering"
+        ],
+        "final_observed_status": "recovering",
+        "final_health_status": "degraded",
+        "final_recovery_state": "recovering",
+        "probe_response": "{'content': 'SupportAgent ready.\\n- Issue summary: mttr probe\\n- Suggested checks: connectivity, input payload, and downstream service health.'}",
+        "error": null,
+        "mode": "overseer",
+        "victim_name": "SupportAgent-MTTR-3efaaddb",
+        "agent_class": "SupportAgent"
+      }
+    ]
+  }
+}
