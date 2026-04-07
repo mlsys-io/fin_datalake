@@ -679,6 +679,11 @@ class ReadLatestPriceWindowTask(BaseTask):
         }
 
 
+class EnsurePriceServiceTask(BaseTask):
+    def run(self, *, symbol: str, window_size: int) -> Dict[str, Any]:
+        return _ensure_price_service(symbol=symbol, window_size=window_size)
+
+
 def _price_service_cfg(*, symbol: str, window_size: int) -> Dict[str, Any]:
     return {
         "symbol": symbol,
@@ -813,7 +818,10 @@ def market_pulse_ingest(
 ) -> Dict[str, Any]:
     logger.info(f"=== Starting Market Pulse Ingest Flow for {symbol} (provider={provider}) ===")
 
-    service_status = _ensure_price_service(symbol=symbol, window_size=DEFAULT_PRICE_WINDOW_SIZE)
+    service_status = EnsurePriceServiceTask(name="Ensure Price Service").submit(
+        symbol=symbol,
+        window_size=DEFAULT_PRICE_WINDOW_SIZE,
+    ).result()
 
     news_task = MarketNewsIngestTask()
     read_price_task = ReadLatestPriceWindowTask(name="Read Latest Price Window")
