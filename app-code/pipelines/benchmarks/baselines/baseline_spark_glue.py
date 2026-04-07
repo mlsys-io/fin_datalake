@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import argparse
+import json
 import time
 from typing import Any, Dict, List
 
@@ -8,7 +10,7 @@ from loguru import logger
 from pipelines.benchmarks.contracts import SYSTEM_SPARK_GLUE
 from pipelines.benchmarks.shared import (
     build_benchmark_result,
-    capture_trial_input,
+    capture_trial_input_local,
     deserialize_json_payload,
     extract_headlines,
     llm_market_news_analysis,
@@ -114,7 +116,7 @@ def run_spark_glue_baseline(
     total_started = time.perf_counter()
 
     if trial_input is None:
-        trial_input = capture_trial_input(provider=provider, symbol=symbol)
+        trial_input = capture_trial_input_local(provider=provider, symbol=symbol)
     else:
         trial_input = dict(trial_input)
 
@@ -193,4 +195,11 @@ def run_spark_glue_baseline(
 
 
 if __name__ == "__main__":
-    run_spark_glue_baseline()
+    parser = argparse.ArgumentParser(description="Run the Spark + glue Market Pulse baseline.")
+    parser.add_argument("--provider", default=DEFAULT_PROVIDER)
+    parser.add_argument("--symbol", default=DEFAULT_SYMBOL)
+    parser.add_argument("--json", action="store_true", help="Print the final payload as JSON.")
+    args = parser.parse_args()
+    result = run_spark_glue_baseline(provider=args.provider, symbol=args.symbol)
+    if args.json:
+        print(json.dumps(result, indent=2))

@@ -1,3 +1,5 @@
+import argparse
+import json
 import time
 from typing import Any
 
@@ -6,7 +8,7 @@ from loguru import logger
 from pipelines.benchmarks.contracts import SYSTEM_PLAIN
 from pipelines.benchmarks.shared import (
     build_benchmark_result,
-    capture_trial_input,
+    capture_trial_input_local,
     compute_market_state_from_ohlc,
     extract_headlines,
     llm_market_news_analysis,
@@ -28,7 +30,7 @@ def run_plain_baseline(
 
     if trial_input is None:
         ingest_started = time.perf_counter()
-        trial_input = capture_trial_input(provider=provider, symbol=symbol)
+        trial_input = capture_trial_input_local(provider=provider, symbol=symbol)
         ingest_duration = time.perf_counter() - ingest_started
     else:
         trial_input = dict(trial_input)
@@ -76,4 +78,11 @@ def run_plain_baseline(
 
 
 if __name__ == "__main__":
-    run_plain_baseline()
+    parser = argparse.ArgumentParser(description="Run the plain sequential Market Pulse baseline.")
+    parser.add_argument("--provider", default=DEFAULT_PROVIDER)
+    parser.add_argument("--symbol", default=DEFAULT_SYMBOL)
+    parser.add_argument("--json", action="store_true", help="Print the final payload as JSON.")
+    args = parser.parse_args()
+    result = run_plain_baseline(provider=args.provider, symbol=args.symbol)
+    if args.json:
+        print(json.dumps(result, indent=2))

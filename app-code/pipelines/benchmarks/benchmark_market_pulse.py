@@ -1,7 +1,9 @@
 import argparse
 import csv
 import json
+import os
 import statistics
+import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
@@ -9,15 +11,15 @@ from typing import Any, Dict, List
 
 from loguru import logger
 
-from pipelines.benchmarks.baselines.baseline_plain import run_plain_baseline
-from pipelines.benchmarks.baselines.baseline_spark_glue import run_spark_glue_baseline
 from pipelines.benchmarks.contracts import SYSTEM_MARKET_PULSE, SYSTEM_PLAIN, SYSTEM_SPARK_GLUE
-from pipelines.benchmarks.shared import capture_trial_input
 from pipelines.market_pulse_demo import DEFAULT_PROVIDER, DEFAULT_SYMBOL, run_market_pulse_flow
 
 
 DEFAULT_TRIALS = 30
 DEFAULT_OUTPUT_ROOT = Path("benchmark-results/market-pulse")
+BENCHMARK_NAMESPACE = str(os.environ.get("BENCHMARK_NAMESPACE", "etl-compute")).strip() or "etl-compute"
+PLAIN_BASELINE_DEPLOYMENT = str(os.environ.get("PLAIN_BASELINE_DEPLOYMENT", "benchmark-plain-runner")).strip() or "benchmark-plain-runner"
+SPARK_BASELINE_DEPLOYMENT = str(os.environ.get("SPARK_BASELINE_DEPLOYMENT", "benchmark-spark-runner")).strip() or "benchmark-spark-runner"
 SYSTEM_ORDER = [SYSTEM_PLAIN, SYSTEM_SPARK_GLUE, SYSTEM_MARKET_PULSE]
 STAGE_FIELD_MAP = {
     "total": "total_duration_seconds",
@@ -241,7 +243,6 @@ def _row_from_baseline_result(
     ohlc_meta = dict(result.get("ohlc_meta") or {})
     timings = dict(result.get("timings") or {})
     success = error is None and bool(result.get("success", True))
-    signal_and_persist_total = float(timings.get("total_duration_seconds", 0.0))
     return {
         "trial": trial,
         "system_name": system_name,
@@ -250,8 +251,8 @@ def _row_from_baseline_result(
         "provider_requested": result.get("provider_requested"),
         "symbol": result.get("symbol"),
         "shared_input_capture_duration_seconds": float(shared_capture_duration_seconds),
-        "total_duration_seconds": float(shared_capture_duration_seconds) + signal_and_persist_total,
-        "ingest_duration_seconds": float(shared_capture_duration_seconds),
+        "total_duration_seconds": float(timings.get("total_duration_seconds", 0.0)),
+        "ingest_duration_seconds": float(timings.get("ingest_duration_seconds", 0.0)),
         "agent_setup_duration_seconds": 0.0,
         "signal_duration_seconds": float(timings.get("signal_duration_seconds", 0.0)),
         "persistence_duration_seconds": float(timings.get("persistence_duration_seconds", 0.0)),
@@ -262,6 +263,52 @@ def _row_from_baseline_result(
         "price_fallback_used": bool(ohlc_meta.get("fallback_used")),
         "mode_classification": _mode_classification(news_meta, ohlc_meta) if success else "failed",
     }
+
+
+def _extract_json_payload(stdout: str) -> Dict[str, Any]:
+    lines = [line for line in stdout.splitlines() if line.strip()]
+    for idx, line in enumerate(lines):
+        if not line.lstrip().startswith("{"):
+            continue
+        candidate = "\n".join(lines[idx:])
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+    raise ValueError("Could not parse JSON payload from baseline runner output.")
+
+
+def _run_baseline_in_runner(*, deployment: str, module_name: str, provider: str, symbol: str) -> Dict[str, Any]:
+    command = [
+        "kubectl",
+        "exec",
+        "-n",
+        BENCHMARK_NAMESPACE,
+        f"deploy/{deployment}",
+        "--",
+        "python",
+        "-m",
+        module_name,
+        "--provider",
+        provider,
+        "--symbol",
+        symbol,
+        "--json",
+    ]
+    completed = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        stderr = completed.stderr.strip()
+        stdout = completed.stdout.strip()
+        raise RuntimeError(
+            f"Runner command failed (deployment={deployment}, exit={completed.returncode}). "
+            f"stdout={stdout!r} stderr={stderr!r}"
+        )
+    return _extract_json_payload(completed.stdout)
 
 
 def _summary_rows(summary: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -525,71 +572,30 @@ def run_master_benchmark(
     for trial in range(1, trials + 1):
         logger.info(f"[MarketPulseBenchmark] Starting comparative trial {trial}/{trials}")
 
-        shared_input = None
-        shared_capture_duration = 0.0
-        shared_capture_error = None
         try:
-            capture_timer_started = time.perf_counter()
-            shared_input = capture_trial_input(provider=provider, symbol=symbol)
-            shared_capture_duration = time.perf_counter() - capture_timer_started
-            logger.info(
-                "[MarketPulseBenchmark] Shared input captured in {:.2f}s for plain and Spark baselines",
-                shared_capture_duration,
+            plain_result = _run_baseline_in_runner(
+                deployment=PLAIN_BASELINE_DEPLOYMENT,
+                module_name="pipelines.benchmarks.baselines.baseline_plain",
+                provider=provider,
+                symbol=symbol,
             )
+            plain_row = _row_from_baseline_result(trial, SYSTEM_PLAIN, plain_result)
         except Exception as exc:
-            shared_capture_error = str(exc)
-            logger.exception(f"[MarketPulseBenchmark] Shared input capture failed for trial {trial}: {exc}")
-
-        if shared_input is not None:
-            try:
-                plain_result = run_plain_baseline(trial_input=shared_input, provider=provider, symbol=symbol)
-                plain_row = _row_from_baseline_result(
-                    trial,
-                    SYSTEM_PLAIN,
-                    plain_result,
-                    shared_capture_duration_seconds=shared_capture_duration,
-                )
-            except Exception as exc:
-                logger.exception(f"[MarketPulseBenchmark] Plain baseline trial {trial} failed: {exc}")
-                plain_row = _row_from_baseline_result(
-                    trial,
-                    SYSTEM_PLAIN,
-                    error=str(exc),
-                    shared_capture_duration_seconds=shared_capture_duration,
-                )
-        else:
-            plain_row = _row_from_baseline_result(
-                trial,
-                SYSTEM_PLAIN,
-                error=f"shared_input_capture_failed: {shared_capture_error}",
-                shared_capture_duration_seconds=shared_capture_duration,
-            )
+            logger.exception(f"[MarketPulseBenchmark] Plain baseline trial {trial} failed: {exc}")
+            plain_row = _row_from_baseline_result(trial, SYSTEM_PLAIN, error=str(exc))
         rows.append(plain_row)
 
-        if shared_input is not None:
-            try:
-                spark_result = run_spark_glue_baseline(trial_input=shared_input, provider=provider, symbol=symbol)
-                spark_row = _row_from_baseline_result(
-                    trial,
-                    SYSTEM_SPARK_GLUE,
-                    spark_result,
-                    shared_capture_duration_seconds=shared_capture_duration,
-                )
-            except Exception as exc:
-                logger.exception(f"[MarketPulseBenchmark] Spark baseline trial {trial} failed: {exc}")
-                spark_row = _row_from_baseline_result(
-                    trial,
-                    SYSTEM_SPARK_GLUE,
-                    error=str(exc),
-                    shared_capture_duration_seconds=shared_capture_duration,
-                )
-        else:
-            spark_row = _row_from_baseline_result(
-                trial,
-                SYSTEM_SPARK_GLUE,
-                error=f"shared_input_capture_failed: {shared_capture_error}",
-                shared_capture_duration_seconds=shared_capture_duration,
+        try:
+            spark_result = _run_baseline_in_runner(
+                deployment=SPARK_BASELINE_DEPLOYMENT,
+                module_name="pipelines.benchmarks.baselines.baseline_spark_glue",
+                provider=provider,
+                symbol=symbol,
             )
+            spark_row = _row_from_baseline_result(trial, SYSTEM_SPARK_GLUE, spark_result)
+        except Exception as exc:
+            logger.exception(f"[MarketPulseBenchmark] Spark baseline trial {trial} failed: {exc}")
+            spark_row = _row_from_baseline_result(trial, SYSTEM_SPARK_GLUE, error=str(exc))
         rows.append(spark_row)
 
         try:

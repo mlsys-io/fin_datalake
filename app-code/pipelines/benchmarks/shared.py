@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections import deque
 import json
+import os
 import time
 from typing import Any, Dict, List
 
@@ -12,15 +14,228 @@ from etl.io.tasks.risingwave_write_task import RisingWaveWriteTask
 from pipelines.benchmarks.contracts import BenchmarkResult, BenchmarkTimings, BenchmarkTrialInput
 from pipelines.market_pulse_ingest import (
     DEFAULT_PROVIDER,
+    DEFAULT_PRICE_WINDOW_SIZE,
     DEFAULT_SYMBOL,
-    market_pulse_ingest,
+    DEFAULT_WEBSOCKET_URL,
+    MarketNewsIngestTask,
     risingwave_signal_table,
     signal_history_uri,
 )
+from etl.io.sources.websocket import WebSocketSource
 
 
 def capture_trial_input(*, provider: str = DEFAULT_PROVIDER, symbol: str = DEFAULT_SYMBOL) -> BenchmarkTrialInput:
-    ingest_result = market_pulse_ingest(provider=provider, symbol=symbol)
+    return capture_trial_input_local(provider=provider, symbol=symbol)
+
+
+def _baseline_price_capture_timeout_seconds() -> int:
+    return int(os.environ.get("BASELINE_PRICE_CAPTURE_TIMEOUT_SECONDS", "20"))
+
+
+def _binance_trade_stream_url(symbol: str) -> str:
+    override = str(os.environ.get("BASELINE_PRICE_WEBSOCKET_URL") or "").strip()
+    if override:
+        return override
+
+    configured = str(os.environ.get("DEMO_PRICE_WEBSOCKET_URL") or config.WEBSOCKET_URL or "").strip()
+    if configured:
+        return configured
+
+    normalized = str(symbol).strip().upper() or DEFAULT_SYMBOL
+    if normalized.endswith("USD"):
+        pair = f"{normalized[:-3]}USDT"
+    else:
+        pair = normalized
+    return f"wss://stream.binance.com:443/ws/{pair.lower()}@trade"
+
+
+def _fallback_price_window(symbol: str, window_size: int = DEFAULT_PRICE_WINDOW_SIZE) -> List[Dict[str, Any]]:
+    now_ms = int(time.time() * 1000)
+    base_price = 68400.0
+    pattern = [-120, -90, -60, -35, -20, -10, 0, 12, 25, 40, 55, 70, 82, 95, 105, 116, 128, 141, 155, 170, 185, 198, 212, 228, 245]
+    rows = []
+    window_pattern = pattern[-window_size:]
+    for index, offset in enumerate(window_pattern):
+        rows.append(
+            {
+                "symbol": symbol,
+                "close": round(base_price + offset, 2),
+                "volume": round(1.1 + (index * 0.07), 4),
+                "timestamp": now_ms - ((len(window_pattern) - index) * 60_000),
+                "provider": "fallback",
+            }
+        )
+    return rows
+
+
+def _normalize_price_batch(batch: List[Dict[str, Any]], symbol: str) -> List[Dict[str, Any]]:
+    normalized: List[Dict[str, Any]] = []
+    for entry in batch:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("e") == "trade":
+            price = entry.get("p")
+            volume = entry.get("q")
+            timestamp = entry.get("T") or entry.get("E")
+            row_symbol = str(entry.get("s") or symbol).upper()
+        elif entry.get("data") and isinstance(entry.get("data"), dict):
+            trade = entry["data"]
+            price = trade.get("p")
+            volume = trade.get("q")
+            timestamp = trade.get("T") or trade.get("E")
+            row_symbol = str(trade.get("s") or symbol).upper()
+        else:
+            price = entry.get("price") or entry.get("p") or entry.get("close")
+            volume = entry.get("volume") or entry.get("q") or entry.get("v")
+            timestamp = entry.get("timestamp") or entry.get("T") or int(time.time() * 1000)
+            row_symbol = str(entry.get("symbol") or entry.get("s") or symbol).upper()
+
+        if price is None:
+            continue
+
+        normalized.append(
+            {
+                "symbol": row_symbol,
+                "close": float(price),
+                "volume": float(volume or 0.0),
+                "timestamp": int(timestamp),
+                "provider": "live_stream",
+            }
+        )
+
+    normalized.sort(key=lambda row: int(row.get("timestamp") or 0))
+    return normalized
+
+
+def capture_price_window_local(
+    *,
+    symbol: str = DEFAULT_SYMBOL,
+    window_size: int = DEFAULT_PRICE_WINDOW_SIZE,
+    minimum_rows: int = 20,
+) -> Dict[str, Any]:
+    websocket_url = _binance_trade_stream_url(symbol)
+    source = WebSocketSource(
+        url=websocket_url,
+        batch_size=20,
+        read_timeout=1.0,
+    )
+    rows_window: deque[Dict[str, Any]] = deque(maxlen=window_size)
+    batch_count = 0
+    tick_count = 0
+    last_error = None
+
+    try:
+        started = time.time()
+        with source.open() as reader:
+            for raw_batch in reader.read_batch():
+                rows = _normalize_price_batch(raw_batch, symbol)
+                if not rows:
+                    if time.time() - started >= _baseline_price_capture_timeout_seconds():
+                        break
+                    continue
+
+                batch_count += 1
+                tick_count += len(rows)
+                rows_window.extend(rows)
+
+                if len(rows_window) >= max(minimum_rows, window_size):
+                    break
+                if time.time() - started >= _baseline_price_capture_timeout_seconds():
+                    break
+
+        live_rows = list(rows_window)
+        if len(live_rows) < minimum_rows:
+            raise RuntimeError(
+                f"Captured only {len(live_rows)} live price rows for {symbol}; need at least {minimum_rows}"
+            )
+        market_state = compute_market_state_from_ohlc(live_rows)
+        market_state["tick_count"] = tick_count
+        market_state["batch_count"] = batch_count
+        market_state["mode"] = "live_stream"
+        return {
+            "records": live_rows,
+            "market_state": market_state,
+            "mode": "live_stream",
+            "provider": "websocket_direct",
+            "fallback_used": False,
+            "table_uri": "",
+            "stream_uri": "",
+            "risingwave_table": None,
+            "source_error": None,
+            "service_meta": {},
+            "metrics": market_state,
+            "source": websocket_url,
+        }
+    except Exception as exc:
+        last_error = str(exc)
+        logger.warning(f"[BenchmarkShared] Live websocket capture failed for {symbol}. Using fallback price window: {exc}")
+
+    fallback_rows = _fallback_price_window(symbol, window_size=window_size)
+    market_state = compute_market_state_from_ohlc(fallback_rows)
+    market_state["tick_count"] = len(fallback_rows)
+    market_state["batch_count"] = 1
+    market_state["mode"] = "fallback"
+    return {
+        "records": fallback_rows,
+        "market_state": market_state,
+        "mode": "fallback",
+        "provider": "fallback",
+        "fallback_used": True,
+        "table_uri": "",
+        "stream_uri": "",
+        "risingwave_table": None,
+        "source_error": last_error,
+        "service_meta": {},
+        "metrics": market_state,
+        "source": websocket_url or DEFAULT_WEBSOCKET_URL,
+    }
+
+
+def capture_trial_input_local(*, provider: str = DEFAULT_PROVIDER, symbol: str = DEFAULT_SYMBOL) -> BenchmarkTrialInput:
+    news_result = MarketNewsIngestTask(name="Benchmark Local News Ingest").local(provider=provider, symbol=symbol)
+    price_result = capture_price_window_local(symbol=symbol, window_size=DEFAULT_PRICE_WINDOW_SIZE)
+    ingest_result = {
+        "symbol": symbol,
+        "provider_requested": provider,
+        "news": news_result["records"],
+        "ohlc": price_result["records"],
+        "market_state": price_result["market_state"],
+        "news_meta": {
+            "mode": news_result["mode"],
+            "provider": news_result["provider"],
+            "fallback_used": news_result["fallback_used"],
+            "persisted": False,
+            "table_uri": news_result["table_uri"],
+            "persist_error": None,
+            "source_error": news_result["source_error"],
+        },
+        "ohlc_meta": {
+            "mode": price_result["mode"],
+            "provider": price_result["provider"],
+            "fallback_used": price_result["fallback_used"],
+            "persisted": False,
+            "table_uri": price_result["table_uri"],
+            "stream_uri": price_result["stream_uri"],
+            "risingwave_table": price_result["risingwave_table"],
+            "persist_error": None,
+            "source_error": price_result["source_error"],
+            "service_status": {},
+            "service_meta": {
+                "source": price_result["source"],
+                "mode": price_result["mode"],
+                "last_error": price_result["source_error"],
+            },
+            "metrics": price_result["metrics"],
+        },
+        "table_uris": {
+            "news": news_result["table_uri"],
+            "ohlc": price_result["table_uri"],
+            "ohlc_stream": price_result["stream_uri"],
+        },
+        "stream_tables": {
+            "price_risingwave": price_result["risingwave_table"],
+        },
+    }
     return build_trial_input(ingest_result, provider=provider, symbol=symbol)
 
 
