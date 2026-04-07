@@ -123,6 +123,7 @@ def run_spark_glue_baseline(
     spark = None
     try:
         from pyspark.sql import SparkSession
+        from pyspark.sql.types import IntegerType, StringType, StructField, StructType
 
         ingest_started = time.perf_counter()
         spark = (
@@ -135,10 +136,22 @@ def run_spark_glue_baseline(
 
         news_rows = list(trial_input.get("news") or [])
         ohlc_rows = list(trial_input.get("ohlc") or [])
-        news_df = spark.createDataFrame(
-            [{"headline": row.get("headline", ""), "source": row.get("site"), "_seq": idx} for idx, row in enumerate(news_rows)]
-            or [{"headline": "", "source": "", "_seq": 0}]
+        news_schema = StructType(
+            [
+                StructField("headline", StringType(), nullable=False),
+                StructField("source", StringType(), nullable=True),
+                StructField("_seq", IntegerType(), nullable=False),
+            ]
         )
+        prepared_news_rows = [
+            {
+                "headline": str(row.get("headline") or ""),
+                "source": str(row.get("site") or ""),
+                "_seq": idx,
+            }
+            for idx, row in enumerate(news_rows)
+        ] or [{"headline": "", "source": "", "_seq": 0}]
+        news_df = spark.createDataFrame(prepared_news_rows, schema=news_schema)
         headlines = [
             str(row["headline"]).strip()
             for row in news_df.orderBy("_seq").select("headline").collect()
