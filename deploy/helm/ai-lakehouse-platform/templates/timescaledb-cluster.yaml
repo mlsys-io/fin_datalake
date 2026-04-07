@@ -1,0 +1,43 @@
+{{- if .Values.timescaledb.enabled }}
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: {{ .Values.timescaledb.name }}
+  labels:
+    {{- include "ai-lakehouse-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: timescaledb
+spec:
+  postgresVersion: {{ .Values.timescaledb.postgresVersion }}
+  image: {{ .Values.timescaledb.image | quote }}
+  instances:
+    - name: instance1
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.timescaledb.dataStorage }}
+  config:
+    parameters:
+      shared_preload_libraries: "timescaledb,pg_stat_statements"
+  users:
+    - name: {{ .Values.timescaledb.user }}
+      databases: ["{{ .Values.timescaledb.database }}"]
+      options: "SUPERUSER"
+  service:
+    type: NodePort
+    nodePort: {{ .Values.timescaledb.nodePort }}
+  backups:
+    pgbackrest:
+      repos:
+        - name: repo1
+          volume:
+            volumeClaimSpec:
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: {{ .Values.timescaledb.backupStorage }}
+  databaseInitSQL:
+    name: {{ .Values.timescaledb.initSqlConfigMapName }}
+    key: init.sql
+{{- end }}

@@ -1,0 +1,261 @@
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+global:
+  minioCa:
+    enabled: true
+    existingConfigMap: minio-ca
+    mountPath: /opt/certs
+    fileName: public.crt
+  externalServices:
+    redisUrl: ""
+    prefectHost: ""
+    prefectUiUrl: ""
+    rayHost: ""
+    rayAddress: ""
+    rayDashboardUrl: ""
+    gatewayInternalUrl: ""
+    gatewayHost: ""
+    tsdbHost: ""
+    tsdbPort: ""
+    tsdbUser: ""
+    tsdbDatabase: ""
+    tsdbPasswordSecretName: ""
+    awsEndpointUrl: ""
+
+sharedSecrets:
+  existingSecret: etl-secrets
+
+redis:
+  enabled: false
+  fullnameOverride: redis
+  architecture: standalone
+  auth:
+    password: redis-lakehouse-pass
+  master:
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        memory: 64Mi
+        cpu: 50m
+      limits:
+        memory: 128Mi
+        cpu: 100m
+
+prefect:
+  enabled: false
+  fullnameOverride: prefect-server
+  service:
+    type: NodePort
+    nodePort: 30420
+  server:
+    uiConfig:
+      prefectUiApiUrl: /prefect/api
+    env:
+      - name: PREFECT_UI_SERVE_BASE
+        value: /prefect/
+
+kuberay-operator:
+  enabled: false
+  fullnameOverride: kuberay-operator
+  watchNamespace: ""
+
+rayCluster:
+  enabled: false
+  name: etl-ray
+  version: 2.54.0
+  image:
+    repository: docker.io/library/etl-ray
+    tag: latest-py312
+    pullPolicy: IfNotPresent
+  userSecretRef: etl-user-secret-ray
+  head:
+    serviceType: NodePort
+    resources:
+      limits:
+        cpu: "2"
+        memory: 4Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+  worker:
+    replicas: 2
+    minReplicas: 1
+    maxReplicas: 5
+    resources:
+      limits:
+        cpu: "4"
+        memory: 8Gi
+      requests:
+        cpu: "1"
+        memory: 2Gi
+
+pgo:
+  enabled: false
+  fullnameOverride: pgo
+
+timescaledb:
+  enabled: false
+  name: tsdb
+  image: registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi9-17.5-2520
+  postgresVersion: 17
+  nodePort: 30543
+  initSqlConfigMapName: tsdb-init-sql
+  dataStorage: 50Gi
+  backupStorage: 20Gi
+  user: app
+  database: app
+
+milvus:
+  enabled: false
+  cluster:
+    enabled: false
+  standalone:
+    replicas: 1
+    resources:
+      limits:
+        cpu: 2
+        memory: 4Gi
+      requests:
+        cpu: 100m
+        memory: 512Mi
+  pulsarv3:
+    enabled: false
+  etcd:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      size: 2Gi
+  minio:
+    mode: standalone
+    replicas: 1
+    persistence:
+      enabled: true
+      size: 5Gi
+  service:
+    type: NodePort
+    port: 19530
+    nodePort: 31530
+
+risingwave:
+  enabled: false
+  tags:
+    bundle: true
+  wait: true
+  service:
+    type: NodePort
+    nodePort: 31001
+
+gateway:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: etl-gateway
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: NodePort
+    port: 8000
+    targetPort: 8000
+    nodePort: 30801
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  readinessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  livenessProbe:
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  env:
+    LOG_LEVEL: info
+    MINIO_ENDPOINT: https://luyao-storage-head.ddns.comp.nus.edu.sg:4000
+    OVERSEER_REDIS_URL: ""
+    PREFECT_UI_URL: ""
+    RAY_ADDRESS: ""
+    RAY_NAMESPACE: serve
+    RAY_DASHBOARD_URL: ""
+    MINIO_CONSOLE_URL: https://luyao-storage-head.ddns.comp.nus.edu.sg:4000
+    SSL_CERT_FILE: /opt/certs/public.crt
+    CA_PATH: /opt/certs/public.crt
+  userSecretRef: etl-user-secret-gateway
+  secretEnv:
+    enabled: true
+    name: ""
+    stringData:
+      GATEWAY_DATABASE_URL: ""
+  secretRefs:
+    GATEWAY_DATABASE_URL:
+      secretName: ""
+      key: GATEWAY_DATABASE_URL
+    GATEWAY_INTERNAL_TOKEN:
+      secretName: ""
+      key: GATEWAY_INTERNAL_TOKEN
+    GATEWAY_JWT_SECRET:
+      secretName: ""
+      key: GATEWAY_JWT_SECRET
+    AWS_ACCESS_KEY_ID:
+      secretName: ""
+      key: AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY:
+      secretName: ""
+      key: AWS_SECRET_ACCESS_KEY
+
+overseer:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: etl-overseer
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    OVERSEER_RAY_HOST: ""
+    OVERSEER_PREFECT_HOST: ""
+    OVERSEER_MINIO_HOST: luyao-storage-head.ddns.comp.nus.edu.sg
+    OVERSEER_MINIO_PORT: "4000"
+    OVERSEER_MINIO_PROTOCOL: https
+    OVERSEER_GATEWAY_HOST: ""
+    OVERSEER_GATEWAY_PORT: "8000"
+    GATEWAY_INTERNAL_URL: ""
+    RAY_ADDRESS: ""
+    RAY_NAMESPACE: serve
+    OVERSEER_AGENT_REGISTRY: '{"SupportAgent":"agents.dummy_agents:SupportAgent","SentimentModelAgent":"agents.dummy_agents:SentimentModelAgent","ForecastAgent":"agents.dummy_agents:ForecastAgent","RouterAgent":"agents.dummy_agents:RouterAgent"}'
+    TSDB_HOST: ""
+    TSDB_PORT: ""
+    TSDB_USER: ""
+    TSDB_DATABASE: ""
+    OVERSEER_REDIS_URL: ""
+    AWS_ENDPOINT_URL: ""
+    AWS_CA_BUNDLE: /opt/certs/public.crt
+    REQUESTS_CA_BUNDLE: /opt/certs/public.crt
+    SSL_CERT_FILE: /opt/certs/public.crt
+    CA_PATH: /opt/certs/public.crt
+    OVERSEER_SSL_VERIFY: "false"
+  userSecretRef: etl-user-secret-overseer
+  secretRefs:
+    TSDB_PASSWORD:
+      secretName: ""
+      key: TSDB_PASSWORD
+    AWS_ACCESS_KEY_ID:
+      secretName: ""
+      key: AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY:
+      secretName: ""
+      key: AWS_SECRET_ACCESS_KEY
+    GATEWAY_INTERNAL_TOKEN:
+      secretName: ""
+      key: GATEWAY_INTERNAL_TOKEN

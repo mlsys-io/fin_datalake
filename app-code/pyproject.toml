@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "etl-framework"
 version = "0.1.0"
-description = "Distributed ETL framework using Prefect and Ray"
+description = "AI lakehouse client/runtime workspace with ETL, agent, gateway, and overseer components"
 readme = "README.md"
 requires-python = ">=3.11"
 
@@ -88,16 +88,50 @@ overseer = [
 hive = [
     "thrift>=0.16",
 ]
+all = [
+    "ray[default]==2.54.0",
+    "prefect>=2.14",
+    "prefect-ray>=0.3",
+    "python-dotenv>=1.0",
+    "pydantic>=2.0",
+    "loguru>=0.7",
+    "requests>=2.28",
+    "pandas>=2.0,<3.0.0",
+    "pyarrow>=14.0",
+    "deltalake>=0.14",
+    "langchain-core>=0.3.0",
+    "langchain-google-genai>=2.0.0",
+    "websocket-client>=1.6",
+    "confluent-kafka>=2.3",
+    "psycopg2-binary>=2.9",
+    "pymilvus>=2.3",
+    "thrift>=0.16",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlalchemy>=2.0",
+    "asyncpg>=0.29.0",
+    "aiosqlite>=0.20.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt<4.0.0",
+    "mcp>=1.0.0",
+    "rich>=13.0.0",
+    "httpx>=0.27.0",
+    "duckdb>=1.0.0",
+    "pyyaml>=6.0",
+    "boto3>=1.34",
+]
 
 [project.scripts]
 gateway-api = "gateway.api.main:app"
 gateway-mcp = "gateway.mcp.server:main"
 overseer = "overseer.main:main"
 etl-agents = "etl.agents.cli:main"
+lakehouse-client = "lakehouse_client.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["agents*", "etl*", "pipelines*", "sample_agents*", "transformations*", "gateway*", "overseer*"]
+include = ["agents*", "etl*", "lakehouse_client*", "pipelines*", "sample_agents*", "transformations*", "gateway*", "overseer*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.json"]

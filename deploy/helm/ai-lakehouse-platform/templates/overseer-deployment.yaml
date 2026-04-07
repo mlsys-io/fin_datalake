@@ -1,0 +1,85 @@
+{{- if .Values.overseer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etl-overseer
+  labels:
+    {{- include "ai-lakehouse-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: overseer
+spec:
+  replicas: {{ .Values.overseer.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ai-lakehouse-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: overseer
+  template:
+    metadata:
+      labels:
+        {{- include "ai-lakehouse-platform.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: overseer
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: overseer
+          image: "{{ .Values.overseer.image.repository }}:{{ .Values.overseer.image.tag }}"
+          imagePullPolicy: {{ .Values.overseer.image.pullPolicy }}
+          {{- if .Values.overseer.userSecretRef }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.overseer.userSecretRef }}
+                optional: true
+          {{- end }}
+          env:
+            {{- range $key, $value := .Values.overseer.env }}
+            {{- if not (has $key (list "OVERSEER_RAY_HOST" "OVERSEER_PREFECT_HOST" "OVERSEER_GATEWAY_HOST" "GATEWAY_INTERNAL_URL" "RAY_ADDRESS" "TSDB_HOST" "TSDB_PORT" "TSDB_USER" "TSDB_DATABASE" "OVERSEER_REDIS_URL" "AWS_ENDPOINT_URL")) }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+            - name: OVERSEER_RAY_HOST
+              value: {{ include "ai-lakehouse-platform.rayHost" . | quote }}
+            - name: OVERSEER_PREFECT_HOST
+              value: {{ include "ai-lakehouse-platform.prefectHost" . | quote }}
+            - name: OVERSEER_GATEWAY_HOST
+              value: {{ include "ai-lakehouse-platform.gatewayHost" . | quote }}
+            - name: GATEWAY_INTERNAL_URL
+              value: {{ include "ai-lakehouse-platform.gatewayInternalUrl" . | quote }}
+            - name: RAY_ADDRESS
+              value: {{ include "ai-lakehouse-platform.rayAddress" . | quote }}
+            - name: TSDB_HOST
+              value: {{ include "ai-lakehouse-platform.tsdbHost" . | quote }}
+            - name: TSDB_PORT
+              value: {{ include "ai-lakehouse-platform.tsdbPort" . | quote }}
+            - name: TSDB_USER
+              value: {{ include "ai-lakehouse-platform.tsdbUser" . | quote }}
+            - name: TSDB_DATABASE
+              value: {{ include "ai-lakehouse-platform.tsdbDatabase" . | quote }}
+            - name: OVERSEER_REDIS_URL
+              value: {{ include "ai-lakehouse-platform.redisUrlDb1" . | quote }}
+            - name: AWS_ENDPOINT_URL
+              value: {{ include "ai-lakehouse-platform.awsEndpointUrl" . | quote }}
+            {{- range $envName, $ref := .Values.overseer.secretRefs }}
+            - name: {{ $envName }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{- if eq $envName "TSDB_PASSWORD" -}}{{ include "ai-lakehouse-platform.tsdbPasswordSecretName" $ }}{{- else -}}{{ default (include "ai-lakehouse-platform.sharedSecretName" $) $ref.secretName }}{{- end }}
+                  key: {{ $ref.key }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.overseer.resources | nindent 12 }}
+          {{- if .Values.global.minioCa.enabled }}
+          volumeMounts:
+            - name: minio-ca
+              mountPath: {{ include "ai-lakehouse-platform.gatewayTlsMountPath" . }}
+              readOnly: true
+          {{- end }}
+      {{- if .Values.global.minioCa.enabled }}
+      volumes:
+        - name: minio-ca
+          configMap:
+            name: {{ .Values.global.minioCa.existingConfigMap }}
+      {{- end }}
+{{- end }}

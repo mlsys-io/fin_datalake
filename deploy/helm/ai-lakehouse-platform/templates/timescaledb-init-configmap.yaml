@@ -1,0 +1,15 @@
+{{- if .Values.timescaledb.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.timescaledb.initSqlConfigMapName }}
+  labels:
+    {{- include "ai-lakehouse-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: timescaledb
+data:
+  init.sql: |
+    \set ON_ERROR_STOP on
+    \c {{ .Values.timescaledb.database }}
+    CREATE EXTENSION IF NOT EXISTS timescaledb;
+    CREATE EXTENSION IF NOT EXISTS vector;
+{{- end }}

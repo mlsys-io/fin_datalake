@@ -1,0 +1,14 @@
+1. Configure the chart values before install:
+   - set `gateway.secretEnv.stringData.GATEWAY_DATABASE_URL`
+   - confirm the `etl-secrets` references match your namespace
+   - override image repositories/tags if you publish images remotely
+   - enable dependency flags if you want a one-go bundled install
+
+2. Install the chart:
+   helm dependency update deploy/helm/ai-lakehouse-platform
+   helm upgrade --install ai-lakehouse deploy/helm/ai-lakehouse-platform -n {{ .Release.Namespace }} --create-namespace
+
+3. Check rollout status:
+   kubectl get pods -n {{ .Release.Namespace }}
+   kubectl get svc etl-gateway-svc -n {{ .Release.Namespace }}
+   kubectl get rayclusters -n {{ .Release.Namespace }}

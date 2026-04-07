@@ -1,0 +1,175 @@
+{{- if .Values.rayCluster.enabled }}
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: {{ .Values.rayCluster.name }}
+  labels:
+    {{- include "ai-lakehouse-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ray-cluster
+spec:
+  rayVersion: {{ .Values.rayCluster.version | quote }}
+  headGroupSpec:
+    serviceType: {{ .Values.rayCluster.head.serviceType }}
+    rayStartParams:
+      dashboard-host: "0.0.0.0"
+      num-cpus: "0"
+    template:
+      metadata:
+        labels:
+          app: ray-head
+      spec:
+        {{- with .Values.imagePullSecrets }}
+        imagePullSecrets:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        containers:
+          - name: ray-head
+            image: "{{ .Values.rayCluster.image.repository }}:{{ .Values.rayCluster.image.tag }}"
+            imagePullPolicy: {{ .Values.rayCluster.image.pullPolicy }}
+            {{- if .Values.rayCluster.userSecretRef }}
+            envFrom:
+              - secretRef:
+                  name: {{ .Values.rayCluster.userSecretRef }}
+                  optional: true
+            {{- end }}
+            resources:
+              {{- toYaml .Values.rayCluster.head.resources | nindent 14 }}
+            ports:
+              - containerPort: 6379
+                name: gcs
+              - containerPort: 8265
+                name: dashboard
+              - containerPort: 10001
+                name: client
+              - containerPort: 8000
+                name: serve
+            env:
+              - name: RAY_GRAFANA_IFRAME_HOST
+                value: "http://127.0.0.1:3000"
+              - name: CA_PATH
+                value: {{ include "ai-lakehouse-platform.gatewayTlsMountPath" . }}/{{ .Values.global.minioCa.fileName }}
+              - name: SSL_CERT_FILE
+                value: {{ include "ai-lakehouse-platform.gatewayTlsMountPath" . }}/{{ .Values.global.minioCa.fileName }}
+              - name: AWS_EC2_METADATA_DISABLED
+                value: "true"
+              - name: AWS_ENDPOINT_URL
+                value: {{ include "ai-lakehouse-platform.awsEndpointUrl" . | quote }}
+              - name: OVERSEER_REDIS_URL
+                value: {{ include "ai-lakehouse-platform.redisUrlDb0" . | quote }}
+              - name: TSDB_HOST
+                value: {{ include "ai-lakehouse-platform.tsdbHost" . | quote }}
+              - name: TSDB_PORT
+                value: {{ include "ai-lakehouse-platform.tsdbPort" . | quote }}
+              - name: TSDB_USER
+                value: {{ include "ai-lakehouse-platform.tsdbUser" . | quote }}
+              - name: TSDB_DATABASE
+                value: {{ include "ai-lakehouse-platform.tsdbDatabase" . | quote }}
+              - name: AWS_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ include "ai-lakehouse-platform.sharedSecretName" . }}
+                    key: AWS_ACCESS_KEY_ID
+              - name: AWS_SECRET_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ include "ai-lakehouse-platform.sharedSecretName" . }}
+                    key: AWS_SECRET_ACCESS_KEY
+              - name: TSDB_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ include "ai-lakehouse-platform.tsdbPasswordSecretName" . }}
+                    key: TSDB_PASSWORD
+            volumeMounts:
+              - mountPath: /tmp/ray
+                name: ray-logs
+              {{- if .Values.global.minioCa.enabled }}
+              - mountPath: {{ include "ai-lakehouse-platform.gatewayTlsMountPath" . }}
+                name: minio-ca
+                readOnly: true
+              {{- end }}
+        volumes:
+          - name: ray-logs
+            emptyDir: {}
+          {{- if .Values.global.minioCa.enabled }}
+          - name: minio-ca
+            configMap:
+              name: {{ .Values.global.minioCa.existingConfigMap }}
+          {{- end }}
+  workerGroupSpecs:
+    - replicas: {{ .Values.rayCluster.worker.replicas }}
+      minReplicas: {{ .Values.rayCluster.worker.minReplicas }}
+      maxReplicas: {{ .Values.rayCluster.worker.maxReplicas }}
+      groupName: default-worker
+      rayStartParams: {}
+      template:
+        metadata:
+          labels:
+            app: ray-worker
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: ray-worker
+              image: "{{ .Values.rayCluster.image.repository }}:{{ .Values.rayCluster.image.tag }}"
+              imagePullPolicy: {{ .Values.rayCluster.image.pullPolicy }}
+              {{- if .Values.rayCluster.userSecretRef }}
+              envFrom:
+                - secretRef:
+                    name: {{ .Values.rayCluster.userSecretRef }}
+                    optional: true
+              {{- end }}
+              resources:
+                {{- toYaml .Values.rayCluster.worker.resources | nindent 16 }}
+              env:
+                - name: CA_PATH
+                  value: {{ include "ai-lakehouse-platform.gatewayTlsMountPath" . }}/{{ .Values.global.minioCa.fileName }}
+                - name: SSL_CERT_FILE
+                  value: {{ include "ai-lakehouse-platform.gatewayTlsMountPath" . }}/{{ .Values.global.minioCa.fileName }}
+                - name: AWS_EC2_METADATA_DISABLED
+                  value: "true"
+                - name: AWS_ENDPOINT_URL
+                  value: {{ include "ai-lakehouse-platform.awsEndpointUrl" . | quote }}
+                - name: OVERSEER_REDIS_URL
+                  value: {{ include "ai-lakehouse-platform.redisUrlDb0" . | quote }}
+                - name: TSDB_HOST
+                  value: {{ include "ai-lakehouse-platform.tsdbHost" . | quote }}
+                - name: TSDB_PORT
+                  value: {{ include "ai-lakehouse-platform.tsdbPort" . | quote }}
+                - name: TSDB_USER
+                  value: {{ include "ai-lakehouse-platform.tsdbUser" . | quote }}
+                - name: TSDB_DATABASE
+                  value: {{ include "ai-lakehouse-platform.tsdbDatabase" . | quote }}
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "ai-lakehouse-platform.sharedSecretName" . }}
+                      key: AWS_ACCESS_KEY_ID
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "ai-lakehouse-platform.sharedSecretName" . }}
+                      key: AWS_SECRET_ACCESS_KEY
+                - name: TSDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "ai-lakehouse-platform.tsdbPasswordSecretName" . }}
+                      key: TSDB_PASSWORD
+              volumeMounts:
+                - mountPath: /tmp/ray
+                  name: ray-logs
+                {{- if .Values.global.minioCa.enabled }}
+                - mountPath: {{ include "ai-lakehouse-platform.gatewayTlsMountPath" . }}
+                  name: minio-ca
+                  readOnly: true
+                {{- end }}
+          volumes:
+            - name: ray-logs
+              emptyDir: {}
+            {{- if .Values.global.minioCa.enabled }}
+            - name: minio-ca
+              configMap:
+                name: {{ .Values.global.minioCa.existingConfigMap }}
+            {{- end }}
+{{- end }}

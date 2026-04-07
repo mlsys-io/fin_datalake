@@ -1,0 +1,34 @@
+apiVersion: v2
+name: ai-lakehouse-platform
+description: Deploy the AI-native lakehouse platform with optional bundled dependencies.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: redis
+    version: "20.11.3"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled
+  - name: prefect-server
+    alias: prefect
+    version: "2024.4.11044131"
+    repository: "https://prefecthq.github.io/prefect-helm"
+    condition: prefect.enabled
+  - name: kuberay-operator
+    alias: kuberay-operator
+    version: "1.3.0"
+    repository: "https://ray-project.github.io/kuberay-helm"
+    condition: kuberay-operator.enabled
+  - name: milvus
+    version: "4.2.16"
+    repository: "https://zilliztech.github.io/milvus-helm/"
+    condition: milvus.enabled
+  - name: risingwave
+    version: "0.7.7"
+    repository: "https://risingwavelabs.github.io/helm-charts"
+    condition: risingwave.enabled
+  - name: pgo
+    alias: pgo
+    version: "5.8.2"
+    repository: "oci://registry.developers.crunchydata.com/crunchydata"
+    condition: pgo.enabled

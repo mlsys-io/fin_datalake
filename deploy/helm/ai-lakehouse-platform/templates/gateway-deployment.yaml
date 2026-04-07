@@ -1,0 +1,94 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etl-gateway
+  labels:
+    {{- include "ai-lakehouse-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.gateway.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ai-lakehouse-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "ai-lakehouse-platform.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: gateway
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.gateway.service.targetPort }}
+          {{- if .Values.gateway.userSecretRef }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.gateway.userSecretRef }}
+                optional: true
+          {{- end }}
+          env:
+            {{- range $key, $value := .Values.gateway.env }}
+            {{- if not (has $key (list "OVERSEER_REDIS_URL" "PREFECT_UI_URL" "RAY_ADDRESS" "RAY_DASHBOARD_URL")) }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+            - name: OVERSEER_REDIS_URL
+              value: {{ include "ai-lakehouse-platform.redisUrlDb0" . | quote }}
+            - name: PREFECT_UI_URL
+              value: {{ include "ai-lakehouse-platform.prefectUiUrl" . | quote }}
+            - name: RAY_ADDRESS
+              value: {{ include "ai-lakehouse-platform.rayAddress" . | quote }}
+            - name: RAY_DASHBOARD_URL
+              value: {{ include "ai-lakehouse-platform.rayDashboardUrl" . | quote }}
+            {{- range $envName, $ref := .Values.gateway.secretRefs }}
+            {{- $secretName := "" }}
+            {{- if $ref.secretName }}
+            {{- $secretName = $ref.secretName }}
+            {{- else if eq $envName "GATEWAY_DATABASE_URL" }}
+            {{- $secretName = include "ai-lakehouse-platform.gatewaySecretName" $ }}
+            {{- else }}
+            {{- $secretName = include "ai-lakehouse-platform.sharedSecretName" $ }}
+            {{- end }}
+            - name: {{ $envName }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $ref.key }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: {{ .Values.gateway.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.gateway.readinessProbe.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: {{ .Values.gateway.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.gateway.livenessProbe.periodSeconds }}
+          {{- if .Values.global.minioCa.enabled }}
+          volumeMounts:
+            - name: minio-ca
+              mountPath: {{ include "ai-lakehouse-platform.gatewayTlsMountPath" . }}
+              readOnly: true
+          {{- end }}
+      {{- if .Values.global.minioCa.enabled }}
+      volumes:
+        - name: minio-ca
+          configMap:
+            name: {{ .Values.global.minioCa.existingConfigMap }}
+      {{- end }}
+{{- end }}
