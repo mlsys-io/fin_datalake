@@ -159,7 +159,7 @@ class StrategyAgent(BaseAgent, LangChainMixin):
                 "- confidence: float between 0.0 and 1.0\n"
             )
 
-            response = llm.invoke([sys_msg, HumanMessage(content=prompt)])
+            response = self._llm_invoke(llm, [sys_msg, HumanMessage(content=prompt)])
             content = response.content if hasattr(response, "content") else str(response)
             parsed = json.loads(content)
 

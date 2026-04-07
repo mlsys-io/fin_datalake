@@ -2,6 +2,7 @@
 Delta Lake Sink for writing data to Delta Lake tables.
 Heavy imports are deferred to runtime for Ray worker execution.
 """
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Union, List, TYPE_CHECKING
 
@@ -68,19 +69,38 @@ class DeltaLakeWriter(DataWriter):
         opts.update(self.sink.storage_options_extra)
         return {k: str(v) for k, v in opts.items() if v is not None}
 
-    def _ensure_ssl_cert(self):
-        """Set SSL_CERT_FILE for Rust object_store if certificate exists."""
+    @contextmanager
+    def _delta_ssl_env(self):
+        """Temporarily apply MinIO/internal CA settings only around Delta operations."""
         import os
         from loguru import logger
         from etl.config import config
         
         ca_path = getattr(config, 'CA_PATH', '/opt/certs/public.crt')
-        if ca_path and os.path.exists(ca_path):
-            os.environ.setdefault("SSL_CERT_FILE", ca_path)
-            logger.info(f"[DeltaLake] SSL certificate configured: {ca_path}")
-        else:
-            logger.warning(f"[DeltaLake] SSL certificate not found at: {ca_path}")
-        os.environ.setdefault("AWS_EC2_METADATA_DISABLED", "true")
+        keys = ("SSL_CERT_FILE", "AWS_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")
+        previous = {key: os.environ.get(key) for key in keys}
+        previous_metadata_flag = os.environ.get("AWS_EC2_METADATA_DISABLED")
+
+        try:
+            if ca_path and os.path.exists(ca_path):
+                for key in keys:
+                    os.environ[key] = ca_path
+                logger.info(f"[DeltaLake] SSL certificate configured for Delta operations: {ca_path}")
+            else:
+                logger.warning(f"[DeltaLake] SSL certificate not found at: {ca_path}")
+            os.environ["AWS_EC2_METADATA_DISABLED"] = "true"
+            yield
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+            if previous_metadata_flag is None:
+                os.environ.pop("AWS_EC2_METADATA_DISABLED", None)
+            else:
+                os.environ["AWS_EC2_METADATA_DISABLED"] = previous_metadata_flag
 
     def write_dataset(self, ds: "ray.data.Dataset") -> None:
         """
@@ -92,13 +112,13 @@ class DeltaLakeWriter(DataWriter):
         Args:
             ds: Ray Dataset to write
         """
-        self._ensure_ssl_cert()
         from loguru import logger
         
         logger.info(f"[DeltaLake] Writing Ray Dataset to {self.sink.uri} (Distributed)...")
         
         try:
-            self._write_ray_dataset(ds)
+            with self._delta_ssl_env():
+                self._write_ray_dataset(ds)
             logger.success(f"[DeltaLake] ✅ Successfully wrote dataset to {self.sink.uri}")
         except Exception as e:
             logger.error(f"[DeltaLake] Failed to write Ray Dataset: {e}")
@@ -108,28 +128,26 @@ class DeltaLakeWriter(DataWriter):
         """
         Write a batch (DataFrame, Table, or Ray Dataset) to Delta Lake.
         """
-        # Ensure SSL certificate is set for HTTPS MinIO connections
-        self._ensure_ssl_cert()
-        
         # Heavy imports - only executed on Ray workers
         import pyarrow as pa
         import pandas as pd
         from loguru import logger
         
         try:
-            # HACK: Lazy import ray to check type without hard dependency if not used
-            is_ray_ds = False
-            try:
-                import ray.data as rd
-                if isinstance(data, rd.Dataset):
-                    is_ray_ds = True
-            except ImportError:
-                pass
+            with self._delta_ssl_env():
+                # HACK: Lazy import ray to check type without hard dependency if not used
+                is_ray_ds = False
+                try:
+                    import ray.data as rd
+                    if isinstance(data, rd.Dataset):
+                        is_ray_ds = True
+                except ImportError:
+                    pass
 
-            if is_ray_ds:
-                self._write_ray_dataset(data)
-            else:
-                self._write_local_batch(data)
+                if is_ray_ds:
+                    self._write_ray_dataset(data)
+                else:
+                    self._write_local_batch(data)
         except Exception as e:
             logger.error(f"Error writing to {self.sink.uri}: {e}")
             raise
@@ -151,24 +169,54 @@ class DeltaLakeWriter(DataWriter):
             ds = ds.repartition(1, shuffle=False)
         
         class _RayDeltaSink(rd.Datasink):
-            def __init__(self, uri_root, mode, storage_opts):
+            def __init__(self, uri_root, mode, storage_opts, ca_path):
                 self.uri_root = uri_root
                 self.mode = mode
                 self.storage_opts = storage_opts
+                self.ca_path = ca_path
             
             def write(self, blocks, ctx):
-                for block in blocks:
-                    if isinstance(block, pd.DataFrame):
-                        block = pa.Table.from_pandas(block, preserve_index=False)
-                    
-                    write_deltalake(
-                        self.uri_root, 
-                        block, 
-                        mode=self.mode, 
-                        storage_options=self.storage_opts
-                    )
+                import os
 
-        sink = _RayDeltaSink(self.sink.uri, self.sink.mode, self._storage_options)
+                keys = ("SSL_CERT_FILE", "AWS_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")
+                previous = {key: os.environ.get(key) for key in keys}
+                previous_metadata_flag = os.environ.get("AWS_EC2_METADATA_DISABLED")
+
+                try:
+                    if self.ca_path and os.path.exists(self.ca_path):
+                        for key in keys:
+                            os.environ[key] = self.ca_path
+                    os.environ["AWS_EC2_METADATA_DISABLED"] = "true"
+
+                    for block in blocks:
+                        if isinstance(block, pd.DataFrame):
+                            block = pa.Table.from_pandas(block, preserve_index=False)
+                        
+                        write_deltalake(
+                            self.uri_root, 
+                            block, 
+                            mode=self.mode, 
+                            storage_options=self.storage_opts
+                        )
+                finally:
+                    for key, value in previous.items():
+                        if value is None:
+                            os.environ.pop(key, None)
+                        else:
+                            os.environ[key] = value
+
+                    if previous_metadata_flag is None:
+                        os.environ.pop("AWS_EC2_METADATA_DISABLED", None)
+                    else:
+                        os.environ["AWS_EC2_METADATA_DISABLED"] = previous_metadata_flag
+
+        from etl.config import config
+        sink = _RayDeltaSink(
+            self.sink.uri,
+            self.sink.mode,
+            self._storage_options,
+            getattr(config, "CA_PATH", "/opt/certs/public.crt"),
+        )
         ds.write_datasink(sink)
         
         # Auto-Register in Hive

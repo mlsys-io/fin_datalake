@@ -109,11 +109,12 @@ class MarketAnalystAgent(LangChainAgent):
             "- summary: one short sentence\n"
             "- headlines: list of objects with headline, label, score\n"
         )
-        response = llm.invoke(
+        response = self._llm_invoke(
+            llm,
             [
                 SystemMessage(content="You are a precise market-news analyst. Respond only with valid JSON."),
                 HumanMessage(content=prompt),
-            ]
+            ],
         )
         content = response.content if hasattr(response, "content") else str(response)
         parsed = json.loads(content)

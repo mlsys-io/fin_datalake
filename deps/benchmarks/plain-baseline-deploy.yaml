@@ -37,8 +37,6 @@ spec:
               value: /home/ray/app-code
             - name: CA_PATH
               value: /opt/certs/public.crt
-            - name: SSL_CERT_FILE
-              value: /opt/certs/public.crt
             - name: AWS_EC2_METADATA_DISABLED
               value: "true"
             - name: AWS_ENDPOINT_URL
