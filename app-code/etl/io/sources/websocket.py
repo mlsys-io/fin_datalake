@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Any, Iterator
 import time
 import json
+import os
 
 from etl.io.base import DataSource, DataReader
 
@@ -15,6 +16,7 @@ class WebSocketSource(DataSource):
 
     url: str
     headers: Dict[str, str] = field(default_factory=dict)
+    sslopt: Dict[str, Any] = field(default_factory=dict)
     
     # Batching Config
     batch_size: int = 100       # Yield after N messages
@@ -38,11 +40,20 @@ class WebSocketReader(DataReader):
             return
             
         import websocket
+        sslopt = dict(self.source.sslopt)
+        ca_file = str(
+            os.environ.get("SSL_CERT_FILE")
+            or os.environ.get("CA_PATH")
+            or ""
+        ).strip()
+        if ca_file and "ca_certs" not in sslopt:
+            sslopt["ca_certs"] = ca_file
         # Note: websocket-client connect is synchronous
         self._ws = websocket.create_connection(
             self.source.url, 
             header=self.source.headers,
-            timeout=self.source.read_timeout
+            timeout=self.source.read_timeout,
+            sslopt=sslopt or None,
         )
         print(f"[WebSocketReader] Connected to {self.source.url}")
 

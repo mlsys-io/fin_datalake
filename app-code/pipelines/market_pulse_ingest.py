@@ -28,7 +28,7 @@ PRICE_SERVICE_NAME = str(os.environ.get("DEMO_PRICE_SERVICE_NAME", "MarketPriceI
 PRICE_WINDOW_CONTEXT_KEY = str(os.environ.get("DEMO_PRICE_WINDOW_CONTEXT_KEY", f"market_pulse:price_window:{DEFAULT_SYMBOL}")).strip() or f"market_pulse:price_window:{DEFAULT_SYMBOL}"
 PRICE_META_CONTEXT_KEY = str(os.environ.get("DEMO_PRICE_META_CONTEXT_KEY", f"market_pulse:price_meta:{DEFAULT_SYMBOL}")).strip() or f"market_pulse:price_meta:{DEFAULT_SYMBOL}"
 PRICE_METRICS_CONTEXT_KEY = str(os.environ.get("DEMO_PRICE_METRICS_CONTEXT_KEY", f"market_pulse:price_metrics:{DEFAULT_SYMBOL}")).strip() or f"market_pulse:price_metrics:{DEFAULT_SYMBOL}"
-DEFAULT_WEBSOCKET_URL = str(os.environ.get("DEMO_PRICE_WEBSOCKET_URL") or config.WEBSOCKET_URL or "wss://stream.binance.com:9443/ws/btcusdt@trade").strip()
+DEFAULT_WEBSOCKET_URL = str(os.environ.get("DEMO_PRICE_WEBSOCKET_URL") or config.WEBSOCKET_URL or "wss://stream.binance.com:443/ws/btcusdt@trade").strip()
 PRICE_SERVICE_READY_TIMEOUT_SECONDS = int(os.environ.get("DEMO_PRICE_SERVICE_READY_TIMEOUT_SECONDS", "20"))
 PRICE_STREAM_RISINGWAVE_TABLE = str(os.environ.get("DEMO_RISINGWAVE_PRICE_TABLE", "market_pulse_prices")).strip() or "market_pulse_prices"
 SIGNAL_RISINGWAVE_TABLE = str(os.environ.get("DEMO_RISINGWAVE_SIGNAL_TABLE", "market_pulse_signals")).strip() or "market_pulse_signals"
@@ -141,6 +141,10 @@ class MarketNewsIngestTask(BaseTask):
                 unique.append(cleaned)
         return unique
 
+    def _is_crypto_symbol(self, symbol: str) -> bool:
+        normalized = str(symbol).strip().upper()
+        return normalized.endswith(("USD", "USDT", "USDC", "BTC", "ETH"))
+
     def _fallback_records(self, symbol: str) -> List[Dict[str, Any]]:
         now = int(time.time())
         return [
@@ -231,9 +235,14 @@ class MarketNewsIngestTask(BaseTask):
     def _build_fmp_sources(self, symbol: str) -> List[RestApiSource]:
         if not FMP_API_KEY:
             raise RuntimeError("FMP_API_KEY is not configured")
+        base_url = (
+            "https://financialmodelingprep.com/stable/news/crypto"
+            if self._is_crypto_symbol(symbol)
+            else "https://financialmodelingprep.com/stable/news/stock"
+        )
         return [
             RestApiSource(
-                url=f"https://financialmodelingprep.com/api/v3/stock_news?{urlencode({'tickers': candidate, 'limit': 8, 'apikey': FMP_API_KEY})}",
+                url=f"{base_url}?{urlencode({'symbols': candidate, 'limit': 8, 'apikey': FMP_API_KEY})}",
                 method="GET",
                 retries=2,
                 rate_limit_delay=0.1,

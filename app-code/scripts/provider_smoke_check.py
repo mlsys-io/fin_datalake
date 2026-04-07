@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from typing import Any, Dict, List
 
@@ -51,8 +52,16 @@ def _probe_binance(*, websocket_url: str) -> Dict[str, Any]:
     started = time.perf_counter()
     try:
         import websocket
+        sslopt: Dict[str, Any] = {}
+        ca_file = str(
+            os.environ.get("SSL_CERT_FILE")
+            or os.environ.get("CA_PATH")
+            or ""
+        ).strip()
+        if ca_file:
+            sslopt["ca_certs"] = ca_file
 
-        ws = websocket.create_connection(websocket_url, timeout=10)
+        ws = websocket.create_connection(websocket_url, timeout=10, sslopt=sslopt or None)
         try:
             message = ws.recv()
         finally:
@@ -89,12 +98,14 @@ def _probe_fmp(*, symbol: str) -> Dict[str, Any]:
 
     task = MarketNewsIngestTask()
     candidates = task._candidate_symbols(symbol)
+    base_url = (
+        "https://financialmodelingprep.com/stable/news/crypto"
+        if task._is_crypto_symbol(symbol)
+        else "https://financialmodelingprep.com/stable/news/stock"
+    )
     attempts: List[Dict[str, Any]] = []
     for candidate in candidates:
-        url = (
-            "https://financialmodelingprep.com/api/v3/stock_news"
-            f"?tickers={candidate}&limit=8&apikey={FMP_API_KEY}"
-        )
+        url = f"{base_url}?symbols={candidate}&limit=8&apikey={FMP_API_KEY}"
         try:
             response = requests.get(url, timeout=15)
             attempts.append(
