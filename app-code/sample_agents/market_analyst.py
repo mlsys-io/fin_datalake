@@ -117,7 +117,11 @@ class MarketAnalystAgent(LangChainAgent):
             ],
         )
         content = response.content if hasattr(response, "content") else str(response)
-        parsed = json.loads(content)
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError:
+            logger.error(f"[MarketAnalystAgent] Non-JSON LLM response: {content[:500]!r}")
+            raise
         label = str(parsed.get("label", "neutral")).lower()
         if label not in {"bullish", "bearish", "neutral"}:
             label = "neutral"

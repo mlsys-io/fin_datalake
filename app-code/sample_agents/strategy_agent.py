@@ -161,7 +161,11 @@ class StrategyAgent(BaseAgent, LangChainMixin):
 
             response = self._llm_invoke(llm, [sys_msg, HumanMessage(content=prompt)])
             content = response.content if hasattr(response, "content") else str(response)
-            parsed = json.loads(content)
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError:
+                logger.error(f"[StrategyAgent] Non-JSON LLM response: {content[:500]!r}")
+                raise
 
             action = str(parsed.get("action", "HOLD")).upper()
             if action not in ["BUY", "SELL", "HOLD"]:
