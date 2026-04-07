@@ -143,6 +143,12 @@ class DeltaLakeWriter(DataWriter):
         import ray.data as rd
         from deltalake import write_deltalake
         from loguru import logger
+
+        if self.sink.mode == "overwrite":
+            logger.info(
+                f"[DeltaLake] Coalescing dataset to a single block before overwrite for {self.sink.uri}."
+            )
+            ds = ds.repartition(1, shuffle=False)
         
         class _RayDeltaSink(rd.Datasink):
             def __init__(self, uri_root, mode, storage_opts):
