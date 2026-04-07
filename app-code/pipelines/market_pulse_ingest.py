@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 from urllib.parse import urlencode
 import os
 import time
+import json
 
 from loguru import logger
 from prefect import flow
@@ -34,6 +35,18 @@ PRICE_STREAM_RISINGWAVE_TABLE = str(os.environ.get("DEMO_RISINGWAVE_PRICE_TABLE"
 SIGNAL_RISINGWAVE_TABLE = str(os.environ.get("DEMO_RISINGWAVE_SIGNAL_TABLE", "market_pulse_signals")).strip() or "market_pulse_signals"
 
 FMP_API_KEY = str(os.environ.get("FMP_API_KEY", "")).strip()
+PRICE_SERVICE_CONFIG_FIELDS = (
+    "websocket_url",
+    "symbol",
+    "window_size",
+    "context_key",
+    "meta_key",
+    "metrics_key",
+    "delta_uri",
+    "risingwave_table",
+    "batch_size",
+    "read_timeout",
+)
 
 
 def market_pulse_root() -> str:
@@ -618,6 +631,12 @@ class MarketPriceIngestService(ServiceTask):
             "last_write_count": self.last_write_count,
             "last_error": self.last_error,
             "metrics": self.metrics_snapshot,
+            "websocket_url": self.websocket_url,
+            "context_key": self.context_key,
+            "meta_key": self.meta_key,
+            "metrics_key": self.metrics_key,
+            "batch_size": self.batch_size,
+            "read_timeout": self.read_timeout,
         }
 
 
@@ -641,7 +660,8 @@ class ReadLatestPriceWindowTask(BaseTask):
 
         if len(normalized_rows) < minimum_rows:
             raise RuntimeError(
-                f"Latest price window for {symbol} has {len(normalized_rows)} rows; need at least {minimum_rows}."
+                f"Latest price window for {symbol} has {len(normalized_rows)} rows; need at least {minimum_rows}. "
+                f"mode={meta.get('mode')!r}, source={meta.get('source')!r}, last_error={meta.get('last_error')!r}"
             )
 
         return {
@@ -659,10 +679,8 @@ class ReadLatestPriceWindowTask(BaseTask):
         }
 
 
-def _ensure_price_service(*, symbol: str, window_size: int) -> Dict[str, Any]:
-    ensure_ray()
-    service_name = PRICE_SERVICE_NAME
-    service_cfg = {
+def _price_service_cfg(*, symbol: str, window_size: int) -> Dict[str, Any]:
+    return {
         "symbol": symbol,
         "window_size": window_size,
         "context_key": PRICE_WINDOW_CONTEXT_KEY,
@@ -675,32 +693,113 @@ def _ensure_price_service(*, symbol: str, window_size: int) -> Dict[str, Any]:
         "read_timeout": 1.0,
     }
 
+
+def _price_service_fingerprint(payload: Dict[str, Any]) -> Dict[str, Any]:
+    return {field: payload.get(field) for field in PRICE_SERVICE_CONFIG_FIELDS}
+
+
+def _clear_price_context() -> None:
+    store = get_context()
+    store.delete(PRICE_WINDOW_CONTEXT_KEY)
+    store.delete(PRICE_META_CONTEXT_KEY)
+    store.delete(PRICE_METRICS_CONTEXT_KEY)
+
+
+def _read_price_context_snapshot() -> Dict[str, Any]:
+    store = get_context()
+    return {
+        "rows": store.get(PRICE_WINDOW_CONTEXT_KEY, default=[]) or [],
+        "meta": store.get(PRICE_META_CONTEXT_KEY, default={}) or {},
+        "metrics": store.get(PRICE_METRICS_CONTEXT_KEY, default={}) or {},
+    }
+
+
+def _restart_price_service(service_name: str, service_cfg: Dict[str, Any]) -> Any:
+    import ray
+
+    try:
+        stale = MarketPriceIngestService.connect(service_name)
+        try:
+            stale.stop()
+        except Exception as exc:
+            logger.warning(f"[Ingest] Could not stop stale price service cooperatively: {exc}")
+    except Exception:
+        stale = None
+
+    try:
+        actor = ray.get_actor(service_name)
+        ray.kill(actor, no_restart=True)
+        logger.info(f"[Ingest] Killed stale price service actor '{service_name}'.")
+    except Exception as exc:
+        logger.debug(f"[Ingest] No existing actor kill needed for '{service_name}': {exc}")
+
+    _clear_price_context()
+    svc = MarketPriceIngestService.deploy(
+        name=service_name,
+        config=service_cfg,
+        num_cpus=0.25,
+        max_concurrency=4,
+    )
+    svc.async_run()
+    time.sleep(1)
+    return svc
+
+
+def _service_status_matches_config(status: Dict[str, Any], service_cfg: Dict[str, Any]) -> bool:
+    return _price_service_fingerprint(status) == _price_service_fingerprint(service_cfg)
+
+
+def _ensure_price_service(*, symbol: str, window_size: int) -> Dict[str, Any]:
+    ensure_ray()
+    service_name = PRICE_SERVICE_NAME
+    service_cfg = _price_service_cfg(symbol=symbol, window_size=window_size)
+
     try:
         svc = MarketPriceIngestService.connect(service_name)
+        status = svc.get_status()
+        if not _service_status_matches_config(status, service_cfg):
+            logger.warning(
+                "[Ingest] Existing price service config is stale. Replacing service. "
+                f"expected={json.dumps(_price_service_fingerprint(service_cfg), default=str)} "
+                f"observed={json.dumps(_price_service_fingerprint(status), default=str)}"
+            )
+            svc = _restart_price_service(service_name, service_cfg)
+            status = svc.get_status()
     except Exception:
-        svc = MarketPriceIngestService.deploy(
-            name=service_name,
-            config=service_cfg,
-            num_cpus=0.25,
-            max_concurrency=4,
-        )
-        svc.async_run()
-        time.sleep(1)
+        logger.info(f"[Ingest] No reusable price service found for '{service_name}'. Deploying a fresh service.")
+        svc = _restart_price_service(service_name, service_cfg)
+        status = svc.get_status()
 
-    status = svc.get_status()
     if not status.get("running"):
         svc.async_run()
         time.sleep(1)
         status = svc.get_status()
 
+    minimum_rows = min(window_size, 20)
     start = time.time()
     while time.time() - start < PRICE_SERVICE_READY_TIMEOUT_SECONDS:
         status = svc.get_status()
-        if int(status.get("window_size") or 0) >= min(window_size, 20):
+        context_snapshot = _read_price_context_snapshot()
+        meta = context_snapshot.get("meta") or {}
+        rows = context_snapshot.get("rows") or []
+        row_count = len(rows) if isinstance(rows, list) else 0
+        meta_mode = str(meta.get("mode") or "")
+        meta_source = str(meta.get("source") or "")
+        status_matches_cfg = _service_status_matches_config(status, service_cfg)
+        has_required_rows = row_count >= minimum_rows
+        has_acceptable_mode = meta_mode in {"live_stream", "fallback"}
+        source_matches = meta_mode != "live_stream" or meta_source == service_cfg["websocket_url"]
+        fallback_ready = meta_mode == "fallback" and status_matches_cfg
+        if has_required_rows and has_acceptable_mode and (source_matches or fallback_ready):
             return status
         time.sleep(1)
 
-    return status
+    context_snapshot = _read_price_context_snapshot()
+    raise RuntimeError(
+        "[Ingest] Price service did not become ready before timeout. "
+        f"status={json.dumps(status, default=str)} "
+        f"price_meta={json.dumps(context_snapshot.get('meta') or {}, default=str)}"
+    )
 
 
 @flow(
