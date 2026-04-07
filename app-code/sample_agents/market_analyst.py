@@ -96,6 +96,17 @@ class MarketAnalystAgent(LangChainAgent):
             "headlines": breakdown,
         }
 
+    def _parse_json_response(self, content: str) -> Dict[str, Any]:
+        cleaned = str(content or "").strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            cleaned = "\n".join(lines).strip()
+        return json.loads(cleaned)
+
     def _analyze_with_llm(self, headlines: List[str], market_state: Dict[str, Any], llm: Any) -> Dict[str, Any]:
         from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -118,7 +129,7 @@ class MarketAnalystAgent(LangChainAgent):
         )
         content = response.content if hasattr(response, "content") else str(response)
         try:
-            parsed = json.loads(content)
+            parsed = self._parse_json_response(content)
         except json.JSONDecodeError:
             logger.error(f"[MarketAnalystAgent] Non-JSON LLM response: {content[:500]!r}")
             raise

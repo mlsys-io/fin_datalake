@@ -131,6 +131,17 @@ class StrategyAgent(BaseAgent, LangChainMixin):
         confidence = min(abs(final_score), 1.0)
         return action, confidence
 
+    def _parse_json_response(self, content: str) -> Dict[str, Any]:
+        cleaned = str(content or "").strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            cleaned = "\n".join(lines).strip()
+        return json.loads(cleaned)
+
     def _generate_signal_llm(
         self,
         *,
@@ -162,7 +173,7 @@ class StrategyAgent(BaseAgent, LangChainMixin):
             response = self._llm_invoke(llm, [sys_msg, HumanMessage(content=prompt)])
             content = response.content if hasattr(response, "content") else str(response)
             try:
-                parsed = json.loads(content)
+                parsed = self._parse_json_response(content)
             except json.JSONDecodeError:
                 logger.error(f"[StrategyAgent] Non-JSON LLM response: {content[:500]!r}")
                 raise
