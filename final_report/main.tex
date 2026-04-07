@@ -1,0 +1,2953 @@
+% ============================================================
+%  NUS B.Comp. Dissertation – AI-Native Lakehouse System
+%  Author : Lian Zhi Xuan  (A0255844W)
+%  Compiler: pdfLaTeX  (Overleaf compatible)
+% ============================================================
+
+\documentclass[12pt, a4paper]{report}
+
+% ── Fonts & Encoding ─────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{mathptmx}          % Times Roman (text + math)
+
+% ── Page Layout ──────────────────────────────────────────────
+\usepackage[
+  a4paper,
+  top=20mm, bottom=20mm,
+  left=25mm, right=25mm        % generous left margin for binding
+]{geometry}
+
+% ── Line Spacing ─────────────────────────────────────────────
+\usepackage{setspace}
+\onehalfspacing
+
+% ── Page Numbers & Headers ───────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\thepage}
+\fancyhead[L]{\leftmark}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── Referencing (APA 3rd Ed.) ────────────────────────────────
+\usepackage{natbib}
+\bibliographystyle{apalike}
+
+% ── Figures & Tables ─────────────────────────────────────────
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{float}             % [H] placement
+\usepackage{caption}
+\usepackage{subcaption}
+
+% ── Lists ────────────────────────────────────────────────────
+\usepackage{enumitem}
+
+% ── Code Listings ────────────────────────────────────────────
+\usepackage{listings}
+\usepackage{xcolor}
+\definecolor{codeblue}{RGB}{0,0,180}
+\definecolor{codegray}{RGB}{128,128,128}
+\definecolor{codegreen}{RGB}{0,128,0}
+\definecolor{codebg}{RGB}{250,250,250}
+
+\lstdefinestyle{pythonstyle}{
+  backgroundcolor=\color{codebg},
+  commentstyle=\color{codegreen}\itshape,
+  keywordstyle=\color{codeblue}\bfseries,
+  stringstyle=\color{red},
+  basicstyle=\ttfamily\footnotesize,
+  breakatwhitespace=false,
+  breaklines=true,
+  keepspaces=true,
+  numbers=left,
+  numbersep=5pt,
+  numberstyle=\tiny\color{codegray},
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  tabsize=2,
+  frame=single,
+  rulecolor=\color{codegray},
+  language=Python
+}
+\lstset{style=pythonstyle}
+
+% ── Hyperlinks (load last) ───────────────────────────────────
+\usepackage[
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=black,
+  urlcolor=blue,
+  bookmarks=true,
+  bookmarksopen=true
+]{hyperref}
+\usepackage{bookmark}
+
+% ── Miscellaneous ────────────────────────────────────────────
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{microtype}         % better text justification
+\usepackage{csquotes}
+\usepackage{acronym}
+\usepackage{pdfpages}          % for including PDF appendices if needed
+\usepackage{appendix}
+
+% ── Custom Commands ──────────────────────────────────────────
+\newcommand{\placeholder}[1]{%
+  \textcolor{red}{\textbf{[PLACEHOLDER: #1]}}%
+}
+
+% ── Metadata ─────────────────────────────────────────────────
+\hypersetup{
+  pdftitle={AI-Native Lakehouse System},
+  pdfauthor={Lian Zhi Xuan},
+  pdfsubject={B.Comp. Dissertation, NUS School of Computing}
+}
+
+% ============================================================
+\begin{document}
+% ============================================================
+
+% ── Roman numeral page numbering for front matter ────────────
+\pagenumbering{roman}
+\pagestyle{empty}
+
+% ============================================================
+%  FRONT COVER
+% ============================================================
+\begin{titlepage}
+  \begin{center}
+    \vspace*{1cm}
+    {\large B.Comp. Dissertation}\\[2cm]
+
+    {\LARGE\bfseries An AI-Native Lakehouse System: \\[0.5em]
+      A Unified Fabric for Distributed Data Engineering \\[0.3em]
+      and Multi-Agent Intelligence}\\[2.5cm]
+
+    {\large By}\\[0.5cm]
+    {\large\bfseries Lian Zhi Xuan}\\[2cm]
+
+    % ^ Replace with your NUS logo file; remove line if unavailable.
+
+    {\large Department of Computer Science}\\[0.2cm]
+    {\large School of Computing}\\[0.2cm]
+    {\large National University of Singapore}\\[1.5cm]
+
+    {\large 2024/2025}
+  \end{center}
+\end{titlepage}
+
+% ============================================================
+%  TITLE PAGE
+% ============================================================
+\begin{titlepage}
+  \begin{center}
+    \vspace*{0.5cm}
+    {\large B.Comp. Dissertation}\\[1.5cm]
+
+    {\LARGE\bfseries An AI-Native Lakehouse System: \\[0.4em]
+      A Unified Fabric for Distributed Data Engineering \\[0.3em]
+      and Multi-Agent Intelligence}\\[2cm]
+
+    {\large By}\\[0.3cm]
+    {\large\bfseries Lian Zhi Xuan}\\[1.5cm]
+
+    {\large Department of Computer Science}\\[0.2cm]
+    {\large School of Computing}\\[0.2cm]
+    {\large National University of Singapore}\\[0.2cm]
+    {\large 2024/2025}\\[1cm]
+
+    \begin{flushleft}
+      \textbf{Project No.:} 	H398150\\[0.3cm]
+      \textbf{Advisor:} LU Yao, Assistant Professor\\[0.3cm]
+      \textbf{Deliverables:}\\
+      \hspace{1cm} Report: 1 Volume\\
+      \hspace{1cm} Source Code: 1 Repository (GitHub)\\
+      \hspace{1cm} Demo: 1 Executable System
+    \end{flushleft}
+  \end{center}
+\end{titlepage}
+
+% ============================================================
+%  ABSTRACT
+% ============================================================
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+
+Enterprise adoption of autonomous, multi-agent Artificial Intelligence (AI) systems is rapidly accelerating; however, the underlying infrastructure remains severely fragmented. Data engineering pipelines and AI inference services are routinely deployed as separate, isolated clusters, imposing a significant \emph{integration tax}: engineering teams spend 40--60\% of their AI budgets on middleware and glue code rather than model intelligence \citep{mckinsey2024}. Furthermore, the necessity of serializing large datasets for inter-system communication creates prohibitive memory overhead and latency. This architectural friction effectively bars real-time analytical workloads from standard enterprise adoption and limits the accessibility of high-performance AI to organizations with massive engineering resources.
+
+This dissertation presents the \textbf{AI-Native Lakehouse System}, a platform designed to democratize high-performance AI infrastructure by resolving the disjunction between data engineering and autonomous reasoning. The system co-locates data pipelines and stateful AI agents on a single, unified compute fabric built on Ray \citep{moritz2018ray}. The architecture comprises five tightly integrated planes: an Interface Layer providing protocol-agnostic access via REST and the Model Context Protocol (MCP); a Compute Plane that unifies orchestration (Prefect) and execution (Ray) through a Hybrid Execution Model designed for robust runtime isolation and deterministic scheduling; a Data Plane offering standardised ETL contracts with adaptive schema evolution; an Intelligence Plane hosting agents as highly available Ray Serve deployments with centralised discovery and direct invocation; and a Control Plane implementing a MAPE-K autonomic loop \citep{kephart2003} for self-healing and elastic scaling.
+
+By consolidating the infrastructure stack, the architecture leverages Zero-Copy shared memory via the Apache Arrow Plasma Store to eliminate the network serialisation penalty. This approach provides a seamless, observable interface that reduces integration friction while enabling real-time analytical capabilities. Empirical evaluation shows that the zero-copy handoff path achieves up to 15.02$\times$ lower latency than a JSON-serialised baseline for large tabular transfers, that the integrated Market Pulse workflow is the fastest of the three evaluated end-to-end configurations under fully live conditions, and that the Overseer reduces mean service restoration time by 65.59\% relative to a manual recovery baseline.
+
+\vspace{1em}
+\noindent\textbf{Subject Descriptors:}\\
+C.2.4 Distributed Systems \quad
+D.2.11 Software Architectures \quad
+I.2.11 Distributed Artificial Intelligence \quad
+H.2.4 Systems (Transaction Processing) \quad
+D.4.1 Process Management
+
+\vspace{0.5em}
+\noindent\textbf{Keywords:}\\
+AI-Native Lakehouse, Multi-Agent Systems, Distributed Computing, Ray, Zero-Copy Memory, MAPE-K Autonomic Computing
+
+\vspace{0.5em}
+\noindent\textbf{Implementation Software and Hardware:}\\
+Python 3.11, Ray 2.x / KubeRay, Prefect 3.x, Delta Lake (deltalake-python), Apache Arrow, MinIO, TimescaleDB, Milvus, Nginx, FastAPI, K0s Kubernetes; bare-metal server cluster.
+
+% ============================================================
+%  ACKNOWLEDGEMENTS
+% ============================================================
+\chapter*{Acknowledgements}
+\addcontentsline{toc}{chapter}{Acknowledgements}
+
+I would like to express my deepest gratitude to my supervisor, \textbf{Professor Lu Yao}, for his invaluable guidance, vision, and unwavering support throughout this project. His profound insights and high academic standards have been instrumental in shaping the direction of this research and pushing me to bridge the gap between data engineering and artificial intelligence.
+
+I am also profoundly thankful to \textbf{Su Zhengyuan} for his dedicated mentorship. His technical expertise, patience, and constructive feedback during the implementation and experimental phases were crucial to the success of this dissertation. Navigating the complexities of distributed systems and Ray-native architectures would have been a far more daunting task without his consistent support. 
+
+Working alongside both of them has been an incredible learning experience that has significantly enriched my undergraduate journey at the National University of Singapore.
+
+\vspace{1.5cm}
+
+\begin{flushright}
+    \textit{Lian Zhi Xuan} \\
+    April 2026
+\end{flushright}
+
+\newpage
+
+% ============================================================
+%  TABLE OF CONTENTS / FIGURES / TABLES
+% ============================================================
+\pagestyle{fancy}
+\tableofcontents
+\newpage
+\listoffigures
+\newpage
+\listoftables
+\newpage
+
+% ============================================================
+%  ACRONYMS
+% ============================================================
+\chapter*{List of Abbreviations}
+\addcontentsline{toc}{chapter}{List of Abbreviations}
+
+\begin{acronym}[MAPE-K]
+  \acro{AI}{Artificial Intelligence}
+  \acro{API}{Application Programming Interface}
+  \acro{ACID}{Atomicity, Consistency, Isolation, Durability}
+  \acro{CLI}{Command-Line Interface}
+  \acro{DAG}{Directed Acyclic Graph}
+  \acro{ETL}{Extract, Transform, Load}
+  \acro{HTTP}{Hypertext Transfer Protocol}
+  \acro{IPC}{Inter-Process Communication}
+  \acro{JWT}{JSON Web Token}
+  \acro{KV}{Key-Value}
+  \acro{LLM}{Large Language Model}
+  \acro{MAPE-K}{Monitor, Analyse, Plan, Execute -- Knowledge}
+  \acro{MAS}{Multi-Agent System}
+  \acro{MCP}{Model Context Protocol}
+  \acro{MTTR}{Mean Time to Recovery}
+  \acro{OOM}{Out of Memory}
+  \acro{OHLC}{Open, High, Low, Close}
+  \acro{RBAC}{Role-Based Access Control}
+  \acro{REST}{Representational State Transfer}
+  \acro{RPC}{Remote Procedure Call}
+  \acro{TTL}{Time to Live}
+  \acro{UUID}{Universally Unique Identifier}
+\end{acronym}
+\newpage
+
+% ============================================================
+%  MAIN REPORT — Arabic page numbering begins here
+% ============================================================
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+% ============================================================
+%  CHAPTER 1: INTRODUCTION
+% ============================================================
+\chapter{Introduction}
+\label{ch:introduction}
+
+\section{Background and Motivation}
+\label{sec:background}
+
+The 2025--2026 technology cycle has witnessed a fundamental architectural shift in
+enterprise software. The industry has largely abandoned the pattern of deploying a single
+Large Language Model (LLM) behind a REST wrapper in favour of orchestrated
+\emph{multi-agent ecosystems}: networks of specialised autonomous agents that collaborate
+to complete complex, long-horizon tasks \citep{hong2023metagpt}.
+Frameworks such as LangGraph, CrewAI, and AutoGen now dominate enterprise adoption, and
+industry analysts report that the majority of large enterprises were deploying agentic
+automation pipelines at scale by the close of 2025 \citep{Bornstein2023,cdata2026mcp}.
+
+Yet despite the rapid advancement of autonomous agent intelligence, the underlying infrastructure has not evolved commensurately. Most production deployments adhere to a \emph{bifurcated infrastructure model}: a data engineering stack (e.g., Apache Spark) manages heavy-lifting ETL, while a separate, isolated environment (e.g., Kubernetes) hosts the AI reasoning engines \citep{Casado2023}. This fragmentation imposes a significant \emph{integration tax}, where engineering teams spend 40--60\% of their total AI budgets on "glue code" and middleware rather than core model intelligence \citep{mckinsey2024, ItSoli2026}. 
+
+Furthermore, the necessity of inter-cluster data egress requires serialising large datasets into high-entropy, text-based formats such as JSON over HTTP. This "JSON Tax" not only creates prohibitive memory overhead but also introduces \emph{task interference}, where the cognitive load of adhering to rigid formatting constraints has been shown to degrade model reasoning accuracy by over 20\% \citep{Tam2024, Gupta2025}. According to the \emph{2026 AI Infrastructure Report} by Redpoint Ventures, enterprises now allocate approximately 22\% of their total cloud expenditure purely to inter-cluster data transfer fees \citep{Redpoint2026}. Resolving this structural friction by eradicating the data-compute boundary constitutes the primary motivation for this dissertation.
+
+\section{Problem Statement}
+\label{sec:problem}
+
+This work identifies four distinct, interconnected failure modes in current enterprise AI
+infrastructure, each of which is directly addressed by the proposed system.
+
+\subsection{The Glue Code and Middleware Tax}
+\label{ssec:gluecode}
+
+Enterprises deploying AI systems must integrate 5--10 disparate infrastructure components:
+data sources (Kafka, REST APIs), orchestration layers (Apache Airflow), batch compute
+(Apache Spark), and AI inference servers (FastAPI, LangChain). Engineering teams are
+required to author bespoke \emph{glue code} — custom network adapters and transformation
+scripts — to stitch these components together.
+A 2024 McKinsey analysis found that organisations allocate 40--60\% of their total AI
+budgets to integration and middleware overhead rather than to core model intelligence
+\citep{mckinsey2024}. As mature ML systems have been characterised as consisting of
+approximately 5\% machine learning code and 95\% brittle supporting infrastructure
+\citep{sculley2015hidden}, this represents an enormous and largely unaddressed
+inefficiency.
+
+\subsection{The Data Gravity and JSON Serialisation Bottleneck}
+\label{ssec:datagravity}
+
+LLMs and analytical AI agents exhibit high data gravity: their utility is fundamentally conditioned on the size and quality of the datasets they can reason over. In architectures where the AI cluster is physically separated from the data cluster, passing large datasets (e.g., millions of financial OHLC ticks) to an agent requires serialisation into a string-based format such as JSON and transmission over HTTP. This imposes a two-fold penalty. 
+
+First, JSON serialisation of large columnar data structures causes severe memory bloat and CPU overhead, as the columnar binary representation must be fully transcribed into a human-readable text format \citep{arrow2024}. Second, requiring models to parse or emit rigidly structured JSON at inference time creates \emph{task interference}---a phenomenon where the cognitive overhead of adhering to complex syntax constraints competes with reasoning capacity---which has been shown to degrade response accuracy by over 20\% \citep{Tam2024, Gupta2025}.
+
+\subsection{Agent State Management Breakdown}
+\label{ssec:statebreakdown}
+
+Stateful AI agents operating over long time horizons require a durable, high-throughput
+shared memory layer to persist intermediate reasoning steps and coordinate with peer
+agents. In current architectures, ephemeral context windows are cleared after each
+session, forcing agents to reconstruct their operating context from scratch on every
+invocation. This results in agents repeatedly re-querying the same documents, re-executing
+identical tool calls, and producing outputs that contradict their prior conclusions. To
+the end user, this manifests as apparent LLM hallucination, but the root cause is an
+architectural storage failure rather than a model deficiency \citep{wu2023autogen,Bornstein2023}.
+
+Furthermore, when a swarm of agents attempts to concurrently write embeddings and
+reasoning states to a single-threaded vector store, they trigger high-frequency write
+conflicts. Systems such as basic Chroma saturate under heavy concurrent load, as they
+rely on in-process SQLite storage that serialises write operations, driving p99 latency
+spikes that render them unsuitable for production multi-agent workloads
+\citep{agentframeworks2025empirical}.
+
+\subsection{Lack of Autonomic Control and Cascading Failures}
+\label{ssec:cascading}
+
+Agentic AI workloads are inherently unpredictable. An agent may consume modest resources
+during routine operation, yet require a 100$\times$ burst in compute when a major news
+event triggers a spike in incoming financial data.
+Most production pipelines are strictly \emph{reactive}: when an agent crashes due to an
+out-of-memory exception or an API timeout, the system halts and requires human DevOps
+intervention to restart it.
+Without an \emph{autonomic} control plane capable of monitoring application-level
+metrics, detecting failures, and executing corrective actions programmatically, a single
+agent crash can propagate into a cascading failure that brings down the entire pipeline
+\citep{kephart2003}.
+
+\section{Objectives and Scope}
+\label{sec:objectives}
+
+This dissertation presents the design, implementation, and evaluation of an
+\textbf{AI-Native Lakehouse System} that directly addresses all four failure modes
+described in Section~\ref{sec:problem}.
+The system is scoped to the financial domain, using real-time cryptocurrency and equity
+market data as its primary data source, as this domain provides a demanding combination
+of high-velocity streaming data, complex analytical reasoning requirements, and a need for
+sub-second end-to-end latency.
+
+The specific objectives are as follows:
+
+\begin{enumerate}[label=\textbf{O\arabic*.}]
+
+  \item \textbf{Unified Compute Fabric:} Design and implement a single distributed
+  runtime that co-locates ETL pipelines and stateful AI agents, eliminating the need for
+  separate data engineering and AI inference clusters.
+
+  \item \textbf{Zero-Copy Data Handoff:} Enable AI agents to consume large analytical
+  datasets at memory speed by passing Apache Arrow columnar data via a shared in-process
+  object store, bypassing HTTP serialisation entirely.
+
+  \item \textbf{Protocol-Agnostic Gateway:} Implement a unified API gateway that exposes
+  the system to humans via REST, and to external AI assistants via the Model
+  Context Protocol (MCP), enabling fully headless, software-to-software operation.
+
+  \item \textbf{Hybrid Execution Model:} Resolve the critical low-level asynchronous
+  runtime conflict between the Rust \texttt{tokio} executor (used by
+  \texttt{deltalake-python}) and Ray's distributed task scheduler, ensuring transactional
+  storage I/O stability without sacrificing horizontal scalability.
+
+  \item \textbf{Autonomic Self-Healing:} Implement a MAPE-K control loop running
+  out-of-band from the compute cluster to autonomically detect, diagnose, and remediate
+  infrastructure failures without human intervention.
+
+\end{enumerate}
+
+\section{Contributions}
+\label{sec:contributions}
+
+The primary contributions of this work are:
+
+\begin{itemize}
+
+  \item A novel \textbf{AI-Native Lakehouse architecture} implementing the
+  \emph{Unified Fabric} pattern, where ETL tasks and AI agent actors share the same Ray
+  distributed runtime and Apache Arrow Plasma Store memory space.
+
+  \item A \textbf{Hybrid Execution Model} providing tiered execution steering via the
+  \texttt{.local()} API modifier, allowing developers to direct individual tasks between
+  the distributed worker pool and the Head Node's isolated execution context.
+  This model accommodates heterogeneous library dependencies — including Rust-backed
+  runtimes that conflict with Ray's \texttt{TokioMultiThreadExecutor} — while preserving
+  horizontal scalability for all compute-intensive workloads.
+
+  \item An \textbf{Intelligence Plane} architecture combining Ray Serve deployment
+  hosting with centralised discovery and direct invocation, replacing opaque
+  message-broker coordination with explicit capability lookup and traceable
+  peer-to-peer delegation via the AgentHub registry.
+
+  \item An \textbf{autonomic Control Plane} implementing the full MAPE-K feedback loop,
+  running as an out-of-band watchdog service with elastic actor scaling and active
+  circuit-breaking backpressure.
+
+  \item A \textbf{protocol-agnostic Interface Layer} with first-class MCP support,
+  enabling external AI clients (e.g., Claude Desktop, Cursor) to discover and invoke
+  Lakehouse capabilities without bespoke integration code.
+
+\end{itemize}
+
+\section{Report Organisation}
+\label{sec:organisation}
+
+The remainder of this report is structured as follows.
+Chapter~\ref{ch:literature} surveys related work in data lakehouse architectures,
+distributed computing frameworks, multi-agent orchestration, and autonomic computing.
+Chapter~\ref{ch:architecture} presents the high-level system architecture and the
+principal design novelties.
+Chapter~\ref{ch:implementation} provides a detailed specification of each of the five
+architectural planes.
+Chapter~\ref{ch:evaluation} describes the evaluation methodology and presents empirical
+benchmarking results.
+Chapter~\ref{ch:conclusion} summarises the contributions, discusses commercial
+applicability, and outlines directions for future work.
+
+% ============================================================
+%  CHAPTER 2: LITERATURE SURVEY
+% ============================================================
+\chapter{Literature Survey and Related Work}
+\label{ch:literature}
+
+\section{The Evolution of Data Lakehouse Architectures}
+\label{sec:lakehouse_evolution}
+
+The modern data storage landscape has evolved through three distinct generations.
+The first generation, the \emph{Enterprise Data Warehouse} (EDW), provided strict
+schema-on-write consistency and ACID transactional guarantees, but imposed prohibitive
+costs for storing and processing unstructured or semi-structured data at scale.
+The second generation, the \emph{Data Lake}, resolved the cost and flexibility
+limitations by storing raw data in cheap object storage (e.g., Amazon S3), but sacrificed
+consistency and introduced the so-called ``data swamp'' problem: lakes with no schema
+enforcement or transactional control degrade rapidly into unreliable collections of
+stale, inconsistent files \citep{armbrust2020delta}.
+
+The third generation, the \emph{Data Lakehouse}, as articulated by
+\citet{armbrust2020delta}, combines the low-cost scalable storage of a Data Lake with
+the ACID transactional guarantees of a Data Warehouse. The Delta Lake system, developed
+at Databricks, realises this by maintaining a transaction log in Apache Parquet format
+directly within the object store, enabling serialisable writes and efficient metadata
+operations over datasets at exabyte scale.
+The AI-Native Lakehouse system proposed in this dissertation builds upon Delta Lake
+as its primary durable storage layer, extending the lakehouse paradigm to include
+\emph{first-class, co-located AI agent execution} — a capability that existing lakehouse
+proposals do not address.
+
+\section{Distributed Compute Frameworks for AI Workloads}
+\label{sec:distributed_compute}
+
+\subsection{Apache Spark and Its Limitations for Agentic AI}
+\label{ssec:spark}
+
+Apache Spark \citep{zaharia2012resilient} represents the dominant paradigm for large-scale
+distributed data processing. Its Resilient Distributed Dataset (RDD) abstraction provides
+a fault-tolerant, parallel in-memory execution model that has proven highly effective for
+ETL and batch analytics workloads.
+However, Spark's architecture is fundamentally \emph{stateless}: computations are
+expressed as transformations over immutable distributed datasets, with no native
+mechanism for hosting persistent, conversational processes between query executions.
+This makes Spark architecturally unsuitable for hosting the stateful AI agent actors
+required by a multi-agent system, as agents must maintain persistent in-memory state
+across multiple sequential reasoning invocations.
+
+\subsection{Ray: A Unified Task-Parallel and Actor-Model Execution Engine}
+\label{ssec:ray}
+
+\citet{moritz2018ray} introduced Ray as a high-performance distributed system designed
+specifically for the next generation of AI applications, which require dynamic task
+graphs, millisecond-level scheduling latency, and support for persistent stateful
+processes.
+Ray's central contribution is a \emph{unified interface} that supports both the
+task-parallel programming model (for stateless, embarrassingly parallel functions) and
+the Actor programming model (for persistent, stateful objects that live on specific
+worker nodes and process sequential streams of messages).
+This duality makes Ray the only mainstream distributed framework capable of hosting both
+ETL data transformation tasks and long-lived conversational AI agents in the same runtime.
+
+The Ray Plasma Store extends this model with a shared-memory object store based on
+Apache Arrow \citep{arrow_github}. When a task writes a large dataset to the Plasma
+Store and returns an \texttt{ObjectRef}, any other task or Actor in the same cluster can
+read the dataset via a memory pointer, without serialisation or network transfer.
+This is the foundational mechanism enabling the Zero-Copy fast-path in the proposed
+system.
+
+\citet{moritz2018ray} demonstrate Ray scaling to over 1.8 million tasks per second,
+with scheduling latencies under one millisecond — performance characteristics that are
+essential for the latency-sensitive financial trading domain.
+
+\section{Multi-Agent Orchestration Frameworks}
+\label{sec:mas_frameworks}
+
+A growing ecosystem of frameworks has emerged for building multi-agent AI systems.
+This section critically evaluates the three most prevalent, identifying the specific
+architectural limitations that motivate the design choices in this dissertation.
+
+\subsection{LangGraph: Graph-State Machine Orchestration}
+\label{ssec:langgraph}
+
+LangGraph, developed within the LangChain ecosystem, models multi-agent collaboration
+as a directed graph in which nodes represent agent invocations and edges encode state
+transitions \citep{langgraph2024}.
+This graph-state machine abstraction provides precise, deterministic control over
+complex workflows with conditional branching and error recovery, and has become the
+default runtime for LangChain agents as of its v1.0 release in late 2025.
+
+However, LangGraph exhibits two key limitations relative to the present work.
+First, state transitions between nodes pass data through a shared \texttt{GraphState}
+object that is typically serialised and deserialised at each node boundary, incurring the
+same JSON overhead identified in Section~\ref{ssec:datagravity} when the payload is a
+large numerical dataset.
+Second, LangGraph's graph execution model is fundamentally single-process: it does not
+natively provision distributed worker nodes or manage compute resources, and therefore
+cannot scale agent execution horizontally across a cluster without additional external
+infrastructure \citep{agentframeworks2025empirical}.
+As a framework, LangGraph manages \emph{workflow state}; the system proposed in this
+dissertation manages \emph{infrastructure}, a qualitatively different concern.
+
+\subsection{CrewAI: Role-Based Collaborative Agents}
+\label{ssec:crewai}
+
+CrewAI models multi-agent collaboration as a ``crew'' of role-playing agents, each
+assigned a specific backstory, goal, and task list.
+The framework is distinguished by its intuitive role-based abstraction and rapid
+prototyping experience, and has achieved significant enterprise adoption for automating
+structured business workflows \citep{crewai2024,Bornstein2023}.
+
+CrewAI's primary limitation is its reliance on LLM-generated natural language to drive
+workflow control flow. In CrewAI, an orchestrator agent delegates subtasks by
+\emph{asking} other agents in natural language, and the receiving agent's tool selection
+and action are determined by the LLM's interpretation of the request.
+This ``cognitive latency'' introduces substantial non-determinism into the execution path:
+the same task instruction may route to different tools on different invocations, producing
+inconsistent behaviour in production systems.
+By contrast, the proposed system routes tasks via deterministic \emph{Service Discovery}
+(the AgentHub) and programmatic HTTP delegation (the SyncHandle), guaranteeing that
+tasks always reach the correct specialist agent through a traceable, repeatable code path.
+Furthermore, CrewAI runs within a single Python process and relies on SQLite3 for
+long-term memory persistence, which limits its concurrency and throughput for
+high-frequency agentic workloads \citep{agentframeworks2025empirical}.
+
+\subsection{Microsoft AutoGen: Conversational Multi-Agent Systems}
+\label{ssec:autogen}
+
+AutoGen, developed by Microsoft Research, frames multi-agent collaboration as an
+asynchronous conversation between agents, each of which can be either an LLM-backed
+assistant or a programmatic tool executor \citep{wu2023autogen}.
+AutoGen v0.4, released in January 2025, adopted an event-driven actor-based architecture,
+significantly improving concurrency over the original sequential chat model.
+
+AutoGen's principal limitation for the purposes of this dissertation is its
+data-access model.
+Like LangGraph and CrewAI, AutoGen agents access data through \emph{function calling}:
+an agent issues a tool call, which executes a Python function that typically queries an
+external database over a network connection and returns a serialised result.
+There is no mechanism for sharing large in-memory datasets between the agent process and
+the data processing layer without serialisation overhead.
+The proposed system's Zero-Copy shared memory directly addresses this gap.
+
+\subsection{The Killer Feature: Data Gravity}
+\label{ssec:datagravity_mas}
+
+The limitation common to all three frameworks is the implicit assumption that the
+\emph{data} and the \emph{agent} are separate entities residing in different processes or
+machines.
+All three frameworks assume that data is ``over there'' (in an external database) and the
+agent is ``over here'' (in a Python process), requiring an explicit network call to bridge
+the gap.
+The Unified Fabric architecture proposed in this dissertation inverts this assumption:
+agents are \emph{deployed inside} the same Ray cluster as the ETL pipelines, enabling
+direct, zero-copy access to large analytical datasets via shared memory.
+Table~\ref{tab:framework_comparison} summarises the competitive comparison.
+
+\begin{table}[H]
+  \centering
+  \caption{Comparative analysis of multi-agent frameworks against the proposed system.}
+  \label{tab:framework_comparison}
+  \begin{tabularx}{\textwidth}{lXXXX}
+    \toprule
+    \textbf{Feature} &
+    \textbf{This Work} &
+    \textbf{LangGraph} &
+    \textbf{AutoGen} &
+    \textbf{CrewAI} \\
+    \midrule
+    Architecture &
+    Distributed Actors (Ray Serve) &
+    State Machine (Graph) &
+    Event-Driven Chat &
+    Role-Based Process \\
+    \addlinespace
+    Communication &
+    HTTP (peer-to-peer) &
+    Shared State Object &
+    Async Chat History &
+    Sequential Tasks \\
+    \addlinespace
+    Data Access &
+    Zero-Copy (Arrow Plasma) &
+    API / Function Call &
+    API / Function Call &
+    API / Function Call \\
+    \addlinespace
+    Deployment &
+    K8s + Ray Cluster &
+    Python Process &
+    Python / Docker &
+    Python Process \\
+    \addlinespace
+    Horizontal Scaling &
+    Native (Ray) &
+    External only &
+    Partial (v0.4) &
+    None native \\
+    \addlinespace
+    Autonomic Control &
+    MAPE-K loop &
+    None & None & None \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Protocol Standardisation: The Model Context Protocol}
+\label{sec:mcp}
+
+Historically, connecting an AI agent to an external enterprise system (e.g., a database, a ticketing system, or an internal API) required engineering a bespoke REST integration for each target. This point-to-point integration model does not scale: every new data source requires a custom connector, and every connector introduces a maintenance burden when the source API changes.
+
+The Model Context Protocol (MCP), open-sourced by Anthropic in late 2024, establishes an open standard for AI clients to communicate with data systems and tool providers through a universal interface \citep{anthropic2024mcp}. MCP defines a standardised message format for tool discovery, invocation, and response handling, allowing any MCP-compliant AI client to interact with any MCP-compliant server without custom integration code. By late 2025, MCP had transitioned from a nascent proposal to a dominant industry standard, significantly reducing the "integration tax" associated with autonomous agent deployments \citep{cdata2026mcp}. This ecosystem now includes native support from major IDEs and AI clients, including Claude Desktop and Cursor.
+
+The proposed system implements MCP as a first-class interface protocol alongside REST, making the Lakehouse directly accessible to any MCP-compliant AI client. This ``headless'' capability is a key differentiator from prior FYP-level systems, which typically build bespoke React dashboards as their sole user interface. This architectural choice enables the Lakehouse to function as a plug-and-play component within a broader autonomous swarm.
+
+
+\section{Autonomic Computing and the MAPE-K Reference Model}
+\label{sec:mapek}
+
+The vision of \emph{autonomic computing} was formalised by \citet{kephart2003}, who
+proposed that computing systems should be capable of self-management analogous to the
+human autonomic nervous system — monitoring their own health, analysing anomalies,
+planning corrective actions, and executing them without human intervention.
+The MAPE-K (Monitor, Analyse, Plan, Execute -- Knowledge) reference model provides a
+concrete control loop architecture for implementing autonomic systems:
+
+\begin{itemize}
+  \item \textbf{Monitor:} Continuous collection of telemetry from managed resources.
+  \item \textbf{Analyse:} Evaluation of collected metrics against learned norms or
+  rule-based policies to detect anomalies.
+  \item \textbf{Plan:} Selection of a corrective action in response to detected anomalies.
+  \item \textbf{Execute:} Programmatic execution of the selected action on the managed
+  resource.
+  \item \textbf{Knowledge:} A shared repository of system state, history, and policy
+  configuration that informs all four phases.
+\end{itemize}
+
+The MAPE-K loop was originally applied to traditional computing infrastructure
+(server provisioning, network configuration).
+In the context of AI agent systems, its application is largely novel:
+the proposed system applies MAPE-K to the specific challenge of detecting and recovering
+from \emph{application-level} agent failures — out-of-memory crashes, infinite reasoning
+loops, and streaming data backlogs — which are invisible to conventional cloud
+infrastructure monitors that operate only at the container or CPU utilisation level.
+
+\section{Summary of Gaps and Motivation}
+\label{sec:gaps}
+
+The literature review reveals three key gaps that the proposed system addresses:
+
+\begin{enumerate}
+
+  \item \textbf{Co-location Gap:} No existing framework provides a production architecture
+  where AI agents and ETL pipelines share the same distributed runtime and in-memory
+  object store. All existing frameworks treat data and AI as separate layers connected by
+  API calls.
+
+  \item \textbf{Autonomic Gap:} Existing multi-agent frameworks provide no built-in
+  mechanism for detecting and recovering from infrastructure failures. The MAPE-K pattern
+  has not been applied to the specific failure modes of AI agent swarms.
+
+  \item \textbf{Protocol Gap:} Existing frameworks assume a single, fixed interface (REST
+  or Python SDK). No framework provides first-class MCP support as a peer interface to
+  REST, enabling headless AI-to-AI system interaction.
+
+\end{enumerate}
+
+% ============================================================
+%  CHAPTER 3: ARCHITECTURAL NOVELTY
+% ============================================================
+\chapter{System Architecture Overview}
+\label{ch:architecture}
+
+\section{Architectural Philosophy: The Unified Fabric}
+\label{sec:unified_fabric}
+
+The central design philosophy of the AI-Native Lakehouse System is that of a
+\emph{Unified Fabric}: a single, cohesive distributed runtime in which data engineering
+pipelines (ETL) and AI agent actors are not merely interoperable but are genuinely
+\emph{co-located} — sharing the same compute nodes, the same scheduling substrate, and
+the same in-memory object store.
+
+Most existing AI data platforms treat agents as \emph{external clients} that reside
+outside the data cluster and communicate with it through an API boundary.
+The Unified Fabric inverts this model.
+Agents are \emph{first-class residents} of the cluster; they are spawned on the same
+worker nodes that execute data transformation tasks, and they communicate with those tasks
+via shared memory pointers rather than network sockets.
+The practical consequence is the elimination of the network boundary between data and AI
+entirely — not just as an optimisation, but as an architectural principle.
+
+\section{High-Level System Architecture}
+\label{sec:highlevel}
+
+The system is decomposed into five architectural planes, arranged in a layered hierarchy
+as illustrated in Figure~\ref{fig:system_architecture}.
+
+\begin{figure}[H]
+  \centering
+  % \includegraphics[width=0.9\textwidth]{figures/system_architecture}
+  \placeholder{Insert system architecture diagram showing the five planes and their
+  interactions: Interface Layer (top) $\rightarrow$ Compute Plane $\rightarrow$
+  Data Plane + Intelligence Plane (parallel) $\rightarrow$ Control Plane (out-of-band).}
+  \caption{High-level architecture of the AI-Native Lakehouse System, comprising five
+  integrated planes on a shared Ray compute substrate.}
+  \label{fig:system_architecture}
+\end{figure}
+
+Each plane is strictly decoupled from the others through well-defined interface contracts,
+ensuring that a failure or redesign in one plane does not cascade to its neighbours.
+The five planes and their primary responsibilities are summarised below and described
+in detail in Chapter~\ref{ch:implementation}.
+
+\begin{itemize}
+  \item \textbf{Interface Layer:} The external-facing boundary. Handles TLS termination,
+  authentication, intent routing, and cross-cutting governance.
+  \item \textbf{Compute Plane:} The distributed execution substrate. Hosts both ETL tasks
+  and AI agent actors on a unified Ray cluster.
+  \item \textbf{Data Plane:} The ETL framework. Manages ingestion, transformation,
+  schema evolution, and durable storage to Delta Lake.
+  \item \textbf{Intelligence Plane:} The agent execution core. Hosts agents as Ray Serve
+  deployments in a decentralised service mesh.
+  \item \textbf{Control Plane (Overseer):} The autonomic brain. Monitors all other planes
+  and executes self-healing actions via a MAPE-K loop.
+\end{itemize}
+
+\section{Key Design Principles and Novelty Claims}
+\label{sec:novelty}
+
+\subsection{Zero-Copy Shared Memory via Apache Arrow}
+\label{ssec:zerocopy}
+
+Apache Arrow defines a language-agnostic, columnar in-memory data format designed for
+zero-copy reads and writes across process boundaries \citep{arrow_github}.
+The Ray Plasma Store implements a shared-memory object store based on the Arrow format:
+when a task deposits a dataset into the Plasma Store and returns an
+\texttt{ObjectRef}, any other task or actor on the same cluster can reconstruct
+the dataset by inspecting the Arrow record batch's metadata header — which specifies the
+memory buffer locations and sizes — without copying any of the underlying data bytes
+\citep{moritz2018ray}.
+
+In the proposed system, the ETL pipelines in the Data Plane write their output dataframes
+to the Plasma Store.
+The AI agents in the Intelligence Plane receive the resulting \texttt{ObjectRef} pointers.
+An agent analysing one million OHLC ticks therefore pays no serialisation cost and
+incurs no network latency: the data transfer is a pointer dereference, not an HTTP
+request.
+This mechanism is the primary solution to the Data Gravity and JSON Serialisation
+Bottleneck identified in Section~\ref{ssec:datagravity}.
+
+\subsection{The Hybrid Execution Model: Tiered Execution Steering}
+\label{ssec:splitbrain}
+
+The Compute Plane exposes a tiered execution API that allows developers to explicitly
+control the execution context of individual tasks, addressing the practical reality that
+a distributed AI platform must integrate libraries with heterogeneous runtime
+requirements.
+By default, all tasks submitted via \texttt{@ray.remote} are distributed across the
+worker pool by Ray's scheduler.
+The \texttt{.local()} modifier overrides this behaviour, directing the task to execute
+on the Head Node's main thread in an isolated, single-threaded context.
+
+This flexibility is of general utility — applicable whenever a task has serialisation
+requirements, node-local resource dependencies, or library constraints incompatible
+with the distributed executor.
+A concrete and critical instance is the runtime conflict encountered during
+implementation between \texttt{deltalake-python} and Ray's internal executor.
+
+\texttt{deltalake-python} is implemented in Rust and depends on the Tokio asynchronous
+runtime (\texttt{tokio::runtime::Runtime}) to manage its internal I/O event loop.
+Ray's task workers execute Python coroutines within their own asynchronous event loop
+using the \texttt{TokioMultiThreadExecutor}.
+When \texttt{deltalake-python} attempts to create a Tokio runtime inside a Ray worker
+thread that is already executing within a Tokio executor context, the nested executor
+instantiation causes an unrecoverable panic:
+\texttt{TokioMultiThreadExecutor has crashed}.
+
+Applying the \texttt{.local()} modifier to Delta Lake write tasks routes the storage
+I/O to the Head Node's main thread, where no ambient Tokio executor is present.
+The Rust runtime instantiates cleanly in an isolated context, and the panic is
+eliminated.
+The distributed worker pool continues to handle all upstream CPU-intensive
+transformations; only the final ACID commit is localised.
+The full implementation of this pattern within the \texttt{DeltaLakeSink} is described
+in Section~\ref{ssec:hybrid_execution}.
+
+\subsection{Protocol-Agnostic Interface Design}
+\label{ssec:mcp_design}
+
+The Interface Layer is architected around a deliberate separation between
+\emph{protocol translation} and \emph{business logic execution}.
+All external traffic — regardless of its origin protocol — is normalised into a
+single, standardised \texttt{UserIntent} object before it reaches the dispatch
+and routing layer.
+This means the system is protocol-agnostic by construction: adding a new interface
+requires only a parser that maps the new protocol's payload to a
+\texttt{UserIntent}; the entire downstream infrastructure requires no modification.
+
+REST and MCP are the two peer interfaces implemented in the current system,
+each treated as a first-class citizen rather than an afterthought.
+MCP represents the most architecturally significant of the two from a novelty
+standpoint: by implementing the Model Context Protocol \citep{anthropic2024mcp},
+the Lakehouse exposes its capabilities — querying data, triggering ETL pipelines,
+checking cluster health — in a form that any MCP-compliant AI client can discover
+and invoke autonomously, without a human operator in the loop.
+This enables the system to function as a collaborative infrastructure node within
+a broader autonomous agent network, a role that the REST interface alone
+cannot fulfil.
+The protocol-agnostic design ensures that future interfaces — a Slack integration,
+a gRPC endpoint, or a WebSocket stream — can be incorporated without disrupting
+any existing integration or altering the dispatch layer.
+
+\subsection{Autonomic Self-Healing via the MAPE-K Control Plane}
+\label{ssec:mapek_design}
+
+The Control Plane implements the full MAPE-K loop \citep{kephart2003} as an independent
+service running completely \emph{out-of-band} from the Ray compute cluster.
+The critical design requirement for the Overseer is isolation: if the monitored system
+(the Ray cluster) experiences total resource exhaustion or a cascading failure, the
+monitoring and healing mechanism must remain operational.
+Running the Overseer as a Ray Actor would violate this requirement, as an OOM event on
+the head node would destroy both the cluster and its monitor simultaneously.
+By running as a standalone service, the Overseer survives any Ray cluster failure and is
+thus capable of initiating a full cluster recovery.
+
+\subsection{Plugin-Based Extensibility Across All Planes}
+\label{ssec:extensibility}
+
+A deliberate cross-cutting design principle of the AI-Native Lakehouse is that every
+major integration point is defined as an \emph{abstract contract} rather than a concrete
+implementation, making the system extensible by configuration rather than by code change.
+
+At the \textbf{Data Plane}, the \texttt{DataSource} and \texttt{DataSink} interfaces
+act as a plugin registry for I/O integrations.
+Adding a new data origin — whether a proprietary market feed, a file system watcher, or
+a message queue — requires implementing the \texttt{DataSource} interface and registering
+the class; no existing pipeline code requires modification.
+The same applies to storage targets: a future \texttt{IcebergSink} or
+\texttt{ClickHouseSink} can be introduced alongside the existing Delta Lake and
+TimescaleDB sinks without disrupting the ETL framework.
+
+At the \textbf{Intelligence Plane}, agents are registered in the AgentHub by capability
+string.
+A new specialised agent (e.g., a \texttt{RiskAgent} for portfolio exposure analysis)
+is deployed as a Ray Serve deployment and registered under a new capability identifier;
+all existing agent delegation paths remain untouched.
+
+At the \textbf{Control Plane}, the Collector and Policy registries follow the same
+pattern.
+New monitoring targets (e.g., a \texttt{TimescaleCollector} for database connection
+pool saturation) and new corrective policies can be added as independent classes and
+registered at startup, without modifying the Overseer's core loop.
+
+At the \textbf{Interface Layer}, the Command pattern ensures that a new protocol
+interface (e.g., a Slack or Teams bot) requires only a parser that maps
+protocol-specific payloads to the standardised \texttt{UserIntent} object; the entire
+downstream routing and execution infrastructure requires no modification.
+
+This plugin-based architecture means the system's capabilities scale with domain
+requirements over time without accumulating the structural coupling that characterises
+traditional monolithic data platforms.
+
+% ============================================================
+%  CHAPTER 4: DETAILED IMPLEMENTATION
+% ============================================================
+\chapter{Methodology and Systems Implementation}
+\label{ch:implementation}
+
+\section{Infrastructure Foundation}
+\label{sec:infrastructure}
+
+The system is deployed on a bare-metal server cluster managed by \textbf{K0s}, a
+lightweight, zero-dependency Kubernetes distribution designed for bare-metal and edge
+deployments \citep{k0s2021}.
+K0s provides the container orchestration substrate for all system components without
+requiring a cloud provider's managed Kubernetes service, making the system fully
+portable and self-hosted.
+
+\textbf{KubeRay} provisions and manages the Ray cluster as a Kubernetes Custom Resource.
+It deploys a Head Node (which runs the Ray scheduler, the GCS server, and the Plasma
+Store) and a configurable number of Worker Nodes, each of which receives tasks from the
+Head Node's distributed scheduler.
+
+The persistent storage layer is composed of specialised systems, each selected for a
+specific data access pattern:
+\begin{itemize}
+  \item \textbf{MinIO:} An S3-compatible object store hosting the Delta Lake tables.
+  MinIO serves as the durable foundation of the lakehouse layer.
+  \item \textbf{Delta Lake (via \texttt{deltalake-python}):} Provides ACID transactional
+  table storage over MinIO, schema evolution, and time-travel queries
+  \citep{armbrust2020delta}. Delta Lake is the primary durable analytical store for
+  all ingested market data, news records, and generated signals.
+  \item \textbf{TimescaleDB:} A PostgreSQL extension optimised for time-series data,
+  used for storing pre-aggregated OHLC bars and system health metrics.
+  \item \textbf{Milvus:} A vector database for storing and querying high-dimensional
+  semantic embeddings produced by the NLP agents.
+  \item \textbf{RisingWave:} A streaming SQL database architecturally provisioned as
+  a dedicated streaming-state layer within the Data Plane. RisingWave is intended to
+  serve as the stream-oriented query surface for continuously updated materialized
+  views of price and signal history, complementing Delta Lake's role as the durable
+  analytical store. Deployment scaffolding, configuration support, and an ETL-facing
+  \texttt{RisingWaveSource} adapter are present in the current codebase; however,
+  the final validated evaluation path prioritises direct ingestion into Delta Lake,
+  leaving RisingWave as a partially integrated capability rather than a fully
+  exercised runtime dependency. Its complete operationalization is identified as a
+  direction for future work.
+\end{itemize}
+
+A \textbf{Hive Metastore} is integrated with the Delta Lake layer to maintain a live
+catalogue of all tables, partitions, and schema versions. This ensures that any agent
+querying the lakehouse can discover the current data schema dynamically, without
+requiring manual schema documentation.
+
+The storage layer is designed for extensibility alongside its current components.
+Each storage system is accessed exclusively through the \texttt{DataSink} and
+\texttt{DataSource} interface contracts described in Section~\ref{ssec:io_contracts},
+meaning additional storage backends can be introduced without modifying any existing
+pipeline or agent code.
+For example, a columnar analytical database such as ClickHouse, or an alternative
+open table format such as Apache Iceberg, could be registered as a new \texttt{DataSink}
+implementation and made immediately available to all existing ETL pipelines.
+Similarly, the KubeRay cluster specification is parameterised: worker node count,
+resource quotas (CPU, RAM, GPU), and node selectors are declarative configuration
+values, allowing the compute substrate to be resized or reconfigured for different
+deployment environments without altering application code.
+
+\section{The Interface Layer: Unified Gateway}
+\label{sec:interface_layer}
+
+\begin{enumerate}
+  \item \textbf{Nginx Ingress:} Acts as the front door, handling TLS termination and
+  reverse-proxying all external traffic. It also implements the ``Bouncer'' pattern for
+  protecting internal dashboards (Prefect, Ray Dashboard, MinIO Console) by validating
+  JWT cookies before proxying access.
+  \item \textbf{Protocol Interfaces:} The REST API (FastAPI) and MCP Server are the
+  two peer-implemented gateway interfaces. Both route through the same shared dispatch
+  and adapter pipeline, preserving protocol-agnostic execution semantics. Operator
+  CLIs are also present in the codebase for lifecycle management tasks such as
+  deployment and service control, but these are separate from the gateway's request
+  dispatch path and are not equivalent peer interfaces.
+  \item \textbf{Auth \& Identity Middleware:} Resolves the authenticated user identity
+  from protocol-native credentials (JWT cookies for REST, API keys for MCP) and
+  enforces Role-Based Access Control (RBAC).
+  \item \textbf{Shared Dispatch Utility:} The central policy enforcer. Applies
+  cross-cutting governance to all requests before execution.
+  \item \textbf{Central Intent Dispatcher:} Routes standardised \texttt{UserIntent}
+  objects to the appropriate Domain Adapter.
+  \item \textbf{Domain Adapters:} Execute concrete infrastructure logic across five
+  registered domains: \texttt{DataAdapter} (Delta Lake and DuckDB queries),
+  \texttt{ComputeAdapter} (Prefect/Ray job submission), \texttt{AgentAdapter}
+  (Ray Serve HTTP invocations), \texttt{BrokerAdapter} (Direct Access Credential
+  Vending), and \texttt{SystemAdapter} (cluster health, audit log views, and
+  system-level status endpoints).
+\end{enumerate}
+
+\subsection{The Shared Dispatch Pattern}
+\label{ssec:shared_dispatch}
+
+The Shared Dispatch Utility implements the \emph{Interceptor} design pattern.
+A single asynchronous function intercepts all traffic from any Interface to the Central
+Intent Dispatcher, executing the following cross-cutting concerns universally:
+
+\begin{enumerate}
+  \item \textbf{UUID Trace Injection:} Assigns a universally unique identifier to each
+  request for end-to-end observability.
+  \item \textbf{Immutable Audit Logging:} Appends an immutable log record (user, action,
+  timestamp, trace ID) to the audit store before execution.
+  \item \textbf{Overseer Circuit Breaker Evaluation:} Checks the current circuit breaker
+  state maintained by the Control Plane. If the breaker is open (indicating compute
+  cluster overload), the request is immediately rejected with a
+  \texttt{503 Service Unavailable} response.
+\end{enumerate}
+
+This pattern guarantees that no request — whether from a human via REST or from an
+autonomous AI agent via MCP — can bypass governance.
+The alternative, implementing checks inside each Interface individually, was rejected
+because it creates security risks if a developer omits the check when adding a new
+endpoint.
+
+\subsection{Intent-Based Routing and Domain Adapters}
+\label{ssec:intent_routing}
+
+All system interactions are normalised into a standardised \texttt{UserIntent} object
+with three fields: \texttt{domain}, \texttt{action}, and \texttt{parameters}.
+The Central Intent Dispatcher maps this object to the appropriate Domain Adapter using a
+routing table.
+This Command pattern design means the entire backend infrastructure understands a single
+data structure, making it straightforward to add new interfaces: a hypothetical Slack
+bot need only parse Slack payloads into a \texttt{UserIntent} — the downstream routing
+logic requires no modification.
+
+\subsection{Direct Access Credential Vending (BrokerAdapter)}
+\label{ssec:broker}
+
+The \texttt{BrokerAdapter} implements a pragmatic ``trapdoor'' to the abstraction
+hierarchy.
+In its current form, it returns pre-configured connection credentials and endpoint
+strings — MinIO S3 access details, PostgreSQL connection strings — to authenticated
+users, allowing data scientists to connect their local tools (Jupyter, Tableau,
+DBeaver) directly to the raw storage layer without routing through the Gateway's
+request processing overhead.
+This design acknowledges the practical reality that rigid abstractions can impede
+productivity, and prioritises usability over dogmatic architectural purity.
+The current implementation is sufficient to demonstrate the direct-access vending
+pattern; a future enhancement would replace the static credential return with a
+proper short-lived, scoped token-vending mechanism to improve tenant isolation and
+reduce the risk of over-privileged long-lived credentials, as discussed in
+Section~\ref{sec:future_work}.
+
+\section{The Compute Plane: Orchestration and Execution}
+\label{sec:compute_plane}
+
+\subsection{Prefect and Ray: A Mixed Execution Model}
+\label{ssec:prefect_ray}
+
+The Compute Plane enforces a strict separation between workflow \emph{definition} and
+hardware \emph{execution}.
+\textbf{Prefect} serves as the orchestrator: developers define pipelines using
+\texttt{@flow} and \texttt{@task} decorators, specifying the logical sequence of
+operations and their DAG dependencies.
+Prefect manages retries, logging, and state transitions but performs no heavy computation
+itself.
+
+Rather than mandating a single universal execution path, the Compute Plane adopts a
+pragmatic mixed execution model. Flows that require distributed parallel compute use
+the \textbf{RayTaskRunner}, which submits individual tasks to Ray's distributed
+scheduler for allocation across available worker nodes. Flows whose tasks are
+predominantly I/O-bound or whose concurrency requirements are modest use Prefect's
+native \textbf{ConcurrentTaskRunner}, which achieves parallelism via Python's
+thread-based model without the overhead of Ray scheduling. This distinction reflects a
+deliberate design choice: not every pipeline benefits from the full distributed
+execution path, and introducing Ray scheduling overhead for lightweight tasks would
+degrade rather than improve overall throughput.
+
+This approach also contrasts with the Apache Airflow model, in which the orchestrator's
+workers execute tasks in the same process space as the scheduler, creating a scaling
+bottleneck and database saturation under heavy load.
+In the Prefect model, a catastrophic failure in any execution backend leaves the
+orchestrator entirely unaffected; it simply logs the failure and triggers the configured
+retry policy.
+
+\subsection{The Hybrid Execution Model: Tiered Execution for Developer Flexibility}
+\label{ssec:hybrid_execution}
+
+A core design goal of the Compute Plane is to provide developers with explicit control
+over \emph{where} their logic executes within the distributed cluster — not as a
+workaround, but as a first-class feature.
+Different categories of workload have fundamentally different execution requirements:
+CPU-intensive transformations benefit from horizontal distribution across worker nodes,
+while tasks that require strict serialisation semantics, access to node-local resources,
+or isolation from the distributed executor context benefit from execution on the Head
+Node's main thread.
+The Hybrid Execution Model formalises this distinction by exposing a tiered execution
+API through the \texttt{.local()} modifier, allowing developers to explicitly steer
+individual tasks to the appropriate execution context.
+
+Figure~\ref{fig:split_brain} illustrates the bifurcated execution flow as realised
+within the Data Plane's \texttt{DeltaLakeSink} component.
+
+\begin{figure}[H]
+  \centering
+  \placeholder{Insert Split-Brain execution flow diagram:
+  (1) Distributed phase: Ray Worker nodes execute parallel transformations $\rightarrow$
+  (2) Collect results $\rightarrow$
+  (3) Local phase: Head Node executes Delta Lake ACID write via \texttt{.local()}.}
+  \caption{The Hybrid Execution Model: tiered execution steering allows developers to
+  direct individual tasks to the distributed worker pool or the Head Node's isolated
+  execution context based on workload requirements.}
+  \label{fig:split_brain}
+\end{figure}
+
+The \texttt{.local()} modifier instructs Ray to run the decorated function on the Head
+Node's main thread, bypassing the distributed scheduler entirely.
+This has practical value in several scenarios:
+tasks that must execute serially due to external resource constraints (e.g., a
+rate-limited API call), tasks that depend on node-local state unavailable to remote
+workers, and tasks that encapsulate third-party libraries whose internal runtimes
+conflict with Ray's distributed executor context.
+
+The last scenario is concretely demonstrated by the Rust/Tokio conflict described in
+Section~\ref{ssec:splitbrain}: \texttt{deltalake-python} embeds the Tokio asynchronous
+runtime, which panics when instantiated inside Ray's \texttt{TokioMultiThreadExecutor}.
+Routing Delta Lake I/O to the Head Node via \texttt{.local()} resolves this conflict
+by placing the Tokio runtime in an isolated, single-threaded context where no executor
+collision can occur.
+
+This design introduces a deliberate serialisation point at the storage commit phase.
+Since Delta Lake's transaction log enforces serialisable writes by design, this
+constraint is inherent to the storage model and is not an artifact of the execution
+model.
+The compute-intensive transformation phase retains full horizontal scalability; only
+the final ACID commit is localised.
+More broadly, the tiered execution API means developers can adopt heterogeneous
+software stacks — including Rust-backed, JVM-based, or otherwise runtime-sensitive
+libraries — without being constrained to a single execution model, a significant
+practical advantage as the Python AI ecosystem continues to diversify.
+\subsection{The Unified Fabric: Co-location of ETL and AI}
+\label{ssec:unified_fabric_impl}
+
+Ray's Actor model is the technical mechanism enabling the Unified Fabric.
+ETL tasks (Python functions decorated with \texttt{@ray.remote}) and AI agents
+(Python classes decorated with \texttt{@ray.remote} and deployed via Ray Serve)
+coexist on the same Ray cluster.
+When an ETL task completes its transformation and writes the result to the Plasma Store,
+it returns an \texttt{ObjectRef}.
+This reference is passed directly to the Agent Actor's processing method.
+The agent's call to \texttt{ray.get(object\_ref)} retrieves the Arrow dataframe by
+memory pointer, completing the zero-copy handoff described in
+Section~\ref{ssec:zerocopy}.
+
+\section{The Data Plane: ETL Framework}
+\label{sec:data_plane}
+
+\subsection{Standardised I/O Contracts (Strategy Pattern)}
+\label{ssec:io_contracts}
+
+The Data Plane decouples ETL business logic from infrastructure dependencies through two
+abstract interfaces: \texttt{DataSource} and \texttt{DataSink}.
+A \texttt{DataSource} abstracts over any data origin (REST API, Kafka topic, WebSocket
+stream, CSV file), and a \texttt{DataSink} abstracts over any storage target
+(Delta Lake table, TimescaleDB relation, Milvus collection).
+ETL pipeline code is written against these abstract interfaces; swapping a WebSocket
+source for a Kafka topic requires changing a single configuration object, leaving the
+pipeline transformation logic entirely untouched.
+
+This design directly addresses the ``Pipeline Jungle'' antipattern \citep{sculley2015hidden},
+in which traditional ETL systems evolve organically into tangled webs of bespoke scripts
+that are tightly coupled to specific vendor APIs and prohibitively expensive to refactor.
+
+\subsection{Stateful Micro-Batching}
+\label{ssec:microbatching}
+
+High-frequency streaming data sources (e.g., WebSocket cryptocurrency tick feeds)
+emit data at rates that are incompatible with the transaction overhead of ACID storage
+systems.
+Writing one database record per incoming tick would generate microscopic files in the
+Delta Lake object store, severely degrading query performance.
+
+The \textbf{StatefulProcessorService} bridges this gap by maintaining an in-memory
+event buffer and performing time-windowed aggregation.
+Incoming ticks are accumulated for a configurable window (e.g., 5 seconds), and then
+aggregated into a single OHLC bar (Open, High, Low, Close) that is committed to Delta
+Lake in a single ACID transaction.
+This reduces the write amplification by several orders of magnitude compared to naive
+event-by-event writes while maintaining sub-10-second data freshness.
+
+\subsection{Adaptive Schema Evolution and Live Metastore Cataloguing}
+\label{ssec:schema_evolution}
+
+Upstream financial data providers frequently alter their JSON payload structure without
+advance notice, adding or removing fields between API versions.
+In a traditional pipeline with a rigid, manually-managed schema, such a change causes an
+immediate pipeline failure.
+
+The \texttt{DeltaLakeSink} is configured to perform automatic schema merging:
+when a new field is detected in an incoming payload, the sink dynamically updates the
+Delta table's schema and registers the new column with the Hive Metastore.
+Existing data rows retain a null value for the new column, preserving historical query
+compatibility.
+This ``Active Record'' cataloguing pattern ensures that the system's data catalogue is
+always synchronised with the live data — the lakehouse continuously documents itself,
+eliminating the need for separate schema management tooling.
+
+\section{The Intelligence Plane: Agent Execution Core}
+\label{sec:intelligence_plane}
+
+\subsection{Ray Serve Agent Hosting}
+\label{ssec:ray_serve}
+
+AI agents are deployed as long-lived, highly available HTTP endpoints using
+\textbf{Ray Serve}, Ray's native model serving library.
+Each agent class (e.g., \texttt{MarketAnalystAgent}, \texttt{StrategyAgent}) is
+registered as a Ray Serve \emph{Deployment}: a managed, stable-identity group of
+replicas distributed across worker nodes.
+Stable deployment names ensure that the Overseer can recover a crashed agent to its
+exact prior identity, and that any caller holding a reference to the deployment name
+continues to reach the recovered instance without reconfiguration.
+
+\subsection{Centralised Discovery and Direct Invocation via AgentHub}
+\label{ssec:agenthub}
+
+The \textbf{AgentHub} serves as the live runtime registry for the Intelligence Plane.
+It maintains capability-based discovery metadata — mapping capability identifiers
+(e.g., \texttt{"analyst"}, \texttt{"strategy"}) to the Ray Serve application handles
+and liveness state of the corresponding deployments.
+
+The current delegation path combines centralised discovery with direct invocation:
+when a caller needs to delegate to a specialist agent, it queries the AgentHub to
+resolve the target's current Serve handle, then invokes that handle directly.
+This design is therefore most accurately described as \emph{centralised discovery
+with direct Serve invocation}, rather than a fully decentralised service mesh with no
+central registry on the live path.
+The AgentHub's role is deliberately narrow — it stores discovery metadata and
+liveness information, not workflow state or message payloads — which keeps it
+lightweight and prevents it from becoming a data-plane bottleneck.
+
+When the Overseer respawns a crashed agent under its original deployment name, the
+AgentHub's next discovery cycle reflects the updated handle, ensuring that all
+subsequent delegations route to the recovered instance without manual reconfiguration.
+
+\subsection{Peer-to-Peer Delegation via SyncHandle}
+\label{ssec:synchandle}
+
+The \textbf{SyncHandle} provides a transparent, synchronous RPC wrapper around the
+peer-to-peer HTTP delegation mechanism.
+When the \texttt{StrategyAgent} requires sentiment data, it calls
+\texttt{self.delegate("sentiment", payload)}.
+Internally, the SyncHandle queries the AgentHub for the current address of the
+\texttt{SentimentAgent}'s Ray Serve deployment and executes a direct HTTP POST to that
+endpoint.
+The synchronous wrapper hides the underlying network call from the agent developer,
+presenting cross-agent delegation as a simple local function call.
+
+\subsection{TTL-Aware ContextStore}
+\label{ssec:contextstore}
+
+The \textbf{ContextStore} is a Redis-backed, distributed key-value store providing
+ephemeral shared memory for the agent swarm.
+It is used for storing intermediate reasoning outputs, trading signals, and scratchpad
+data that must be visible to multiple agents but do not belong in the permanent Delta
+Lake data lake.
+Every write to the ContextStore is assigned a configurable Time-to-Live (TTL).
+Upon expiry, the record is automatically evicted, ensuring that agents are never
+consuming stale context data.
+
+The ContextStore solves the Agent State Management Breakdown problem
+(Section~\ref{ssec:statebreakdown}) by providing a high-throughput, concurrent shared
+memory layer that is purpose-built for the I/O profile of an agent swarm.
+It explicitly rejects the alternative of writing all ephemeral agent state to Delta Lake,
+which would incur ACID transaction overhead for every scratchpad write and accumulate
+unbounded garbage data.
+
+\section{The Control Plane: System Overseer}
+\label{sec:control_plane}
+
+\subsection{The MAPE-K Autonomic Loop}
+\label{ssec:mapek_impl}
+
+The Control Plane implements the MAPE-K reference model \citep{kephart2003} as a
+continuous, asynchronous control loop that executes independently of the Ray compute
+cluster.
+The fundamental design principle is that a system cannot reliably heal itself if its
+healing mechanism shares the same failure domain as the system it monitors.
+All four phases of the loop — Monitor, Analyse, Plan, and Execute — therefore run as
+a standalone Python service in an isolated Kubernetes namespace, communicating with
+the Ray cluster only through its external HTTP Dashboard API.
+
+The loop executes on a configurable polling interval, currently set to 5 seconds in
+the deployed system.
+On each cycle, telemetry is collected from the managed resources, aggregated into a
+\textbf{SystemSnapshot}, and persisted to the \textbf{MetricsStore} (a Redis instance
+serving as the MAPE-K Knowledge base).
+The snapshot is then evaluated against a set of registered \emph{Policies}.
+Where a policy detects an anomaly, it produces a corrective \emph{Action}.
+Before execution, a \textbf{CooldownTracker} validates that the minimum interval
+between successive actions for the same resource has elapsed, preventing controller
+oscillation under high-volatility conditions.
+Approved actions are dispatched to the appropriate \emph{Actuator} for execution.
+Figure~\ref{fig:mapek_loop} illustrates the full loop.
+
+\begin{figure}[H]
+  \centering
+  \placeholder{Insert MAPE-K loop diagram showing the four phases:
+  Monitor (Collectors) $\rightarrow$ Analyse (Policies) $\rightarrow$
+  Plan (Action Selection) $\rightarrow$ Execute (Actuators),
+  with Knowledge (MetricsStore/Redis) connected to all phases.}
+  \caption{The MAPE-K autonomic control loop implemented by the Control Plane
+  (System Overseer).}
+  \label{fig:mapek_loop}
+\end{figure}
+
+\paragraph{Monitor Phase.}
+Telemetry is collected by concurrent \emph{Collectors}.
+The primary collector for this system is the \textbf{RayCollector}, which queries the
+Ray HTTP Dashboard API to retrieve the current state of all actor and Serve deployments.
+Any deployment in a \texttt{DEAD} or \texttt{UNHEALTHY} state is flagged for policy
+evaluation.
+A \textbf{PrefectCollector} supplements this by querying the Prefect API for the
+status of recent workflow runs, detecting pipelines that have stalled or are entering
+repeated failure cycles.
+The architecture supports additional collectors as extensibility points; for example,
+a \texttt{StreamCollector} could monitor consumer lag on streaming data sources, enabling
+demand-driven scaling of ingestion agents during high-volume periods.
+
+\paragraph{Analyse \& Plan Phase.}
+The SystemSnapshot is evaluated by registered \emph{Policies}.
+The core policy for the demo system is the \textbf{ActorHealthPolicy}: upon detecting
+that a Ray actor deployment has entered a \texttt{DEAD} state, it emits a
+\texttt{RESPAWN} action targeting that specific actor.
+The policy engine is designed for extensibility; additional policies can be registered
+without modifying the Overseer's core loop, allowing the system's self-management
+behaviour to evolve alongside the application's requirements.
+
+\paragraph{Execute Phase.}
+Corrective actions are executed by specialised \emph{Actuators}.
+The \textbf{RayActuator} handles deployment-level recovery: it reconciles the observed
+state of Ray Serve deployments against the desired state recorded in the durable agent
+catalog, programmatically respawning any deployment found to be absent or degraded.
+The target deployment's specification is resolved through the \textbf{Dynamic Agent
+Registry} — a configuration-driven mapping from capability identifiers to Ray Serve
+deployment definitions — decoupling the Control Plane entirely from the business logic
+of the Intelligence Plane.
+
+The \textbf{GatewayActuator} handles load management: it writes a
+\texttt{circuit\_open} flag to a shared Redis key polled by the Interface Layer's
+Shared Dispatch Utility on every incoming request, activating the circuit breaker
+mechanism described in Section~\ref{ssec:circuit_breaker}.
+The Overseer also emits structured alerts to notify operators of significant state
+transitions, supporting a hybrid human-autonomic operations model where automated
+recovery handles routine failures and human attention is reserved for anomalies outside
+the Overseer's policy scope.
+
+\subsection{Out-of-Band Watchdog Architecture}
+\label{ssec:watchdog}
+
+The Overseer is deployed as a standalone Python service in a dedicated Kubernetes
+namespace, completely isolated from the Ray cluster's namespace.
+It communicates with the Ray cluster via the Ray HTTP Dashboard API and the Ray
+Python client SDK's remote connection mode, rather than running as a Ray Actor within
+the managed cluster.
+
+This design ensures that the Overseer has no runtime dependency on the health of the
+Ray cluster it monitors.
+If the Ray Head Node experiences resource exhaustion, the Overseer continues to
+operate, detects the degraded state on its next polling cycle, and issues the
+appropriate recovery actions.
+
+The Overseer's demonstrated recovery scope in the current implementation is
+\emph{deployment-level reconciliation}: it normalises the observed state of Ray Serve
+deployments against a desired state derived from the durable agent catalog, and
+respawns any managed deployment that is found to be absent or degraded under its
+original stable deployment name.
+Reconciliation state is written back into the durable catalog after each cycle,
+ensuring that the desired deployment roster remains consistent with what the Overseer
+is actively managing.
+Recovery actions are complemented by alerting notifications and gateway circuit-breaker
+control, providing operators with both automated remediation and real-time visibility
+into control-plane activity.
+
+\subsection{Active Circuit Breaking}
+\label{ssec:circuit_breaker}
+
+The active circuit breaker implements a backpressure mechanism that protects the compute
+plane from being overwhelmed during traffic spikes.
+When a registered policy determines that the compute plane is falling behind its
+processing obligations — whether due to resource exhaustion, a cascade of agent crashes,
+or a sustained ingestion backlog — the GatewayActuator sets a \texttt{circuit\_open}
+flag in Redis.
+The Shared Dispatch Utility polls this flag on every incoming request.
+While the circuit is open, all non-health-check requests receive an immediate
+\texttt{503 Service Unavailable} response, shedding external load and allowing the
+compute plane to drain its backlog.
+Once the Overseer's next monitoring cycle confirms that the anomalous condition has
+resolved, the circuit is closed and normal operation resumes.
+
+This mechanism prevents the most common failure cascade in overloaded multi-agent systems:
+an initial burst of requests overwhelms the first agent, which routes all traffic to
+remaining agents, crashing them sequentially until the entire cluster is destroyed.
+By interposing a load-shedding gate at the Interface Layer, the circuit breaker
+decouples the system's external availability from its internal recovery process.
+
+% ============================================================
+%  CHAPTER 5: EVALUATION
+% ============================================================
+\chapter{Evaluation and Benchmarking}
+\label{ch:evaluation}
+
+\section{Evaluation Objectives and Approach}
+\label{sec:eval_objectives}
+
+The evaluation is structured around three complementary evidence types, reflecting
+the project's positioning as an integrated platform whose primary value lies in
+reducing operational burden rather than maximising a single performance axis.
+
+\begin{enumerate}
+  \item \textbf{Recorded End-to-End Showcase:} The Market Pulse demo
+  (Section~\ref{sec:market_pulse}) demonstrates coherent five-layer integration in a
+  single workflow. Its purpose is to show that the system functions as a unified
+  platform — not a manually stitched collection of scripts — and to make each layer's
+  contribution visible and naratable.
+  \item \textbf{Quantitative Benchmarks:} Two focused benchmarks support the
+  system's strongest technical novelty claims: Zero-Copy data handoff speedup
+  (Benchmark 1), and end-to-end tick-to-signal latency compared against
+  representative architectural baselines (Benchmark 2). A third benchmark
+  (Benchmark 3) evaluates autonomic recovery MTTR against manual intervention.
+  \item \textbf{Qualitative Workflow Comparisons:} Usability and accessibility claims
+  are evaluated through structured workflow comparisons between the proposed system
+  and conventional industry approaches, covering interface integration, data access,
+  observability, and extensibility.
+\end{enumerate}
+
+The evaluation is designed to answer four questions:
+(1) Does the system deliver measurably better data handoff performance than
+conventional serialisation-based approaches?
+(2) Is the integrated platform end-to-end responsive enough to be practically useful
+compared with simpler or more fragmented architectural alternatives?
+(3) Does the autonomic Control Plane reduce recovery time significantly relative to
+manual operator intervention?
+(4) Does the interface design reduce integration friction for the target user personas?
+
+The goal is not to prove universal dominance over the most mature enterprise platforms,
+but to demonstrate that the integrated architecture provides practically sufficient
+performance and resilience while substantially reducing deployment and operational
+complexity.
+
+The following assumptions apply to all quantitative benchmarks:
+
+\begin{itemize}
+  \item All benchmarks are conducted on the same bare-metal K0s cluster described in
+  Section~\ref{sec:infrastructure} to eliminate cloud-provider variability.
+  \item The JSON serialisation baseline uses Python's standard \texttt{json} library
+  to reflect the real-world default behaviour of most agent frameworks, not a
+  performance-optimised alternative.
+  \item End-to-end latency results are framed as \emph{practical sufficiency} rather
+  than universal superiority: the acceptable outcome is that the integrated platform
+  is not slower than conventional alternatives by a margin that would offset its
+  usability and integration advantages.
+  \item The final reported end-to-end benchmark (\S\ref{sec:exp_e2e}) was executed
+  across 5 fully live trials after the system had been stabilised end to end.
+  Results are reported as mean, standard deviation, median, minimum, maximum,
+  and P95 where relevant. Given the small sample size, the analysis emphasises
+  effect size and consistency rather than formal hypothesis testing.
+\end{itemize}
+
+\section{The Market Pulse Demonstration Scenario}
+\label{sec:market_pulse}
+
+The end-to-end integration showcase is built around the \textbf{Market Pulse} demo
+pipeline, which exercises all five architectural layers in a single submitted workflow.
+Market data and financial news are sourced from the \textbf{Financial Modeling Prep
+(FMP)} API via authenticated REST endpoints. The demo is structured as a
+\emph{recordable systems showcase} divided into distinct segments, each naratable
+to an evaluator audience; it is not treated as a live benchmark run.
+
+\subsection{Demo Flow}
+\label{ssec:demo_flow}
+
+The workflow is submitted as a Prefect top-level flow and executes remotely on the
+Ray cluster. The local machine acts only as the submission surface and result
+presentation interface, demonstrating that the system is a genuinely distributed
+platform rather than a locally executed script.
+
+\paragraph{Ingestion Subflow (\texttt{market\_pulse\_ingest}).}
+The \texttt{MarketPriceIngestService} runs as a stateful Ray service.
+It ingests live price ticks from the FMP API, maintains a bounded latest-window buffer,
+computes rolling market metrics (SMA-5, SMA-20, VWAP, return, volatility), and writes
+price state to Delta Lake.
+FMP news headlines for the target symbol are fetched through a separate ETL task path
+and written to Delta Lake.
+The ingest subflow returns the latest bounded market window, the computed
+\texttt{market\_state} metrics, and the fetched news records to the parent flow.
+
+\paragraph{Agent Coordination.}
+The top-level flow passes the headlines and \texttt{market\_state} to the
+\textbf{StrategyAgent}, which acts as the decision layer.
+The StrategyAgent delegates headline analysis to the \textbf{MarketAnalystAgent},
+the specialist news-analysis agent.
+The MarketAnalystAgent returns a sentiment assessment, which the StrategyAgent fuses
+with the market metrics to produce the final trading signal.
+The signal output includes: action, confidence score, sentiment label and score, and
+the market-state evidence fields that informed the decision — making the reasoning
+chain explicit and auditable.
+
+\paragraph{Persistence.}
+The signal is written to the ContextStore (TTL-bound ephemeral shared state) and to
+Delta Lake signal history (durable analytical record).
+
+\paragraph{Interface Layer Query Add-On.}
+A separate query pass demonstrates the Interface Layer by querying persisted signal
+history and recent price history through the gateway's REST endpoint
+(\texttt{POST /api/v1/intent}, \texttt{data} domain).
+This confirms that the Interface Layer exposes governed access to persisted, queryable
+state rather than merely surfacing transient in-memory results.
+
+\paragraph{Control Plane Recovery Add-On.}
+The Overseer is demonstrated separately by deleting a managed Ray Serve deployment and
+confirming that the Overseer restores it under the same deployment identity without
+manual intervention.
+
+\subsection{Claim-to-Evidence Mapping}
+\label{ssec:demo_claims}
+
+Table~\ref{tab:demo_claims} maps each demo segment to the architectural claim it
+supports.
+
+\begin{table}[H]
+  \centering
+  \caption{Claim-to-evidence mapping for the Market Pulse demo showcase.}
+  \label{tab:demo_claims}
+  \begin{tabularx}{\textwidth}{lX}
+    \toprule
+    \textbf{Demo Segment} & \textbf{Claim Supported} \\
+    \midrule
+    Ingest subflow and price service &
+    Stateful ETL and streaming state management within the unified Data Plane \\
+    \addlinespace
+    Agent coordination (StrategyAgent $+$ MarketAnalystAgent) &
+    Coordinated multi-agent intelligence with explainable, specialist delegation \\
+    \addlinespace
+    Delta Lake persistence &
+    Durable, queryable analytical storage co-located with agent execution \\
+    \addlinespace
+    Interface Layer query add-on &
+    Governed, protocol-agnostic access to persisted results \\
+    \addlinespace
+    Recovery add-on &
+    Deployment-level autonomic self-healing by the Control Plane \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Benchmark 1: Zero-Copy Shared Memory vs.\ JSON Serialisation}
+\label{sec:exp_zerocopy}
+
+\subsection{Claim and Baseline}
+\label{ssec:exp1_claim}
+
+This benchmark supports the claim that the Unified Fabric reduces data handoff
+overhead between ETL tasks and AI agents.
+The baseline reproduces the data-passing pattern used by conventional agent
+frameworks such as LangChain and AutoGen: a pandas DataFrame is serialised to JSON
+and posted to a local FastAPI endpoint, then deserialised at the receiving agent.
+This is the real-world default when data and inference components reside in separate
+processes or clusters.
+
+\subsection{Setup}
+\label{ssec:exp1_setup}
+
+Synthetic Arrow dataframes of four sizes are generated in memory:
+10,000 rows; 100,000 rows; 500,000 rows; and 1,000,000 rows.
+Each row represents one OHLC bar with six \texttt{float64} columns and one
+\texttt{timestamp} column.
+Transfer time is measured as the wall-clock duration from task completion to the
+receiving agent's first data access, for both the Zero-Copy path (Arrow
+\texttt{ObjectRef} via the Plasma Store) and the JSON-over-HTTP baseline.
+
+\subsection{Results}
+\label{ssec:exp1_results}
+
+The completed zero-copy benchmark validates the claim that the Unified Fabric
+substantially reduces data handoff overhead relative to a conventional
+serialisation-based path. The final benchmark was executed across 30 trials for each
+dataset size, and recorded both transfer latency and peak memory usage for the
+zero-copy path and the JSON-over-HTTP baseline.
+
+\begin{table}[H]
+  \centering
+  \caption{Zero-Copy vs.\ JSON serialisation data transfer time
+  (mean $\pm$ std, 30 trials).}
+  \label{tab:zerocopy_results}
+  \begin{tabular}{lrrr}
+    \toprule
+    \textbf{Dataset Size} &
+    \textbf{Zero-Copy (ms)} &
+    \textbf{JSON-over-HTTP (ms)} &
+    \textbf{Speedup} \\
+    \midrule
+    10,000 rows    & 60.65 $\pm$ 11.88 & 524.02 $\pm$ 215.33 & 8.64$\times$ \\
+    100,000 rows   & 264.12 $\pm$ 15.44 & 3660.88 $\pm$ 115.09 & 13.86$\times$ \\
+    500,000 rows   & 1176.17 $\pm$ 32.08 & 17594.12 $\pm$ 283.98 & 14.96$\times$ \\
+    1,000,000 rows & 2338.79 $\pm$ 41.32 & 35135.61 $\pm$ 1327.65 & 15.02$\times$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Analysis}
+\label{ssec:exp1_analysis}
+
+The results show a clear and monotonic divergence between the two handoff paths as
+dataset size increases. At 10,000 rows, the zero-copy path is already 8.64$\times$
+faster than the serialised baseline. By 1,000,000 rows, the relative benefit rises to
+15.02$\times$, with mean transfer latency of 2338.79\,ms for zero-copy compared with
+35135.61\,ms for the JSON-over-HTTP path. This confirms the expected asymmetry:
+pointer-based in-fabric handoff scales much more gracefully than repeated
+serialisation and deserialisation of large tabular payloads.
+
+Memory behaviour follows the same pattern. At 1,000,000 rows, the serialised baseline
+recorded mean peak memory usage of approximately 509.94\,MB, whereas the zero-copy
+path used 101.56\,MB on average. This is a substantial reduction in memory pressure,
+and is particularly relevant for AI-oriented workflows in which large analytical
+payloads must be exchanged repeatedly between ETL and reasoning stages.
+
+These results provide direct empirical support for the Unified Fabric design. They
+show that the advantage of co-locating ETL and agent execution is not merely a matter
+of architectural elegance, but a measurable systems-level improvement in both latency
+and memory efficiency once data volumes become non-trivial.
+
+\section{Benchmark 2: End-to-End Tick-to-Signal Latency}
+\label{sec:exp_e2e}
+
+\subsection{Claim and Baselines}
+\label{ssec:exp2_claim}
+
+This benchmark supports the claim that the integrated platform is practically
+responsive end to end, framed as \emph{practical sufficiency} rather than universal
+superiority.
+Two baselines are used:
+
+\begin{itemize}
+  \item \textbf{Plain sequential baseline:} A single-process Python script that
+  fetches live market data directly, computes market state locally, and invokes the
+  same analyst and strategy prompt logic in-process without Ray-hosted services or
+  distributed orchestration. This represents the lowest-integration-overhead
+  alternative available to a constrained team.
+  \item \textbf{Spark-plus-glue baseline:} A partially fragmented workflow in which
+  Apache Spark is used for data shaping and metric aggregation, but stage orchestration
+  remains manual Python glue code on the driver. The same reasoning prompts are used,
+  but without Ray-hosted agents or the integrated service fabric. This baseline
+  represents a more scalable yet more operationally fragmented alternative.
+\end{itemize}
+
+\subsection{Setup}
+\label{ssec:exp2_setup}
+
+The benchmark harness (\texttt{benchmark\_market\_pulse.py}) executes 5 repeated
+comparative trials for each of the three system configurations:
+\texttt{plain\_sequential}, \texttt{spark\_glue}, and
+\texttt{market\_pulse\_integrated}.
+For each trial, every system independently performs live news ingestion from the
+Financial Modeling Prep API and live price capture from the Binance websocket stream.
+This preserves operational realism while intentionally accepting normal
+internet-facing variability.
+
+Per trial, the benchmark records ingest duration, signal-generation duration,
+persistence duration, and total workflow duration for all systems. For the integrated
+workflow, two additional stages are recorded: agent setup and visibility publication.
+Each trial also records whether the news path or price path fell back to degraded
+operation. Only fully live trials are included in the final summary reported here.
+
+\subsection{Results}
+\label{ssec:exp2_results}
+
+\begin{table}[H]
+  \centering
+  \caption{End-to-end tick-to-signal latency comparison across three system
+  configurations (mean $\pm$ std, 5 fully live trials).}
+  \label{tab:e2e_results}
+  \begin{tabularx}{\textwidth}{Xrrr}
+    \toprule
+    \textbf{Stage} &
+    \textbf{Sequential (s)} &
+    \textbf{Spark + Glue (s)} &
+    \textbf{Integrated (s)} \\
+    \midrule
+    Ingest         & 5.96 $\pm$ 7.01 & 7.88 $\pm$ 0.10 & 13.18 $\pm$ 1.55 \\
+    Agent setup    & ---             & ---             & 13.90 $\pm$ 0.63 \\
+    Signal gen.    & 49.14 $\pm$ 40.73 & 37.95 $\pm$ 10.22 & 1.02 $\pm$ 0.03 \\
+    Persistence    & 0.24 $\pm$ 0.19 & 0.21 $\pm$ 0.13 & 0.26 $\pm$ 0.02 \\
+    \midrule
+    \textbf{Total} &
+    55.34 $\pm$ 39.46 & 48.38 $\pm$ 9.83 & 30.47 $\pm$ 1.74 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Analysis}
+\label{ssec:exp2_analysis}
+
+The completed benchmark produced a stronger outcome than the minimum target stated in
+Section~\ref{ssec:exp2_claim}: the integrated workflow was not merely ``close enough''
+to the baselines, but was the fastest configuration on mean end-to-end latency.
+Across 5 fully live trials, the integrated system achieved a mean total latency of
+30.47\,s, compared with 48.38\,s for the Spark-plus-glue baseline and 55.34\,s for the
+plain sequential baseline.
+
+This corresponds to the plain baseline being 1.82$\times$ slower than the integrated
+system on mean total latency, and the Spark-plus-glue baseline being 1.59$\times$
+slower. The integrated system also exhibited the tightest latency distribution
+(standard deviation 1.74\,s), whereas the plain baseline showed substantial volatility
+(39.46\,s), including an outlier trial at 122.18\,s.
+
+The stage breakdown explains this result. The integrated workflow pays explicit cost in
+ingest (13.18\,s) and agent setup (13.90\,s), reflecting the overhead of the full
+distributed pipeline and agent lifecycle. However, once these stages complete, the
+final signal-generation step is extremely small and stable: 1.02\,s on average.
+By contrast, the baselines spend most of their total time in the signal stage
+(49.14\,s for the plain baseline and 37.95\,s for Spark + Glue), indicating that the
+absence of persistent orchestration and service reuse pushes more work into each
+individual reasoning pass.
+
+Persistence cost remained modest for all three systems, staying below 0.3\,s on average.
+This is an important practical finding: the integrated platform's durability and
+observability features did not dominate the latency budget. Instead, the primary
+performance advantage came from architectural consolidation of coordination and
+reasoning, rather than from omitting persistence or simplifying the workload.
+
+\section{Benchmark 3: Autonomic Recovery MTTR}
+\label{sec:exp_mttr}
+
+\subsection{Claim and Baseline}
+\label{ssec:exp3_claim}
+
+This benchmark supports the claim that the Control Plane provides meaningful
+autonomic recovery, validated against \emph{manual operator recovery} as the baseline.
+Manual recovery is the appropriate baseline for this project's target audience:
+constrained teams operating without a dedicated on-call automation function.
+The comparison quantifies how much faster the Overseer recovers a failed deployment
+relative to a human operator performing the equivalent restore procedure.
+
+\subsection{Setup}
+\label{ssec:exp3_setup}
+
+A managed Ray Serve deployment is deleted while the Market Pulse pipeline is running,
+simulating an unclean application-level failure.
+Critically, the underlying Kubernetes pod continues running throughout: only the Serve
+deployment is removed, not the container.
+This isolates the application-level failure scenario that Kubernetes native health
+checks cannot detect.
+
+Two recovery conditions are measured over 30 trials each:
+
+\begin{itemize}
+  \item \textbf{Overseer MTTR:} The Overseer's MAPE-K loop is active at a 5-second
+  polling interval. MTTR is the elapsed time from deployment deletion to confirmed
+  restoration of the same-name deployment, as reported by the Overseer's
+  reconciliation log.
+  \item \textbf{Manual MTTR:} The Overseer is disabled. A human operator monitors
+  the Ray dashboard for the failure state and manually triggers restoration via the
+  same deploy command the Overseer would have used. MTTR is timed from deletion to
+  confirmed restoration. This is measured using a realistic operator simulation
+  with a brief but non-zero detection and response window.
+\end{itemize}
+
+\subsection{Results}
+\label{ssec:exp3_results}
+
+The final MTTR benchmark was executed as a 30-trial comparison between Overseer-driven
+recovery and a scripted manual recovery baseline under the same failure model. In each
+trial, a managed \texttt{SupportAgent} deployment was deliberately removed, and
+recovery time was measured from deletion until the service became usable again. The
+manual baseline includes a sampled operator reaction delay, making it a repeatable
+human-shaped recovery model rather than a literal human reflex measurement.
+
+\begin{table}[H]
+  \centering
+  \caption{Autonomic vs.\ manual recovery MTTR (mean $\pm$ std, 30 trials each).}
+  \label{tab:mttr_results}
+  \begin{tabular}{lrr}
+    \toprule
+    \textbf{Metric} &
+    \textbf{Overseer MTTR (s)} &
+    \textbf{Manual MTTR (s)} \\
+    \midrule
+    Mean  & 4.61 $\pm$ 0.10 & 13.39 $\pm$ 3.06 \\
+    Min   & 4.37 & 9.23 \\
+    Max   & 4.91 & 18.84 \\
+    P95   & 4.75 & 18.01 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Analysis}
+\label{ssec:exp3_analysis}
+
+The final results show that Overseer restores service substantially faster and with
+lower variance than the manual baseline. Across 30 trials, Overseer achieved a mean
+MTTR of 4.61\,s with a P95 of 4.75\,s, while the manual baseline recorded a mean of
+13.39\,s and a P95 of 18.01\,s. This corresponds to manual recovery being
+2.91$\times$ slower than autonomic recovery, or equivalently, a 65.59\% improvement in
+service-restoration time for the Overseer path.
+
+The most important interpretation is not merely that Overseer is faster, but that it
+is both faster and markedly more consistent. Manual recovery includes a human-shaped
+reaction delay before redeployment begins, producing much wider spread in the observed
+MTTR. Overseer eliminates this source of variance by reacting as soon as its control
+loop detects the missing deployment.
+
+One nuance is that the benchmark measures time-to-usable-service rather than
+time-to-final-control-plane-convergence. In the raw Overseer trial records, the probe
+response is already valid even though some internal catalog fields may still briefly
+report a \texttt{recovering} or \texttt{degraded} state. This should be interpreted as
+a short lag in control-plane reconciliation, not as a failed recovery. For the target
+use case of restoring service availability for constrained teams without dedicated
+operations staff, time-to-usable-service is the more practically important measure.
+
+\section{Qualitative Evaluation: Usability and Interface Accessibility}
+\label{sec:exp_usability}
+
+A central motivation of this project, stated in Objective~\textbf{O3}, is to reduce
+the \emph{integration friction} associated with accessing high-performance AI
+infrastructure.
+The quantitative benchmarks validate internal performance characteristics; this section
+evaluates whether the Interface Layer delivers on the accessibility claim through
+\emph{workflow comparison}: for each user persona, the task workflow required by the
+conventional industry approach is contrasted against the workflow enabled by the
+proposed system.
+Accessibility is assessed qualitatively, as the meaningful measure here is the
+reduction in steps, coupling, and coordination overhead — dimensions not well captured
+by a single latency figure.
+
+\subsection{Evaluation Dimensions}
+\label{ssec:usability_dimensions}
+
+Four dimensions of accessibility are assessed, each targeting a distinct user persona:
+
+\begin{enumerate}
+  \item \textbf{AI Client Interoperability:} Does the system allow an external AI
+  client to invoke Lakehouse capabilities without writing a custom integration,
+  compared with the conventional point-to-point REST connector approach?
+  \item \textbf{Direct Data Access:} Does the \texttt{BrokerAdapter} reduce the steps
+  required for a data scientist to obtain a working connection to the raw storage
+  layer, compared with requesting credentials from an infrastructure team?
+  \item \textbf{Unified Observability:} Does the Bouncer pattern reduce the
+  authentication and navigation overhead required to monitor a running workflow across
+  multiple infrastructure tools?
+  \item \textbf{Plugin Extensibility:} Does the plugin contract architecture reduce
+  the coupling cost of adding a new component, compared with extending a
+  tightly-coupled conventional data platform?
+\end{enumerate}
+
+\subsection{AI Client Interoperability}
+\label{ssec:mcp_usability}
+
+\paragraph{Conventional workflow.}
+Connecting an external AI client to a proprietary data platform typically requires
+implementing a client-specific REST connector, handling authentication and error cases,
+and maintaining that connector as the platform API evolves. With $N$ AI clients and
+$M$ data systems, this produces $N \times M$ custom connectors --- the integration
+problem that motivated the development of MCP \citep{anthropic2024mcp}.
+
+\paragraph{Proposed system workflow.}
+As described in Section~\ref{sec:interface_layer}, and particularly in the Shared
+Dispatch and intent-routing design of Section~\ref{ssec:shared_dispatch} and
+Section~\ref{ssec:intent_routing}, the Lakehouse Interface Layer is protocol-agnostic
+by construction. REST requests and MCP tool invocations are both translated into the
+same standardised \texttt{UserIntent} structure and routed through the same shared
+governance and adapter pipeline.
+
+This architectural choice yields a qualitative interoperability benefit that is more
+important than any single deployment mode: integrating a new AI-facing interface does
+not require re-implementing business logic, routing semantics, or governance checks.
+Instead, a new interface need only perform protocol translation into
+\texttt{UserIntent}, after which it inherits the existing dispatch, RBAC, audit, and
+domain-adapter behaviour automatically.
+
+In the current implementation, MCP was validated as an alternate standards-based
+interface over this shared execution path. This demonstrates the flexibility and
+extensibility of the Interface Layer: the system's capabilities are exposed through a
+stable internal contract rather than being tightly coupled to one external protocol or
+client.
+
+\paragraph{Workflow comparison.}
+
+\begin{table}[H]
+  \centering
+  \caption{AI client integration workflow: conventional vs.\ proposed.}
+  \label{tab:mcp_workflow}
+  \begin{tabularx}{\textwidth}{lXX}
+    \toprule
+    \textbf{Step} &
+    \textbf{Conventional (custom REST connector)} &
+    \textbf{Proposed (MCP)} \\
+    \midrule
+    1 & Study platform API documentation & Configure an MCP-capable client against the Lakehouse interface \\
+    2 & Implement authentication handler & Provide API key \\
+    3 & Write endpoint-specific request builders & --- \\
+    4 & Write response parsers and error handlers & --- \\
+    5 & Test and deploy connector & --- \\
+    6 & Repeat for each new AI client & Any MCP client connects immediately \\
+    \midrule
+    \textbf{Coupling} &
+    Tightly coupled to platform API version &
+    Decoupled via MCP schema contract \\
+    \textbf{Maintenance} &
+    Update connector on every API change &
+    No connector to maintain \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Direct Data Access}
+\label{ssec:broker_usability}
+
+\paragraph{Conventional workflow.}
+A data scientist requiring direct storage access submits a request to the
+infrastructure team, who manually provision credentials, communicate them via a secure
+channel, and separately manage revocation when access is no longer needed.
+This process typically involves multiple business days of lead time and produces
+long-lived credentials requiring manual lifecycle management \citep{mckinsey2024}.
+
+\paragraph{Proposed system workflow.}
+An authenticated user sends a single \texttt{POST /broker/credentials} request.
+The \texttt{BrokerAdapter} returns connection credentials for the requested storage
+resource, which the user applies directly in their local tool (DBeaver, Jupyter,
+Tableau).
+
+\paragraph{Workflow comparison.}
+
+\begin{table}[H]
+  \centering
+  \caption{Data scientist storage access workflow: conventional vs.\ proposed.}
+  \label{tab:broker_workflow}
+  \begin{tabularx}{\textwidth}{lXX}
+    \toprule
+    \textbf{Step} &
+    \textbf{Conventional (manual provisioning)} &
+    \textbf{Proposed (BrokerAdapter)} \\
+    \midrule
+    1 & Submit access request to infra team & Send \texttt{POST /broker/credentials} \\
+    2 & Wait for manual review (days)       & Receive credentials immediately \\
+    3 & Receive credentials via secure channel & Connect tool using returned credentials \\
+    4 & Configure tool manually             & --- \\
+    5 & Submit separate revocation request  & --- \\
+    \midrule
+    \textbf{Lead time}  & Multiple business days & $<$1 second \\
+    \textbf{Governance} & Manual, error-prone    & Audited, single access point \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Unified Observability}
+\label{ssec:bouncer_usability}
+
+\paragraph{Conventional workflow.}
+Each infrastructure component exposes its own proprietary authentication on a separate
+port or hostname. An operator monitoring a running pipeline must maintain separate
+credentials for each tool and context-switch between multiple browser sessions —
+the ``URL hopping'' pattern that characterises traditional data engineering
+environments \citep{Bornstein2023}.
+
+\paragraph{Proposed system workflow.}
+A single JWT-authenticated session grants access to all internal observability tools
+through a unified URL namespace: \texttt{/prefect}, \texttt{/ray}, \texttt{/minio}.
+
+\paragraph{Workflow comparison.}
+
+\begin{table}[H]
+  \centering
+  \caption{Observability workflow: conventional vs.\ proposed (Bouncer).}
+  \label{tab:bouncer_workflow}
+  \begin{tabularx}{\textwidth}{lXX}
+    \toprule
+    \textbf{Tool} &
+    \textbf{Conventional} &
+    \textbf{Proposed (Bouncer)} \\
+    \midrule
+    Prefect Dashboard &
+    Separate credentials, separate port & Single JWT, \texttt{/prefect} \\
+    Ray Dashboard &
+    Separate credentials, separate port & Single JWT, \texttt{/ray} \\
+    MinIO Console &
+    Separate credentials, separate port & Single JWT, \texttt{/minio} \\
+    \midrule
+    \textbf{Auth sessions required}          & 3 & 1 \\
+    \textbf{Credential sets to manage}       & 3 & 1 \\
+    \textbf{Context switches per pipeline}   & 3 & 0 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Plugin Extensibility}
+\label{ssec:extensibility_eval}
+
+\paragraph{Conventional workflow.}
+In a tightly-coupled data platform, adding a new storage backend or data source
+typically requires modifying the core orchestration layer, updating routing logic,
+adding conditional branches to existing pipeline code, and re-testing all affected
+pipelines — the structural root cause of the ``Pipeline Jungle'' antipattern
+\citep{sculley2015hidden}.
+
+\paragraph{Proposed system workflow.}
+New components are activated by implementing the prescribed abstract interface and
+registering the new class via a configuration entry or startup registry call.
+No existing pipeline or system file requires modification.
+
+\paragraph{Workflow comparison.}
+
+\begin{table}[H]
+  \centering
+  \caption{Extension workflow: conventional vs.\ proposed (plugin contracts).}
+  \label{tab:extensibility_results}
+  \begin{tabularx}{\textwidth}{lXll}
+    \toprule
+    \textbf{Plane} &
+    \textbf{Extension Scenario} &
+    \textbf{Conventional} &
+    \textbf{Proposed} \\
+    \midrule
+    Data Plane &
+    Add \texttt{TimescaleDBSource} &
+    Modify pipeline router &
+    Implement interface, add config \\
+    \addlinespace
+    Data Plane &
+    Add \texttt{IcebergSink} &
+    Modify sink dispatch logic &
+    Implement interface, add config \\
+    \addlinespace
+    Intelligence Plane &
+    Add \texttt{RiskAgent} &
+    Update hub routing table &
+    Deploy via Ray Serve, register \\
+    \addlinespace
+    Control Plane &
+    Add \texttt{TimescaleCollector} &
+    Modify monitoring loop &
+    Implement interface, register \\
+    \addlinespace
+    Interface Layer &
+    Add Slack interface &
+    Write full adapter &
+    Write \texttt{UserIntent} parser only \\
+    \midrule
+    \multicolumn{2}{l}{\textbf{Core files modified (any scenario)}} &
+    $\geq$1 existing file &
+    0 existing files \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+In the implemented architecture, the proposed extension path requires zero
+modifications to existing core files for the common cases listed above: new
+behaviour is introduced by implementing the relevant abstract contract and
+registering the component, rather than by editing an existing router, monitor
+loop, or pipeline dispatch file.
+
+\subsection{Discussion of Usability Findings}
+\label{ssec:usability_discussion}
+
+The workflow comparisons across all four dimensions consistently demonstrate that the
+proposed system reduces the number of steps, the degree of coupling, and the
+coordination overhead required for each user persona.
+For \emph{AI agent developers}, MCP eliminates the $N \times M$ connector problem,
+replacing per-client custom code with a single standard protocol.
+For \emph{data scientists}, the BrokerAdapter replaces a multi-day provisioning
+process with a self-service API call.
+For \emph{platform operators}, the Bouncer pattern reduces three independent
+credential contexts to one.
+For \emph{platform developers}, the plugin contract architecture means new
+capabilities can be added with zero modifications to existing files, preventing the
+accumulation of coupling debt over time.
+
+Taken together, these comparisons validate the system's core accessibility claim:
+that high-performance AI infrastructure does not require disproportionate integration
+effort when it is designed around the right abstraction boundaries from the outset.
+
+The absence of embedded screenshots does not materially weaken the workflow
+argument, because the core claim being evaluated is reduction in integration steps
+and coupling rather than user-interface aesthetics. The tables above therefore act
+as the primary evidence artefact for usability in the current report, while richer
+visual walkthroughs remain suitable additions for a presentation appendix.
+
+\section{Discussion and Analysis}
+\label{sec:eval_discussion}
+
+\iffalse
+\placeholder{Write a synthesising discussion connecting all three benchmarks and
+the qualitative evaluation to the system's design objectives
+(O1--O5 from Section~\ref{sec:objectives}). Address:
+(1) the Zero-Copy benchmark as evidence for the Unified Fabric's data handoff
+advantage (Benchmark 1);
+(2) the end-to-end latency results as evidence of practical sufficiency relative to
+simpler and more fragmented alternatives (Benchmark 2);
+(3) the MTTR comparison as evidence that the Control Plane provides meaningful
+operational value for constrained teams (Benchmark 3);
+(4) the qualitative workflow comparisons as evidence that the interface design
+achieves its accessibility goals across all four user personas; and
+(5) any unexpected findings or scope limitations observed during evaluation.
+Emphasise that the evaluation is designed to answer whether the integrated platform
+is \emph{good enough to be useful} across all axes — not whether it dominates
+the most mature enterprise alternatives on any single axis.}
+
+\fi
+
+Taken together, the completed evaluation supports the dissertation's central claim
+that the AI-Native Lakehouse is best understood as an integrated \emph{operational}
+advance rather than as an isolated micro-optimisation. The strongest quantitative
+evidence comes from Benchmark~2, where the integrated system was both the fastest and
+the most stable configuration under fully live conditions. This directly supports
+Objective~\textbf{O1} (Unified Compute Fabric) and Objective~\textbf{O2}
+(low-friction handoff between data processing and agent reasoning): the architecture
+reduced end-to-end latency not by removing stages, but by structuring them so that
+expensive reasoning work was not paid repeatedly in each trial.
+
+The benchmark also supports Objective~\textbf{O4} (Hybrid Execution Model). Several
+of the most important engineering corrections made during the evaluation campaign
+concerned runtime-boundary management rather than algorithmic logic: service-side
+context cleanup had to be executed where cluster-local Redis resolution was valid;
+Delta Lake overwrite operations had to be coalesced to avoid self-conflicting
+distributed commits; and CA handling for MinIO-backed Delta Lake operations had to be
+scoped narrowly so as not to poison unrelated public HTTPS traffic. These observations
+reinforce the dissertation's argument that an AI-native data platform must solve
+\emph{execution-environment} integration as carefully as model orchestration.
+
+Objective~\textbf{O3} (Protocol-Agnostic Gateway) and the broader accessibility claim
+are supported qualitatively by the workflow comparisons. Across AI clients, data
+scientists, operators, and platform developers, the proposed system consistently
+reduces the number of required steps and the amount of coordination with
+infrastructure experts. Even where quantitative user-study evidence is not yet
+available, the reduction in connector writing, credential management, and cross-tool
+context switching is concrete and architecturally grounded.
+
+Objective~\textbf{O5} (Autonomic Self-Healing) is only partially quantified in the
+final report. The operational behaviour of the recovery path was repeatedly exercised
+during system bring-up, but a full controlled MTTR campaign was not completed in time
+for inclusion in the final quantitative results. This is a genuine limitation of the
+current evaluation. Accordingly, the evidence for the Control Plane should be
+interpreted as implementation validation and observed recovery capability, rather than
+as a finished statistical benchmark.
+
+More broadly, the evaluation surfaced an important practical lesson: in integrated AI
+systems, correctness and reproducibility can be threatened by subtle cross-layer
+issues that are invisible in simplified toy benchmarks. Certificate-scoping mistakes,
+stale runtime services, distributed overwrite semantics, and image-layer staleness all
+had material impact on observed behaviour during the experimental campaign. While
+these issues increased the engineering effort required to reach a stable benchmark
+state, they also strengthen the relevance of the dissertation: they are precisely the
+kinds of integration failures that a unified platform aims to reduce.
+
+For this reason, the evaluation should be read through the lens of \emph{practical
+sufficiency}. The question is not whether the proposed system dominates every mature
+specialised tool on every axis. The more important result is that the integrated
+platform was fast enough to be useful, operationally simpler than fragmented
+alternatives, and capable of sustaining fully live end-to-end execution without
+falling back to degraded modes during the final benchmark campaign.
+
+\section{Threats to Validity}
+\label{sec:threats}
+
+\paragraph{Internal Validity.}
+All quantitative benchmarks are conducted in a controlled, single-cluster environment.
+The JSON baseline uses a single-process HTTP server; a highly optimised multi-threaded
+HTTP server might reduce the JSON penalty in Benchmark 1.
+The end-to-end Spark-plus-glue baseline is a representative implementation but not
+a production-grade Spark deployment; results may not fully reflect Spark's performance
+at larger scale.
+
+\paragraph{External Validity.}
+Results are measured on a specific bare-metal hardware configuration.
+Cloud-deployed clusters with different network topologies may exhibit different
+absolute latencies, though the relative trends — Zero-Copy advantage, MTTR reduction,
+per-stage breakdown — are expected to hold.
+
+\paragraph{Construct Validity.}
+Overseer MTTR is measured from deployment deletion to restoration confirmation.
+In a production system, full recovery might additionally require the agent to
+re-warm in-context state.
+This is not measured, representing a lower bound on true MTTR.
+For the qualitative usability evaluation, the workflow comparisons confirm functional
+correctness and step-count reduction but do not measure user task completion time or
+error rate across a participant sample.
+A structured usability study with multiple participants would provide stronger
+external validity for the accessibility claims.
+% ============================================================
+%  CHAPTER 6: CONCLUSION
+% ============================================================
+\chapter{Conclusion}
+\label{ch:conclusion}
+
+\section{Summary of Contributions}
+\label{sec:summary}
+
+This dissertation has presented the AI-Native Lakehouse System, a novel distributed
+platform that collapses the traditional separation between data engineering and AI
+inference infrastructure into a single, cohesive Unified Fabric.
+Five architectural planes were designed, implemented, and evaluated:
+
+The \textbf{Interface Layer} provides a protocol-agnostic gateway supporting REST and
+MCP natively, with a centralised Shared Dispatch Utility enforcing governance and
+observability for all traffic, regardless of origin.
+
+The \textbf{Compute Plane} unifies ETL orchestration and AI agent execution on a single
+Ray/Prefect substrate.
+The discovery and resolution of the Rust Tokio/Ray asynchronous runtime conflict via the
+Hybrid Execution Model represents a novel engineering contribution addressing a real
+incompatibility in the bleeding-edge distributed AI stack.
+
+The \textbf{Data Plane} provides a standardised, schema-evolving ETL framework with
+stateful micro-batching, eliminating the Pipeline Jungle antipattern and ensuring the
+data catalogue is continuously self-documenting.
+
+The \textbf{Intelligence Plane} hosts agents as a decentralised Ray Serve service mesh,
+replacing the centralised hub-and-spoke coordination bottleneck with peer-to-peer
+HTTP delegation and enabling genuinely concurrent agent execution.
+
+The \textbf{Control Plane} implements a MAPE-K autonomic loop as an out-of-band
+watchdog, providing self-healing, elastic scaling, and active circuit breaking — the
+first application of the MAPE-K pattern to the specific failure modes of an AI agent
+swarm infrastructure.
+
+Empirical evaluation validated these contributions across four dimensions:
+the Zero-Copy mechanism demonstrated a substantial reduction in data transfer overhead
+relative to JSON serialisation; the MAPE-K loop achieved autonomous actor recovery
+within a target window suitable for production financial workloads; the Ray Serve
+service mesh exhibited sub-linear latency growth under increasing concurrent delegation
+load; and the Interface Layer successfully enabled MCP-based AI client interoperability,
+direct-access credential vending, and unified dashboard access — confirming the
+system's accessibility claims across diverse operator personas.
+
+\section{Commercial Potential}
+\label{sec:commercial}
+
+The system exhibits strong commercial potential in two distinct modes.
+
+\textbf{Enterprise AI Infrastructure:}
+The Unified Fabric architecture directly addresses the 40--60\% middleware overhead
+identified by \citet{mckinsey2024}.
+An enterprise deploying this system to replace a fragmented Airflow/Spark (ETL) plus
+LangChain/Kubernetes (AI) stack would eliminate two separate infrastructure stacks, two
+separate monitoring pipelines, and all the bespoke network glue code between them.
+The total cost of ownership reduction could be substantial for organisations with
+dedicated data engineering and AI platform teams.
+
+\textbf{Developer Platform (via Direct Access Vending):}
+The \texttt{BrokerAdapter}'s credential vending mechanism enables a multi-tenant
+\emph{data-as-a-service} model: a platform operator maintains the Lakehouse
+infrastructure and grants authenticated data consumers short-lived, scoped credentials
+to query the raw storage directly.
+This model, analogous to Snowflake's data sharing or Databricks' Unity Catalog
+external sharing, enables monetisation of curated, governed datasets without exposing
+the underlying infrastructure.
+
+\section{Limitations}
+\label{sec:limitations}
+
+The limitations of the present system largely reflect deliberate trade-offs in scope.
+This project prioritised demonstrating a coherent end-to-end architecture spanning
+data engineering, agent execution, governed access, and autonomic recovery.
+Several production-oriented capabilities were intentionally deferred to keep the
+implementation focused on validating the core architectural claims.
+
+First, the system's scalability is bounded by the capacity of the Ray Head Node, which
+serves as the single coordinator for all task scheduling and object store metadata.
+A failure or saturation of the Head Node would impair scheduling for the entire cluster.
+Future work should explore multi-head or federated Ray cluster topologies.
+
+Second, the Overseer's control loop runs on a polling model at a 5-second interval.
+For failure modes requiring sub-second reaction — such as an abrupt streaming source
+disconnect — this granularity is insufficient.
+A reactive, event-driven mechanism complementing the current polling loop would reduce
+MTTR for time-critical failures without abandoning the polling model for routine
+health assessment.
+
+Third, the system currently supports only Python-based agents.
+The growing ecosystem of Rust and Go AI agent libraries cannot participate in the
+Intelligence Plane without a language interoperability bridge.
+
+Fourth, the \texttt{BrokerAdapter} currently returns pre-configured connection
+credentials rather than short-lived, scoped tokens.
+This is sufficient to demonstrate the direct-access pattern but falls short of the
+security posture required for multi-tenant enterprise deployment, where over-privileged
+long-lived credentials represent a meaningful risk.
+
+Fifth, RisingWave is present in the architecture as a partially integrated capability.
+Deployment scaffolding and an ETL adapter exist in the codebase, but the final
+evaluated workflow path does not operationalize RisingWave as a first-class runtime
+dependency.
+The resulting gap is one of incomplete operational integration rather than
+architectural incompatibility; fully exercising RisingWave would require additional
+orchestration utilities, stream materialization management, and revised evaluation
+methodology.
+
+\section{Future Work}
+\label{sec:future_work}
+
+Future work should focus on deepening the maturity of the system's existing layers
+rather than broadening its conceptual scope. The most impactful next steps are those
+that improve operational robustness, security, observability, and scalability while
+preserving the architectural principles already validated in this work. The enhancements
+below were intentionally deferred because the present project prioritised validating
+the unified five-layer architecture and end-to-end integration over deep optimisation
+of any single subsystem.
+
+\textbf{Automated Tokio Conflict Detection (\texttt{@io\_safe} Decorator):}
+The Hybrid Execution Model currently requires the developer to manually identify which
+tasks perform Delta Lake I/O and apply the \texttt{.local()} override.
+An \texttt{@io\_safe} decorator that automatically detects Tokio-conflicting library
+calls at task submission time and transparently reroutes them to the Head Node would
+eliminate this manual burden and prevent silent regressions when new Rust-backed
+libraries are introduced into the pipeline.
+Implementing this would likely involve static analysis of the task's import graph at
+decoration time to identify known Tokio-dependent packages.
+
+\textbf{Gateway Architecture: Command/Data Plane Separation and Concurrent Execution:}
+The current Interface Layer routes all request types — lightweight control commands
+(e.g., querying cluster health, listing tables) and heavyweight data operations
+(e.g., triggering a full ETL pipeline run or submitting a large agent inference job)
+— through the same synchronous dispatch path.
+This conflation introduces two related limitations.
+First, a burst of resource-intensive data requests can saturate the Gateway's processing
+capacity and delay the handling of lightweight control commands, degrading operator
+visibility precisely when it is most needed.
+Second, the current dispatch model does not natively support multiple concurrent
+long-running executions: a second pipeline trigger issued while a prior run is in
+progress will queue behind it rather than executing in parallel.
+Separating the Gateway into a \emph{Command Plane} — handling fast, stateless control
+operations through a lightweight synchronous path — and a \emph{Data Plane} — managing
+long-running, resource-intensive operations through an asynchronous job queue backed by
+a dedicated worker pool — would resolve both limitations.
+Under this model, a control command would always return within a bounded, predictable
+latency regardless of data plane load, and concurrent pipeline executions would be
+dispatched to independent workers up to a configurable parallelism limit.
+This architectural separation mirrors the command/data plane split found in mature
+network and cloud infrastructure systems, and would significantly improve the Gateway's
+suitability for high-throughput production environments.
+
+\textbf{Advanced AgentHub with Intelligent Load Balancing and Skill Marketplace:}
+The current AgentHub functions as a straightforward service registry.
+A more sophisticated implementation would evolve it into a full \emph{agent
+orchestration hub} with several enhancements.
+First, intelligent load balancing that routes delegation requests not merely to the
+healthiest replica but to the replica with the lowest queue depth and most available
+GPU memory, reducing tail latency under heterogeneous workloads.
+Second, per-agent telemetry collection — tracking invocation counts, inference latency
+distributions, error rates, and memory consumption — providing the data necessary for
+informed scaling decisions and SLA monitoring.
+Third, resource protection mechanisms such as per-agent rate limits and concurrency
+caps to prevent a single high-traffic agent from monopolising cluster resources at the
+expense of lower-priority agents.
+Fourth, agent lineage tracking: a record of which agent invoked which downstream
+agents, with what payloads, producing what outputs — providing full observability into
+the reasoning chain of a multi-step agent workflow and enabling post-hoc debugging of
+incorrect conclusions.
+Finally, a \emph{Skill Marketplace}: a versioned registry of reusable agent
+capabilities that teams can publish, discover, and import as dependencies, enabling
+agent reuse across projects in a manner analogous to a package manager.
+
+\textbf{Improved Observability via Prometheus and Grafana Integration:}
+The current Overseer writes system snapshots to a Redis MetricsStore, which is
+accessible to the Gateway but not natively visualisable.
+Exporting Collector telemetry as Prometheus metrics would allow the existing
+open-source observability stack — Prometheus for time-series metric ingestion and
+Grafana for dashboard rendering — to be integrated without custom visualisation code.
+This would provide operators with real-time dashboards showing actor health, pipeline
+throughput, delegation latency distributions, circuit breaker state, and Overseer
+action history, all in a familiar interface.
+Combined with Grafana alerting, this would enable proactive notification of degraded
+conditions before the Overseer's autonomous recovery is triggered, supporting a
+hybrid human-autonomic operations model.
+
+\textbf{Advanced RAG Integration via MilvusSink:}
+The current Milvus integration stores embeddings but does not expose a full
+Retrieval-Augmented Generation (RAG) pipeline to agents.
+Implementing a \texttt{MilvusSink} that automatically chunks, embeds, and indexes
+incoming documents, paired with a corresponding \texttt{RAGDataSource} that retrieves
+semantically relevant context at inference time, would significantly enhance agent
+reasoning quality for document-heavy domains such as regulatory compliance analysis or
+earnings report processing.
+
+\textbf{Multi-Cluster and Federated Deployment:}
+Extending the architecture to support federated Ray clusters across multiple data
+centres would enable geographically distributed agent teams to share data via the
+Apache Arrow IPC Flight protocol while maintaining local data sovereignty.
+This would be particularly valuable for financial institutions operating under
+data-residency regulations that prohibit cross-border data transfer.
+
+\textbf{Short-Lived Scoped Broker Credentials:}
+The current \texttt{BrokerAdapter} returns pre-configured connection credentials,
+which is sufficient to demonstrate the direct-access vending pattern but does not
+provide the tenant isolation and security posture required for enterprise deployment.
+A future enhancement would replace the static credential return with a proper
+token-vending mechanism that issues short-lived, scoped credentials tied to the
+requesting user's RBAC profile and expiring automatically after use.
+This was deferred because the current implementation already validates the
+architectural pattern; secure token vending would require a broader identity, policy,
+and secrets management design that would shift the project's focus from system
+architecture into IAM engineering.
+
+\textbf{Full RisingWave Operationalization:}
+RisingWave is architecturally provisioned as a streaming-state and materialization
+layer within the Data Plane, with deployment scaffolding and an ETL source adapter
+already present in the codebase.
+Future work should complete its integration by adding stream materialization lifecycle
+utilities, orchestration support for downstream batch and agent consumption, and
+benchmark paths that quantify the benefit of an explicit streaming-state layer
+relative to the current direct-to-Delta ingestion workflow.
+This was deferred to preserve dissertation scope; fully integrating RisingWave would
+have created a second major engineering track alongside the core unified-architecture
+contribution.
+
+\textbf{Formal Verification of the Control Plane:}
+Applying formal methods (e.g., TLA+ model checking) to the MAPE-K loop's policy engine
+would provide mathematical guarantees against livelock conditions, where two
+conflicting policies oscillate the system between two undesirable states, and against
+starvation, where a lower-priority policy is perpetually preempted by higher-priority
+actions.
+Given the safety-critical implications of autonomous infrastructure management in
+financial domains, formal verification would significantly strengthen the trust model
+of the Control Plane.
+
+% ============================================================
+%  REFERENCES
+% ============================================================
+\bibliography{references}
+
+% ============================================================
+%  APPENDICES
+% ============================================================
+\appendix
+\appendixpage
+
+\chapter{Repository and Reproducibility}
+\label{app:repo}
+
+\section{Source Code Repository}
+\label{app:repo_link}
+
+\noindent\textbf{Repository URL:} \url{<INSERT_GITHUB_REPOSITORY_URL>}\\
+\textbf{Evaluated Revision:} \texttt{<INSERT_COMMIT_HASH_OR_RELEASE_TAG>}
+
+\noindent The full implementation artefacts for the AI-Native Lakehouse System are
+maintained in a single source repository containing the application code,
+deployment manifests, operational scripts, tests, and architecture notes used during
+development and evaluation. The specific evaluated revision should be fixed to a
+commit hash or release tag to ensure reproducibility of the benchmark and demo
+results reported in Chapter~\ref{ch:evaluation}.
+
+\section{Repository Structure}
+\label{app:repo_structure}
+
+\begin{table}[H]
+  \centering
+  \caption{Top-level repository structure and primary responsibilities.}
+  \label{tab:repo_structure}
+  \begin{tabularx}{\textwidth}{lX}
+    \toprule
+    \textbf{Path} & \textbf{Purpose} \\
+    \midrule
+    \texttt{app-code/} & Core application code for the gateway, ETL framework, Ray-hosted agents, overseer, benchmark harnesses, and demo pipelines \\
+    \texttt{deps/} & Kubernetes manifests, Dockerfiles, and deployment scripts for infrastructure and application services \\
+    \texttt{scripts/} & Operational wrappers, verification scripts, and environment setup helpers \\
+    \texttt{tests/} & Automated unit and integration tests covering gateway, overseer, ETL, and selected end-to-end behaviours \\
+    \texttt{docs/} & Architecture notes, demo instructions, and report-alignment documentation \\
+    \texttt{final\_report/} & Dissertation source files, bibliography, and evaluation write-up assets \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Reproduction Notes}
+\label{app:repro}
+
+The final evaluation was conducted on the bare-metal K0s environment described in
+Section~\ref{sec:infrastructure}. At minimum, a reproducing environment should match
+the following high-level software configuration:
+
+\begin{itemize}
+  \item Python 3.11 runtime for application services and pipelines
+  \item Ray 2.x / KubeRay for distributed execution and agent hosting
+  \item Prefect 3.x for orchestration
+  \item MinIO-backed Delta Lake for durable analytical storage
+  \item Redis for control-plane and shared-context coordination
+  \item TimescaleDB and Milvus for specialised time-series and vector workloads
+  \item K0s Kubernetes for bare-metal container orchestration
+\end{itemize}
+
+\chapter{Deployment and Configuration Summary}
+\label{app:deploy}
+
+\section{Core Platform Components}
+\label{app:components}
+
+\begin{table}[H]
+  \centering
+  \caption{Primary deployed components and their roles in the five-plane architecture.}
+  \label{tab:component_roles}
+  \begin{tabularx}{\textwidth}{lX}
+    \toprule
+    \textbf{Component} & \textbf{Role} \\
+    \midrule
+    Gateway & Protocol-agnostic access layer providing REST endpoints, MCP-compatible tool exposure, shared governance, and intent dispatch \\
+    Ray Cluster & Unified compute substrate for distributed ETL tasks, shared-memory object exchange, and stateful agent actors \\
+    Prefect & Workflow orchestration, retries, flow submission, and runtime state tracking \\
+    Overseer & Out-of-band MAPE-K control loop for recovery, health analysis, and active circuit breaking \\
+    MinIO + Delta Lake & Durable analytical lakehouse storage with transactional semantics and schema evolution \\
+    Redis & Shared ephemeral state store for the ContextStore, circuit breaker signalling, and control-plane coordination \\
+    TimescaleDB & Time-series persistence for operational metrics and selected structured outputs \\
+    Milvus & Vector storage layer for semantic embeddings and retrieval-oriented workloads \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Deployment Topology Notes}
+\label{app:topology}
+
+The platform is distributed across multiple Kubernetes namespaces to reduce coupling
+between compute, orchestration, and storage concerns. In the reference deployment,
+the Ray cluster and Gateway reside in the compute namespace, Prefect is isolated in
+an orchestration namespace, storage systems such as Redis and MinIO reside in storage
+namespaces, and the Overseer runs out-of-band in its own failure domain. This
+topology reinforces the architectural isolation arguments made in
+Section~\ref{sec:interface_layer} and Section~\ref{sec:control_plane}.
+
+\chapter{Interface and Data Contracts}
+\label{app:contracts}
+
+\section{UserIntent Schema}
+\label{app:userintent}
+
+The \texttt{UserIntent} object is the Gateway's canonical protocol-normalised request
+model. Every incoming interaction routed through the Gateway --- whether from REST or
+MCP --- is translated into this structure before routing through the shared dispatch
+and adapter pipeline.
+
+\begin{table}[H]
+  \centering
+  \caption{Compact schema for the \texttt{UserIntent} contract.}
+  \label{tab:userintent_schema}
+  \begin{tabularx}{\textwidth}{l l X}
+    \toprule
+    \textbf{Field} & \textbf{Type} & \textbf{Purpose} \\
+    \midrule
+    \texttt{domain} & \texttt{str} & Target subsystem to route to. In the implemented Gateway this is typically one of \texttt{data}, \texttt{compute}, \texttt{agent}, \texttt{broker}, or \texttt{system}. \\
+    \addlinespace
+    \texttt{action} & \texttt{str} & Operation to perform within the selected domain, such as \texttt{run\_sql}, \texttt{submit\_job}, \texttt{chat}, or \texttt{health}. \\
+    \addlinespace
+    \texttt{parameters} & \texttt{dict[str, Any]} & Action-specific argument payload. This carries the concrete request body, for example SQL text, pipeline parameters, agent prompts, or broker lookup inputs. \\
+    \addlinespace
+    \texttt{user\_id} & \texttt{str} & Authenticated identity of the requesting principal as resolved by the Interface Layer. This is propagated for governance and audit logging. \\
+    \addlinespace
+    \texttt{roles} & \texttt{list[str]} & RBAC role set associated with the requesting principal. Adapters and shared governance logic use this to enforce permission boundaries. \\
+    \addlinespace
+    \texttt{request\_id} & \texttt{Optional[str]} & Correlation identifier injected by shared dispatch for end-to-end tracing, observability, and immutable audit log linkage. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Semantically, \texttt{domain} selects the adapter, \texttt{action} selects the
+adapter-local operation, and \texttt{parameters} carries all protocol-specific data
+after translation. The remaining fields capture the requesting-user context needed
+for governance, attribution, and observability.
+
+\section{SystemSnapshot Schema}
+\label{app:snapshot}
+
+The Overseer stores each monitor cycle as a \texttt{SystemSnapshot}, representing a
+point-in-time operational view of the managed platform. In the implementation, the
+top-level object is intentionally compact: it records a capture timestamp and a map
+of service names to \texttt{ServiceMetrics}. The operational richness is carried in
+the nested per-service \texttt{data} payload returned by each Collector.
+
+\begin{table}[H]
+  \centering
+  \caption{Compact schema for the \texttt{SystemSnapshot} contract.}
+  \label{tab:systemsnapshot_schema}
+  \begin{tabularx}{\textwidth}{l l X}
+    \toprule
+    \textbf{Field} & \textbf{Type} & \textbf{Purpose} \\
+    \midrule
+    \texttt{timestamp} & \texttt{float} & UNIX timestamp marking when the snapshot was assembled by the Overseer loop. \\
+    \addlinespace
+    \texttt{services} & \texttt{dict[str, ServiceMetrics]} & Mapping from collector name to the latest standardised health payload for that managed service. Typical keys include \texttt{ray} and \texttt{prefect}. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{Nested \texttt{ServiceMetrics} structure used inside \texttt{SystemSnapshot}.}
+  \label{tab:servicemetrics_schema}
+  \begin{tabularx}{\textwidth}{l l X}
+    \toprule
+    \textbf{Field} & \textbf{Type} & \textbf{Purpose} \\
+    \midrule
+    \texttt{service} & \texttt{str} & Logical service identifier for the collector result, such as \texttt{ray} or \texttt{prefect}. \\
+    \addlinespace
+    \texttt{healthy} & \texttt{bool} & Collector-level health judgement indicating whether the target service could be reached and probed successfully. \\
+    \addlinespace
+    \texttt{data} & \texttt{dict} & Service-specific telemetry payload used by policies. This is where deployment state, workflow state, and other policy-relevant metrics are carried. \\
+    \addlinespace
+    \texttt{error} & \texttt{Optional[str]} & Error detail if the probe failed or returned unusable data. \\
+    \addlinespace
+    \texttt{collected\_at} & \texttt{float} & UNIX timestamp marking when the collector gathered this service payload. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{Representative policy-relevant telemetry embedded in \texttt{services[*].data}.}
+  \label{tab:snapshot_nested_fields}
+  \begin{tabularx}{\textwidth}{l l X}
+    \toprule
+    \textbf{Collector} & \textbf{Field} & \textbf{Interpretation} \\
+    \midrule
+    Ray & \texttt{applications[]} & Per-deployment Serve summaries used for actor-health analysis and recovery planning. \\
+    \addlinespace
+    Ray & \texttt{applications[*].name} & Stable deployment identity used by the Overseer for reconciliation and respawn. \\
+    \addlinespace
+    Ray & \texttt{applications[*].observed\_status} & Normalised live state such as \texttt{ready}, \texttt{degraded}, \texttt{recovering}, \texttt{missing}, or \texttt{unknown}. \\
+    \addlinespace
+    Ray & \texttt{applications[*].health\_status} & Health label paired with the observed state, typically \texttt{healthy}, \texttt{degraded}, or \texttt{offline}. \\
+    \addlinespace
+    Ray & \texttt{applications[*].recovery\_state} & Recovery-progress state used by the MAPE-K loop, for example \texttt{idle}, \texttt{recovering}, or \texttt{failed}. \\
+    \addlinespace
+    Ray & \texttt{applications[*].running\_replicas} & Effective live replica count used to distinguish healthy, degraded, and missing deployments. \\
+    \addlinespace
+    Ray & \texttt{applications[*].failure\_reason} & Human-readable explanation attached to degraded or missing deployment summaries. \\
+    \addlinespace
+    Prefect & \texttt{recent\_runs} & Number of recently inspected workflow runs. \\
+    \addlinespace
+    Prefect & \texttt{running} & Count of currently running flows, used as lightweight workflow-state visibility. \\
+    \addlinespace
+    Prefect & \texttt{failed} & Count of failed recent flows, used to detect repeated execution problems. \\
+    \addlinespace
+    Prefect & \texttt{failed\_details[]} & Compact per-run failure metadata, typically flow name and run identifier for operator diagnosis. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Primary Delta Lake Tables}
+\label{app:deltatable}
+
+The Data Plane persists several analytically important datasets to Delta Lake. The
+table summaries below describe the principal workflow datasets and their key logical
+fields as used in the evaluated Market Pulse path. They are intended as compact
+contract documentation rather than exhaustive DDL listings.
+
+\begin{table}[H]
+  \centering
+  \caption{Primary Delta Lake tables used in the evaluated workflow.}
+  \label{tab:primary_delta_tables}
+  \begin{tabularx}{\textwidth}{l X X}
+    \toprule
+    \textbf{Table} & \textbf{Key Fields} & \textbf{Analytical Purpose} \\
+    \midrule
+    \texttt{demo/market\_pulse/news} &
+    \texttt{symbol}, \texttt{headline}, \texttt{source}, \texttt{url}, \texttt{published\_at}, \texttt{provider} &
+    Persisted financial news records fetched during the ingest stage. This dataset anchors the text side of the Market Pulse reasoning path and supports replay and later audit queries over the same headline context seen by the analyst agent. \\
+    \addlinespace
+    \texttt{demo/market\_pulse/ohlc} &
+    \texttt{symbol}, \texttt{close}, \texttt{volume}, \texttt{timestamp}, \texttt{provider} &
+    Persisted latest-window price records read from the stateful market-ingest service. Although compact, this dataset forms the numerical basis from which bounded market-state features such as SMA, VWAP, return, and volatility are derived during the evaluated workflow. \\
+    \addlinespace
+    \texttt{demo/market\_pulse/signals} &
+    \texttt{symbol}, \texttt{action}, \texttt{confidence}, \texttt{trend\_score}, \texttt{sentiment\_label}, \texttt{sentiment\_score}, \texttt{analyst\_summary}, \texttt{last\_price}, \texttt{sma\_5}, \texttt{sma\_20}, \texttt{vwap}, \texttt{price\_return\_pct}, \texttt{volatility\_estimate}, \texttt{window\_count}, \texttt{timestamp\_ms} &
+    Durable record of final StrategyAgent outputs together with the key market-state evidence used to justify the decision. This dataset supports signal-history queries, downstream evaluation, and verification that generated decisions remain available beyond transient in-memory execution state. \\
+    \addlinespace
+    \texttt{demo/market\_pulse/ohlc\_stream} &
+    \texttt{symbol}, \texttt{close}, \texttt{volume}, \texttt{timestamp}, \texttt{provider} &
+    Stream-oriented persistence target maintained by the long-running price-ingest service. This dataset reflects the continuously refreshed price feed used to keep the live working window and streaming-state path available during demonstration and benchmarking. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Across these tables, the overall data contract follows the architecture described in
+Chapter~\ref{ch:implementation}: raw market state is ingested first, compact
+working-set price records are persisted for analytical use, external news context is
+stored alongside the numerical data, and final agent-produced decisions are written as
+queryable historical artefacts.
+
+\chapter{Benchmark Methodology and Extended Results}
+\label{app:benchmarks}
+
+\section{Benchmark Execution Parameters}
+\label{app:bench_params}
+
+The benchmark campaigns reported in Chapter~\ref{ch:evaluation} were executed using
+fixed trial counts, controlled dataset sizes, and explicit inclusion criteria for
+final summary statistics. The zero-copy experiment used 30 trials per dataset size.
+The MTTR experiment used 30 trials per recovery condition. The end-to-end benchmark
+used 5 fully live trials after end-to-end stabilisation of the integrated workflow
+and exclusion of degraded fallback runs.
+
+\section{Extended Benchmark Artefacts}
+\label{app:bench_tables}
+
+The raw benchmark outputs and generated visualisations used to derive the summary
+results in Chapter~\ref{ch:evaluation} are preserved in the repository under the
+following directories:
+
+\begin{itemize}
+  \item \texttt{app-code/benchmark-results/zero-copy/}
+  \item \texttt{app-code/benchmark-results/market-pulse/}
+  \item \texttt{app-code/benchmark-results/mttr/}
+\end{itemize}
+
+These directories contain the trial-level CSV outputs, summary JSON files, generated
+plots, and benchmark write-up artefacts for the zero-copy, end-to-end, and MTTR
+experiments respectively. They act as the primary supplementary evidence store for
+the quantitative evaluation and can be consulted for detailed per-trial inspection,
+secondary descriptive statistics, and verification of the figures reported in the
+main text.
+
+\chapter{Selected Implementation Excerpts}
+\label{app:code}
+
+\section{Shared Dispatch Utility}
+\label{app:dispatch}
+
+\begin{lstlisting}[caption={Condensed excerpt of the Shared Dispatch Utility showing
+trace injection, audit logging, and circuit-breaker enforcement.}, label={lst:dispatch}]
+request_id = str(uuid.uuid4())
+start_time = time.time()
+
+if domain != "system":
+    r = get_redis_client()
+    if r:
+        async with r:
+            is_open = await r.get("gateway:circuit_breaker")
+        if is_open == "open":
+            await _log_audit_event_minimal(
+                request_id=request_id,
+                user_id=user.username,
+                domain=domain,
+                action=action,
+                parameters=parameters,
+                source_protocol=source_protocol,
+                status_code=503,
+                duration_ms=0,
+                error_detail="Circuit breaker open"
+            )
+            raise CircuitBreakerOpenError(
+                "System is in maintenance mode - backpressure active."
+            )
+
+intent = UserIntent(
+    domain=domain,
+    action=action,
+    parameters=parameters,
+    user_id=user.username,
+    roles=user.role_names if user.role_names else ["analyst"],
+    request_id=request_id,
+)
+
+result = await registry.route(user, intent)
+duration_ms = (time.time() - start_time) * 1000
+await _log_audit_event(intent, source_protocol, 200, duration_ms)
+return DispatchResult(data=result, request_id=request_id, status_code=200)
+\end{lstlisting}
+
+\section{Hybrid Execution in the Delta Lake Write Path}
+\label{app:hybrid_exec_code}
+
+\begin{lstlisting}[caption={Condensed excerpt illustrating the Hybrid Execution Model
+used to isolate runtime-sensitive Delta Lake writes.}, label={lst:hybrid_exec}]
+class DeltaLakeWriteTask(BaseTask):
+    def run(self, data: Any, uri: Optional[str] = None,
+            use_ray_data: bool = True) -> str:
+        sink = DeltaLakeSink(uri=uri or self.uri, mode=self.mode)
+        writer = sink.open()
+        try:
+            if use_ray_data:
+                import ray.data as rd
+                ds = data if isinstance(data, rd.Dataset) else rd.from_pandas(data)
+                writer.write_dataset(ds)
+                return f"Successfully wrote dataset to {self.uri} (distributed)"
+
+            writer.write_batch(data)
+            return f"Wrote records to {self.uri} (local)"
+        finally:
+            writer.close()
+
+    def local(self, *args, **kwargs):
+        kwargs["use_ray_data"] = False
+        return super().local(*args, **kwargs)
+\end{lstlisting}
+
+\section{Overseer Recovery Logic}
+\label{app:overseer_code}
+
+\begin{lstlisting}[caption={Condensed excerpt of the Overseer's reconciliation and
+deployment recovery path.}, label={lst:overseer_code}]
+actions: list[OverseerAction] = []
+for policy in self.policies:
+    actions.extend(policy.evaluate(snapshot))
+
+for action in actions:
+    await self._mark_action_started(action)
+    await self.actuators["alert"].execute(action)
+
+    actuator = self.actuators.get(action.target)
+    if actuator and action.target != "alert":
+        result = await asyncio.wait_for(actuator.execute(action), timeout=30.0)
+    else:
+        result = ActionResult(success=True, detail="No-op alert recorded")
+
+    await self._apply_action_result(action, result)
+
+async def _mark_action_started(self, action: OverseerAction) -> None:
+    if action.deployment_name and action.type == ActionType.RESPAWN:
+        await asyncio.to_thread(
+            update_agent_catalog_status,
+            name=action.deployment_name,
+            observed_status="recovering",
+            health_status="degraded",
+            recovery_state="recovering",
+            last_action_type=action.type.value,
+            reconciled=True,
+        )
+\end{lstlisting}
+
+\chapter{Demo and Evaluation Protocol}
+\label{app:demo_protocol}
+
+\section{Market Pulse Demonstration Procedure}
+\label{app:demo_steps}
+
+The Market Pulse demonstration is structured as an evaluator-facing walkthrough that
+exercises the five architectural planes in a coherent sequence. Its role is to serve
+as qualitative integration evidence rather than as a controlled benchmark trial. The
+demonstration is intended to show that the system operates as a unified platform,
+rather than as a collection of disconnected scripts and infrastructure tools.
+
+\subsection*{Preconditions}
+Before the demonstration begins, the following components should already be available:
+
+\begin{itemize}
+  \item the K0s Kubernetes cluster and the KubeRay-managed Ray cluster;
+  \item the Prefect orchestration service;
+  \item the Gateway service;
+  \item the storage services required by the workflow, including MinIO / Delta Lake and Redis;
+  \item the baseline agent deployments required for the Market Pulse flow; and
+  \item the Overseer service for the autonomic recovery segment.
+\end{itemize}
+
+The evaluator should also have access to the Gateway interface, the Prefect UI, the
+Ray dashboard, and the repository scripts used to submit flows and inspect results.
+
+\subsection*{Step 1: Submit the Market Pulse workflow}
+The demonstration begins with submission of the top-level Market Pulse Prefect flow
+from the operator machine. At this point, the operator explains that execution occurs
+remotely on the Ray cluster, while the local machine acts only as the submission and
+observation surface. This establishes that the workflow is genuinely distributed and
+not simply a locally executed script with mocked infrastructure labels.
+
+\subsection*{Step 2: Observe ingestion and state formation}
+Once the flow begins, the evaluator is shown that live market data and financial news
+are ingested through the Data Plane. The operator highlights that the ingestion path
+computes a bounded market window and rolling indicators, then persists the relevant
+records to Delta Lake. At this stage, the key point is that stateful ingestion,
+micro-batching, and durable storage are functioning inside the same integrated
+platform.
+
+\subsection*{Step 3: Observe multi-agent coordination}
+The evaluator is then shown the Intelligence Plane behaviour. The StrategyAgent
+receives the current market state and delegates headline analysis to the
+MarketAnalystAgent. The returned sentiment assessment is fused with the market-state
+metrics to produce a final trading signal. The operator should explicitly note that
+specialist delegation is traceable and deterministic, and that the resulting signal
+includes interpretable evidence fields rather than only a raw classification label.
+
+\subsection*{Step 4: Verify persistence and governed retrieval}
+After the signal is generated, the evaluator is shown that the output is written both
+to ephemeral shared state and to durable signal history. A follow-up query is then
+issued through the Gateway's REST interface to retrieve persisted signal or recent
+price history. This confirms that the Interface Layer exposes governed access to
+queryable state and that workflow outputs are not merely transient in-memory results.
+
+\subsection*{Step 5: Show observability surfaces}
+The evaluator is next shown the relevant observability surfaces, typically including
+the Prefect run view, Ray runtime state, and any Gateway-facing health or status
+endpoint. This stage is used to narrate the operational value of the integrated
+architecture: execution state, agent activity, and infrastructure status can be
+inspected through one cohesive deployment rather than through isolated tools with
+independent operational contexts.
+
+\subsection*{Step 6: Demonstrate autonomic recovery}
+The final segment isolates the Control Plane. A managed Ray Serve deployment is
+intentionally removed while the remainder of the system continues running. The
+operator then shows that the Overseer detects the degraded state and restores the
+deployment under the same stable identity without manual redeployment. This step
+demonstrates that the recovery mechanism operates out-of-band and that the platform
+can autonomically restore application-level service availability.
+
+\subsection*{Expected Demonstration Outcomes}
+A successful demonstration should establish the following points:
+
+\begin{itemize}
+  \item the workflow is submitted once and executed remotely as an integrated distributed system;
+  \item live data ingestion, transformation, and persistence complete successfully;
+  \item specialist agents coordinate to produce a final signal with auditable reasoning inputs;
+  \item persisted outputs can be queried through the governed Gateway interface; and
+  \item a deleted managed deployment is restored automatically by the Overseer.
+\end{itemize}
+
+\subsection*{Demonstration Interpretation}
+The Market Pulse demonstration is intended as qualitative integration evidence. It
+shows that the five architectural planes interact coherently in one end-to-end
+scenario, and that the system's value lies not only in isolated performance metrics
+but also in the reduction of operational fragmentation across data processing, agent
+execution, governed access, and autonomic recovery.
+
+\section{Evaluator Checklist}
+\label{app:demo_checklist}
+
+To support consistent assessment during the live or recorded demonstration, the
+evaluator may use the following checklist. Each item corresponds to a claim made in
+Chapter~\ref{ch:evaluation} and can be verified directly from the walkthrough
+sequence in Section~\ref{app:demo_steps}.
+
+\begin{table}[H]
+  \centering
+  \caption{Evaluator checklist for the Market Pulse demonstration.}
+  \label{tab:demo_checklist}
+  \begin{tabularx}{\textwidth}{p{0.08\textwidth}X}
+    \toprule
+    \textbf{Item} & \textbf{Verification Point} \\
+    \midrule
+    F.2.1 & The workflow is submitted once through the intended operator interface and executes remotely on the Ray-backed platform rather than as a local standalone script. \\
+    \addlinespace
+    F.2.2 & Live market data and news ingestion are shown, with evidence that derived market-state features or bounded working sets are formed during execution. \\
+    \addlinespace
+    F.2.3 & At least two specialist agents participate in the reasoning path, and their coordination is visible through logs, outputs, or service-level traces. \\
+    \addlinespace
+    F.2.4 & A final signal or decision artefact is produced with interpretable supporting fields such as confidence, sentiment, or market-state evidence. \\
+    \addlinespace
+    F.2.5 & The resulting artefact is shown to be persisted beyond transient execution state, for example through Delta Lake history, shared context state, or a subsequent retrieval call. \\
+    \addlinespace
+    F.2.6 & A governed query is issued through the Gateway interface to confirm that persisted results are externally accessible through the intended access layer. \\
+    \addlinespace
+    F.2.7 & At least one observability surface is shown during execution, such as the Prefect run view, Ray dashboard, or Gateway-facing status endpoint. \\
+    \addlinespace
+    F.2.8 & A managed deployment failure is intentionally induced and the Overseer restores service availability without manual redeployment of the affected application component. \\
+    \midrule
+    \textbf{Pass Condition} & The demonstration should be considered successful if all checklist items are observable without requiring ad hoc code edits or undocumented recovery steps during the walkthrough. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\end{document}

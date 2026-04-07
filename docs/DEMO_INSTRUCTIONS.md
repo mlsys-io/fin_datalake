@@ -239,8 +239,99 @@ Bring up:
 - do not overstate RisingWave as a separately benchmarked core contribution unless that benchmark is added later
 - do not treat the showcase demo as a formal benchmark
 
+## Benchmark Talking Points
+
+Use benchmark numbers as precomputed supporting evidence rather than live demo content.
+
+### Zero-Copy
+
+- latest artifact folder:
+  - `app-code/benchmark-results/zero-copy/20260406-223020/`
+- headline number:
+  - zero-copy reduced handoff latency by `8.64x` to `15.02x` depending on payload size
+- safe interpretation:
+  - the shared fabric materially reduces transport overhead between data and intelligence workloads, especially at larger payload sizes
+
+### MTTR
+
+- latest artifact folder:
+  - `app-code/benchmark-results/mttr/20260407-034737/`
+- headline number:
+  - Overseer mean MTTR `4.61s` vs manual mean MTTR `13.39s`
+  - `2.91x` faster service restoration
+- safe interpretation:
+  - this is a **service-restoration** benchmark
+  - internal recovery-state fields may still briefly lag behind successful endpoint recovery
+
 ## Practical Notes
 
 - if live external data is flaky, the fallback path is acceptable as long as it is explained honestly
 - benchmark runs should not be recorded as live experiments unless they are already stable and fast
 - the most important thing is that each chunk is clear, coherent, and easy to narrate
+
+## Operator Script Reference
+
+Use these scripts as the main operational entrypoints during setup, verification, and benchmarking.
+
+### Platform Setup
+
+- `scripts/setup-config.sh`
+  Creates or refreshes config and secret-facing setup.
+- `scripts/apply-user-secrets.sh`
+  Reads `.env.user` and applies scoped optional secrets such as `etl-user-secret-ray`, `etl-user-secret-benchmarks`, `etl-user-secret-gateway`, and `etl-user-secret-overseer`.
+- `scripts/deploy-infrastructure.sh`
+  Main infrastructure bring-up helper.
+- `scripts/setup-local-env.sh`
+  Local environment setup.
+- `scripts/cleanup-cluster.sh`
+  Cleanup/reset helper.
+
+### Demo Verification
+
+- `scripts/verify/01-deploy-baseline.sh`
+  Deploys the demo baseline agent fleet.
+- `scripts/verify/02-control-plane-smoke.sh`
+  Control-plane smoke verification.
+- `scripts/verify/03-self-healing.sh`
+  Self-healing verification flow.
+- `scripts/verify/run-all.sh`
+  Runs the main verification chain.
+- `scripts/demo-self-healing.sh`
+  Small self-healing demo helper.
+
+### Overseer
+
+- `deps/overseer/build-image.sh`
+  Builds the Overseer image.
+- `deps/overseer/deploy.sh`
+  Deploys Overseer in normal mode or MTTR mode with `--mttr`.
+- `deps/overseer/overseer-deploy.yaml`
+  Normal Overseer deployment manifest.
+- `deps/overseer/overseer-deploy-mttr.yaml`
+  Recovery-only benchmark deployment manifest.
+
+### Benchmark Baselines
+
+- `deps/benchmarks/build-spark-image.sh`
+  Builds the Spark baseline image.
+- `deps/benchmarks/deploy.sh`
+  Deploys `benchmark-plain-runner` and/or `benchmark-spark-runner`.
+- `deps/benchmarks/delete.sh`
+  Removes benchmark baseline runner deployments.
+- `deps/benchmarks/plain-baseline-deploy.yaml`
+  Plain baseline runner manifest.
+- `deps/benchmarks/spark-baseline-deploy.yaml`
+  Spark baseline runner manifest.
+
+### Other Deployment Helpers
+
+- `deps/gateway/build-image.sh`
+- `deps/gateway/deploy.sh`
+- `deps/gateway/down.sh`
+- `deps/kuberay/build-image.sh`
+- `deps/kuberay/deploy.sh`
+- `deps/prefect/deploy.sh`
+- `deps/risingwave/deploy.sh`
+- `deps/risingwave/check_connection.sh`
+- `deps/timescaledb/deploy.sh`
+- `deps/redis/deploy.sh`

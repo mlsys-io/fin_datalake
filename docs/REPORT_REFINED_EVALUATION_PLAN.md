@@ -202,6 +202,19 @@ Important note:
 - this remains one of the strongest technical novelty benchmarks
 - the current implementation already uses the current Serve invocation pattern and a benchmark-only dummy table agent to avoid polluting the main strategy path
 
+Current observed result:
+
+- `10,000` rows: `524.02 ms` serialized vs `60.65 ms` zero-copy, `8.64x` speedup
+- `100,000` rows: `3660.88 ms` serialized vs `264.12 ms` zero-copy, `13.86x` speedup
+- `500,000` rows: `17594.12 ms` serialized vs `1176.17 ms` zero-copy, `14.96x` speedup
+- `1,000,000` rows: `35135.61 ms` serialized vs `2338.79 ms` zero-copy, `15.02x` speedup
+
+Observation:
+
+- the zero-copy advantage widened as payload size increased
+- the larger-size results were stable enough to support the claim that shared-memory handoff materially reduces transport overhead
+- the run showed some Ray Client control-plane warnings, but the benchmark completed successfully and saved all artifacts
+
 ### Benchmark 2: End-To-End Tick-To-Signal Latency
 
 Claim supported:
@@ -256,7 +269,7 @@ Claim supported:
 Current status:
 
 - self-healing demo exists
-- the benchmark should now be treated as a **comparative MTTR benchmark** rather than an Overseer-only measurement
+- the benchmark is now implemented and should be treated as a **comparative MTTR benchmark** rather than an Overseer-only measurement
 
 What the benchmark should show:
 
@@ -269,6 +282,21 @@ Important note:
 
 - this remains essential if the report is going to make a strong quantitative recovery claim
 - manual recovery is the better baseline for this project than Kubernetes-style recovery because it matches the constrained-team target user story
+
+Current observed result:
+
+- Overseer: `30/30` successes, mean `4.61s`, std `0.10s`, P95 `4.75s`
+- Manual: `30/30` successes, mean `13.39s`, std `3.06s`, P95 `18.01s`
+- comparative result:
+  - manual-over-overseer MTTR ratio: `2.91x`
+  - Overseer mean MTTR improvement: `65.59%`
+
+Observation:
+
+- the final run supports the claim that Overseer restores service much faster and with much lower variance than the manual baseline
+- the benchmark should be described as measuring **time-to-usable-service**
+- in the final Overseer trials, the endpoint probe had already succeeded even while the final catalog snapshot still briefly reported `recovering/degraded`
+- this means service restoration slightly leads full control-plane convergence, which should be stated explicitly in the report rather than treated as a failed recovery
 
 ### Optional Benchmark 4: Delegation / Concurrency
 

@@ -87,8 +87,8 @@ Suggested closing line on screen:
 Use simple baselines that make the platform advantages easy to explain:
 
 - Plain Python: sequential script, no orchestration, no recovery, no persistent agents
-- Airflow-style baseline: batch orchestration pattern without native persistent agents
-- LangGraph: agent coordination comparison only, without the full infrastructure stack
+- Spark + glue baseline: fragmented but scalable conventional stack with more operational overhead
+- Integrated workflow: unified ETL, runtime, agents, persistence, and recovery story
 
 Suggested comparison dimensions:
 
@@ -99,12 +99,125 @@ Suggested comparison dimensions:
 - self-healing
 - unified API surface
 
+## Benchmark Observations
+
+### Zero-Copy Benchmark
+
+Observed result from `app-code/benchmark-results/zero-copy/20260406-223020/`:
+
+| Rows | JSON mean +/- std (ms) | Zero-copy mean +/- std (ms) | Speedup |
+|---|---:|---:|---:|
+| 10,000 | 524.02 +/- 215.33 | 60.65 +/- 11.88 | 8.64x |
+| 100,000 | 3660.88 +/- 115.09 | 264.12 +/- 15.44 | 13.86x |
+| 500,000 | 17594.12 +/- 283.98 | 1176.17 +/- 32.08 | 14.96x |
+| 1,000,000 | 35135.61 +/- 1327.65 | 2338.79 +/- 41.32 | 15.02x |
+
+Key observation:
+
+- the zero-copy path stayed consistently faster than the JSON-serialized path
+- the speedup increased with payload size, peaking at about `15.02x` on `1,000,000` rows
+- memory behavior also improved in the smoke run:
+  - serialized peak memory at `10,000` rows: `5.42 MB`
+  - zero-copy peak memory at `10,000` rows: `1.38 MB`
+
+Interpretation to present:
+
+- this benchmark supports the claim that the shared Ray fabric reduces handoff overhead between data processing and intelligence workloads
+- the advantage becomes more pronounced as payload size grows, which is the practical regime where serialization overhead matters most
+- the larger-size runs were stable, while the smallest-size runs showed more jitter because control-plane overhead is a larger fraction of the total runtime
+
+Runtime caveat:
+
+- the benchmark completed successfully and saved all artifacts, but the run showed Ray Client control-plane warnings during execution
+- these warnings are best described as runtime noise rather than benchmark-logic failure
+- if needed, mention that the larger-payload results were stable and remained the stronger evidence
+
+Artifacts:
+
+- `app-code/benchmark-results/zero-copy/20260406-223020/zero_copy_result.txt`
+- `app-code/benchmark-results/zero-copy/20260406-223020/zero_copy_summary.json`
+- `app-code/benchmark-results/zero-copy/20260406-223020/zero_copy_latency.svg`
+
+### MTTR Benchmark
+
+Observed result from `app-code/benchmark-results/mttr/20260407-034737/`:
+
+| Mode | Trials | Successes | Mean MTTR (s) | Std (s) | P95 (s) |
+|---|---:|---:|---:|---:|---:|
+| Overseer | 30 | 30 | 4.61 | 0.10 | 4.75 |
+| Manual | 30 | 30 | 13.39 | 3.06 | 18.01 |
+
+Key observation:
+
+- Overseer restored service successfully in all 30 trials
+- the manual baseline also succeeded in all 30 trials, but was much slower and more variable
+- the measured improvement was:
+  - `2.91x` faster than the manual baseline
+  - `65.59%` lower mean MTTR
+
+Interpretation to present:
+
+- this benchmark supports the claim that the control plane provides useful autonomic recovery
+- Overseer reduced service-restoration time by removing operator reaction delay and reacting immediately to deployment loss
+- the low variance in Overseer recovery also supports the claim that the control loop converges consistently once the implementation issues were fixed
+
+Important nuance:
+
+- this MTTR benchmark measures **time to usable service**, not full control-plane convergence
+- in the raw Overseer trials, the endpoint probe had already succeeded while the catalog snapshot still briefly reported `recovering` and `degraded`
+- this should be described as conservative internal reconciliation lag rather than failed recovery
+
+Artifacts:
+
+- `app-code/benchmark-results/mttr/20260407-034737/mttr_summary.json`
+- `app-code/benchmark-results/mttr/20260407-034737/mttr_trials.csv`
+- `app-code/benchmark-results/mttr/20260407-034737/mttr_comparison.svg`
+- `app-code/benchmark-results/mttr/20260407-034737/mttr_writeup.md`
+
 ## Recommended Operator Scripts
+
+### Core Platform
+
+- `scripts/setup-config.sh`
+- `scripts/apply-user-secrets.sh`
+- `scripts/deploy-infrastructure.sh`
+- `scripts/setup-local-env.sh`
+- `scripts/cleanup-cluster.sh`
+
+### Demo / Verification
 
 - `scripts/verify/01-deploy-baseline.sh`
 - `scripts/verify/02-control-plane-smoke.sh`
 - `scripts/verify/03-self-healing.sh`
 - `scripts/verify/run-all.sh`
+- `scripts/demo-self-healing.sh`
+
+### Overseer
+
+- `deps/overseer/build-image.sh`
+- `deps/overseer/deploy.sh`
+- `deps/overseer/overseer-deploy.yaml`
+- `deps/overseer/overseer-deploy-mttr.yaml`
+
+### Benchmark Baseline Runners
+
+- `deps/benchmarks/build-spark-image.sh`
+- `deps/benchmarks/deploy.sh`
+- `deps/benchmarks/delete.sh`
+- `deps/benchmarks/plain-baseline-deploy.yaml`
+- `deps/benchmarks/spark-baseline-deploy.yaml`
+
+### Gateway / Ray / Data Services
+
+- `deps/gateway/build-image.sh`
+- `deps/gateway/deploy.sh`
+- `deps/kuberay/build-image.sh`
+- `deps/kuberay/deploy.sh`
+- `deps/prefect/deploy.sh`
+- `deps/risingwave/deploy.sh`
+- `deps/risingwave/check_connection.sh`
+- `deps/timescaledb/deploy.sh`
+- `deps/redis/deploy.sh`
 
 ## Pre-Demo Checklist
 
