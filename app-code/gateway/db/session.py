@@ -37,6 +37,8 @@ _ENSURE_AGENT_DEFINITION_COLUMNS_SQL = [
     "ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS last_failure_reason TEXT",
     "ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS last_action_type TEXT",
     "ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS reconcile_notes TEXT",
+    "ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS state_source TEXT NOT NULL DEFAULT 'catalog'",
+    "ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS state_updated_at TIMESTAMPTZ",
     "ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS runtime_source TEXT",
     "ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS runtime_namespace TEXT",
     "ALTER TABLE agent_definitions ADD COLUMN IF NOT EXISTS route_prefix TEXT",

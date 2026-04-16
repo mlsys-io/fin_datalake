@@ -23,6 +23,15 @@ class PermissionError(Exception):
     pass
 
 
+class AdapterExecutionError(Exception):
+    """Raised when an adapter reaches a downstream dependency failure."""
+
+    def __init__(self, message: str, *, error_type: str | None = None, context: dict[str, object] | None = None):
+        super().__init__(message)
+        self.error_type = error_type
+        self.context = context or {}
+
+
 class ActionNotFoundError(Exception):
     """Raised when an action is not supported by the adapter."""
     pass
@@ -67,3 +76,12 @@ class BaseAdapter(ABC):
             raise PermissionError(
                 f"User '{user.username}' lacks permission '{permission.value}'. "
             )
+
+    def describe_actions(self) -> list[dict[str, Any]]:
+        """
+        Return a structured description of actions exposed by this adapter.
+
+        Concrete adapters may override this to provide richer inventory data for
+        interface discovery and operational introspection.
+        """
+        return []

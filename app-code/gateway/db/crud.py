@@ -251,6 +251,8 @@ def _agent_definition_to_dict(row: AgentDefinitionORM) -> dict:
         "capability_specs": _parse_json_text(row.capability_specs, []),
         "metadata": _parse_json_text(row.metadata_json, {}),
         "deployment_metadata": _parse_json_text(row.deployment_metadata_json, {}),
+        "state_source": row.state_source,
+        "state_updated_at": row.state_updated_at.isoformat() if row.state_updated_at else None,
         "registered_at": row.registered_at.isoformat() if row.registered_at else None,
         "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else None,
         "last_heartbeat_at": row.last_heartbeat_at.isoformat() if row.last_heartbeat_at else None,
@@ -277,6 +279,7 @@ async def upsert_agent_definition(
     agent: dict,
     *,
     mark_seen: bool = True,
+    state_source: str = "runtime",
 ) -> dict:
     """
     Insert or update a persistent agent catalog entry from a live/runtime payload.
@@ -290,6 +293,9 @@ async def upsert_agent_definition(
     )
     row = result.scalars().first()
     now = datetime.now(timezone.utc)
+    incoming_state_source = str(agent.get("state_source") or state_source or "runtime").strip() or "runtime"
+    previous_state_source = str(getattr(row, "state_source", "") or "").strip().lower() if row is not None else ""
+    is_new_row = row is None
 
     registered_at = agent.get("registered_at")
     if isinstance(registered_at, str):
@@ -311,17 +317,26 @@ async def upsert_agent_definition(
     row.runtime_source = agent.get("runtime_source") or row.runtime_source or "ray-serve"
     row.runtime_namespace = agent.get("runtime_namespace") or row.runtime_namespace
     row.route_prefix = agent.get("route_prefix") or row.route_prefix
-    row.status = str(agent.get("status") or row.status or "unknown")
-    row.managed_by_overseer = bool(agent.get("managed_by_overseer", row.managed_by_overseer if row.managed_by_overseer is not None else True))
-    row.desired_status = str(agent.get("desired_status") or row.desired_status or "running")
-    row.observed_status = str(agent.get("observed_status") or row.observed_status or "unknown")
-    row.health_status = str(agent.get("health_status") or row.health_status or "unknown")
-    row.recovery_state = str(agent.get("recovery_state") or row.recovery_state or "idle")
-    row.last_failure_reason = agent.get("last_failure_reason") or row.last_failure_reason
-    row.last_action_type = agent.get("last_action_type") or row.last_action_type
-    row.reconcile_notes = agent.get("reconcile_notes") or row.reconcile_notes
+    effective_state_source = incoming_state_source
+    if previous_state_source == "control" and incoming_state_source != "control":
+        effective_state_source = previous_state_source
+
+    row.state_source = effective_state_source
+    row.state_updated_at = now
     if registered_at is not None:
         row.registered_at = registered_at
+
+    if is_new_row or incoming_state_source == "control" or previous_state_source != "control":
+        row.status = str(agent.get("status") or row.status or "unknown")
+        row.managed_by_overseer = bool(agent.get("managed_by_overseer", row.managed_by_overseer if row.managed_by_overseer is not None else True))
+        row.desired_status = str(agent.get("desired_status") or row.desired_status or "running")
+        row.observed_status = str(agent.get("observed_status") or row.observed_status or "unknown")
+        row.health_status = str(agent.get("health_status") or row.health_status or "unknown")
+        row.recovery_state = str(agent.get("recovery_state") or row.recovery_state or "idle")
+        row.last_failure_reason = agent.get("last_failure_reason") or row.last_failure_reason
+        row.last_action_type = agent.get("last_action_type") or row.last_action_type
+        row.reconcile_notes = agent.get("reconcile_notes") or row.reconcile_notes
+
     reconciled_at = agent.get("last_reconciled_at")
     if isinstance(reconciled_at, str):
         try:
@@ -346,6 +361,7 @@ async def mark_agent_status(
     name: str,
     *,
     status: str,
+    state_source: str = "control",
     mark_seen: bool = False,
     heartbeat: bool = False,
 ) -> dict | None:
@@ -361,6 +377,8 @@ async def mark_agent_status(
 
     now = datetime.now(timezone.utc)
     row.status = status
+    row.state_source = state_source
+    row.state_updated_at = now
     observed_status = status
     health_status = row.health_status
     if status == "alive":
@@ -403,8 +421,13 @@ async def mark_stale_agents(
 
     result = await db.execute(stmt)
     rows = result.scalars().all()
+    now = datetime.now(timezone.utc)
     for row in rows:
         row.status = stale_status
+        row.state_source = "control"
+        row.state_updated_at = now
+        row.observed_status = "stale"
+        row.health_status = "degraded"
 
     await db.commit()
     return len(rows)

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 
 from gateway.api.deps import get_current_user, get_registry
-from gateway.core.adapters import ActionNotFoundError, PermissionError
+from gateway.core.adapters import ActionNotFoundError, AdapterExecutionError, PermissionError
 from gateway.core.dispatch import CircuitBreakerOpenError, dispatch
 from gateway.core.registry import DomainNotFoundError, InterfaceRegistry
 from gateway.models.user import User
@@ -62,6 +62,12 @@ async def _dispatch_agent_action(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e),
             code="permission_denied",
+        )
+    except AdapterExecutionError as e:
+        raise api_error(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(e),
+            code="adapter_execution_failed",
         )
     except DomainNotFoundError as e:
         raise api_error(

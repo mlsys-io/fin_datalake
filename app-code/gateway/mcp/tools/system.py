@@ -1,70 +1,140 @@
-"""
-MCP Tools: System Domain
+from __future__ import annotations
 
-Exposes SystemAdapter capabilities as MCP Tools.
-
-Registered Tools:
-  - query_system_logs: Query centralized logs from TimescaleDB
-  - get_system_health: Get the system health summary of all components
-"""
-
-from mcp.server import Server
-from mcp.types import Tool, TextContent
-
-from gateway.core.registry import InterfaceRegistry, DomainNotFoundError
-from gateway.core.adapters import ActionNotFoundError, PermissionError
-from gateway.core.dispatch import dispatch, CircuitBreakerOpenError
-from gateway.models.user import User
+from gateway.mcp.tool_registry import GatewayMcpTool
 
 
-def register(server: Server, registry: InterfaceRegistry, user: User):
-    """Register all System domain tools onto the MCP server."""
-
-    @server.list_tools()
-    async def list_system_tools() -> list[Tool]:
-        return [
-            Tool(
-                name="query_system_logs",
-                description="Query centralized system logs from TimescaleDB across all services.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "component": {"type": "string", "description": "Filter by component (e.g. agent, hub, overseer)."},
-                        "level": {"type": "string", "description": "Filter by level (INFO, ERROR, WARNING)."},
-                        "since": {"type": "string", "description": "Time window (e.g. '1h', '24h'). Default: 1h."},
-                        "limit": {"type": "integer", "description": "Max rows to return. Default: 100."},
-                    },
-                    "required": [],
+TOOL_SPECS = [
+    GatewayMcpTool(
+        name="query_system_logs",
+        description="Query centralized system logs across all services.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string",
+                    "description": "Filter by component.",
+                },
+                "level": {
+                    "type": "string",
+                    "description": "Filter by level (INFO, ERROR, WARNING).",
+                },
+                "since": {
+                    "type": "string",
+                    "description": "Time window such as '1h' or '24h'.",
+                },
+                "agent_name": {
+                    "type": "string",
+                    "description": "Filter by specific agent name.",
+                },
+                "trace_id": {
+                    "type": "string",
+                    "description": "Filter by trace or request identifier.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of rows to return.",
+                },
+            },
+        },
+        domain="system",
+        action="logs",
+    ),
+    GatewayMcpTool(
+        name="get_system_health",
+        description="Get the current health status of monitored components.",
+        input_schema={"type": "object", "properties": {}},
+        domain="system",
+        action="health",
+    ),
+    GatewayMcpTool(
+        name="get_overseer_snapshots",
+        description="Retrieve recent overseer snapshots.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of snapshots to return.",
                 }
-            ),
-            Tool(
-                name="get_system_health",
-                description="Get the current health status of all monitored system components.",
-                inputSchema={"type": "object", "properties": {}},
-            ),
-        ]
+            },
+        },
+        domain="system",
+        action="overseer_snapshots",
+    ),
+    GatewayMcpTool(
+        name="get_overseer_alerts",
+        description="Retrieve recent overseer alert events.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of alerts to return.",
+                }
+            },
+        },
+        domain="system",
+        action="overseer_alerts",
+    ),
+    GatewayMcpTool(
+        name="get_infra_status",
+        description="Probe infrastructure dashboard targets such as Prefect and Ray.",
+        input_schema={"type": "object", "properties": {}},
+        domain="system",
+        action="infra_status",
+    ),
+    GatewayMcpTool(
+        name="query_audit_logs",
+        description="Query persisted gateway audit logs.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "since": {
+                    "type": "string",
+                    "description": "Time window such as '1h' or '24h'.",
+                },
+                "request_id": {
+                    "type": "string",
+                    "description": "Filter by gateway request identifier.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of rows to return.",
+                },
+                "source_protocol": {
+                    "type": "string",
+                    "description": "Filter by REST or MCP.",
+                },
+                "domain": {
+                    "type": "string",
+                    "description": "Filter by domain.",
+                },
+                "action": {
+                    "type": "string",
+                    "description": "Filter by action.",
+                },
+                "status_code": {
+                    "type": "integer",
+                    "description": "Filter by HTTP-style status code.",
+                },
+                "user_id": {
+                    "type": "string",
+                    "description": "Filter by user identifier.",
+                },
+            },
+        },
+        domain="system",
+        action="audit_logs",
+    ),
+    GatewayMcpTool(
+        name="get_interface_inventory",
+        description="Inspect gateway interfaces, routes, and MCP tools.",
+        input_schema={"type": "object", "properties": {}},
+        domain="system",
+        action="interface_inventory",
+    ),
+]
 
-    @server.call_tool()
-    async def handle_system_tool(name: str, arguments: dict) -> list[TextContent]:
-        action_map = {
-            "query_system_logs": "logs",
-            "get_system_health": "health",
-        }
-        action = action_map.get(name)
-        if action is None:
-            return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
-        try:
-            result = await dispatch(
-                registry=registry,
-                user=user,
-                domain="system",
-                action=action,
-                parameters=arguments,
-                source_protocol="mcp"
-            )
-            return [TextContent(type="text", text=str(result.data))]
-        except (CircuitBreakerOpenError, PermissionError, DomainNotFoundError, ActionNotFoundError, ValueError) as e:
-            return [TextContent(type="text", text=f"Error: {str(e)}")]
-        except Exception as e:
-            return [TextContent(type="text", text=f"Internal Error: {str(e)}")]
+def get_tool_specs() -> list[GatewayMcpTool]:
+    return list(TOOL_SPECS)

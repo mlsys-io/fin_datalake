@@ -10,9 +10,9 @@ import time
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
-from gateway.core.adapters import ActionNotFoundError, PermissionError
+from gateway.core.adapters import ActionNotFoundError, AdapterExecutionError, PermissionError
 from gateway.core.registry import InterfaceRegistry, DomainNotFoundError
 from gateway.models.intent import UserIntent
 from gateway.models.user import User
@@ -32,6 +32,37 @@ class DispatchResult:
 class CircuitBreakerOpenError(Exception):
     """Raised when the system is in maintenance mode/backpressure is active."""
     pass
+
+
+_SENSITIVE_PARAMETER_KEYS = {
+    "password",
+    "secret",
+    "token",
+    "api_key",
+    "authorization",
+    "connection_string",
+    "access_key",
+    "secret_access_key",
+    "client_secret",
+    "refresh_token",
+}
+
+
+def _sanitize_audit_parameters(parameters: Dict[str, Any]) -> Dict[str, Any]:
+    def _sanitize_value(key: str | None, value: Any) -> Any:
+        if key and key.lower() in _SENSITIVE_PARAMETER_KEYS:
+            return "[REDACTED]"
+        if isinstance(value, dict):
+            return {str(k): _sanitize_value(str(k), v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_sanitize_value(None, item) for item in value]
+        if isinstance(value, tuple):
+            return [_sanitize_value(None, item) for item in value]
+        if isinstance(value, str) and len(value) > 2000:
+            return value[:2000] + "...[truncated]"
+        return value
+
+    return {str(key): _sanitize_value(str(key), value) for key, value in (parameters or {}).items()}
 
 async def dispatch(
     registry: InterfaceRegistry,
@@ -72,7 +103,7 @@ async def dispatch(
                         user_id=user.username,
                         domain=domain,
                         action=action,
-                        parameters=parameters,
+                        parameters=_sanitize_audit_parameters(parameters),
                         source_protocol=source_protocol,
                         status_code=503,
                         duration_ms=0,
@@ -105,6 +136,9 @@ async def dispatch(
             request_id=request_id,
             status_code=200
         )
+    except AdapterExecutionError as e:
+        await _log_audit_event(intent, source_protocol, 502, (time.time() - start_time) * 1000, str(e))
+        raise
     except PermissionError as e:
         await _log_audit_event(intent, source_protocol, 403, (time.time() - start_time) * 1000, str(e))
         raise
@@ -128,7 +162,7 @@ async def _log_audit_event(intent: UserIntent, source_protocol: str, status_code
         user_id=intent.user_id,
         domain=intent.domain,
         action=intent.action,
-        parameters=intent.parameters,
+        parameters=_sanitize_audit_parameters(intent.parameters),
         source_protocol=source_protocol,
         status_code=status_code,
         duration_ms=duration_ms,

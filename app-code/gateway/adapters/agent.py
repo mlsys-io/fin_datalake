@@ -35,6 +35,34 @@ class AgentAdapter(BaseAdapter):
     def handles(self) -> str:
         return "agent"
 
+    def describe_actions(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "name": "chat",
+                "description": "Synchronous request-response chat with a named agent.",
+                "permission": Permission.AGENT_INTERACT.value,
+                "protocols": ["rest", "mcp"],
+            },
+            {
+                "name": "invoke",
+                "description": "Generic invoke-response against a named agent.",
+                "permission": Permission.AGENT_INTERACT.value,
+                "protocols": ["rest", "mcp"],
+            },
+            {
+                "name": "notify",
+                "description": "Broadcast an event to all live agents.",
+                "permission": Permission.AGENT_BROADCAST.value,
+                "protocols": ["rest", "mcp"],
+            },
+            {
+                "name": "list",
+                "description": "List all registered agents and their catalog metadata.",
+                "permission": Permission.AGENT_READ.value,
+                "protocols": ["rest", "mcp"],
+            },
+        ]
+
     async def execute(self, user: User, intent: UserIntent) -> Any:
         dispatch = {
             "chat": self._chat,
@@ -157,7 +185,7 @@ class AgentAdapter(BaseAdapter):
         async with AsyncSessionLocal() as db:
             for agent in live_by_name.values():
                 try:
-                    await crud.upsert_agent_definition(db, agent)
+                    await crud.upsert_agent_definition(db, agent, state_source="runtime")
                 except Exception as e:
                     logger.warning("Failed to sync agent '%s' into catalog: %s", agent.get("name"), e, exc_info=True)
 
@@ -209,11 +237,13 @@ class AgentAdapter(BaseAdapter):
         normalized.setdefault("last_action_type", None)
         normalized.setdefault("reconcile_notes", None)
         normalized.setdefault("deployment_metadata", {})
+        normalized.setdefault("state_source", "runtime")
 
         now = datetime.now(timezone.utc).isoformat()
         normalized.setdefault("last_seen_at", now)
         normalized.setdefault("last_heartbeat_at", now)
         normalized.setdefault("last_reconciled_at", now if is_alive else None)
+        normalized.setdefault("state_updated_at", now)
         return normalized
 
     def _merge_catalog_and_live_agent(self, catalog_agent: dict, live_agent: dict) -> dict:
@@ -224,6 +254,8 @@ class AgentAdapter(BaseAdapter):
             "capability_specs",
             "metadata",
             "deployment_metadata",
+            "state_source",
+            "state_updated_at",
             "runtime_source",
             "runtime_namespace",
             "route_prefix",
@@ -235,7 +267,10 @@ class AgentAdapter(BaseAdapter):
             if live_agent.get(field) is not None:
                 merged[field] = live_agent[field]
 
+        merged["catalog_state_source"] = catalog_agent.get("state_source")
+        merged["runtime_state_source"] = live_agent.get("state_source")
         merged["source"] = "catalog+runtime"
+        merged["state_source"] = "catalog+runtime"
 
         # Preserve the richer control-plane status coming from the catalog.
         if not merged.get("status"):

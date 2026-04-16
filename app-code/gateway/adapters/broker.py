@@ -34,6 +34,28 @@ class BrokerAdapter(BaseAdapter):
     def handles(self) -> str:
         return "broker"
 
+    def describe_actions(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "name": "get_s3_creds",
+                "description": "Return direct-access object storage credentials.",
+                "permission": Permission.BROKER_VEND.value,
+                "protocols": ["rest", "mcp"],
+            },
+            {
+                "name": "get_psql_string",
+                "description": "Return a PostgreSQL / TimescaleDB connection string.",
+                "permission": Permission.BROKER_VEND.value,
+                "protocols": ["rest", "mcp"],
+            },
+            {
+                "name": "list_connections",
+                "description": "List the connection services the broker can vend.",
+                "permission": Permission.BROKER_READ.value,
+                "protocols": ["rest", "mcp"],
+            },
+        ]
+
     async def execute(self, user: User, intent: UserIntent) -> Any:
         dispatch = {
             "get_s3_creds": self._get_s3_creds,

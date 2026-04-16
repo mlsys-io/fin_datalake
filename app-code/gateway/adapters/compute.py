@@ -27,6 +27,34 @@ class ComputeAdapter(BaseAdapter):
     def handles(self) -> str:
         return "compute"
 
+    def describe_actions(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "name": "submit_job",
+                "description": "Trigger a Prefect deployment for a named pipeline.",
+                "permission": Permission.COMPUTE_WRITE.value,
+                "protocols": ["rest", "mcp"],
+            },
+            {
+                "name": "get_status",
+                "description": "Get the status of a flow run.",
+                "permission": Permission.COMPUTE_READ.value,
+                "protocols": ["rest", "mcp"],
+            },
+            {
+                "name": "cancel_job",
+                "description": "Cancel a running flow run.",
+                "permission": Permission.COMPUTE_WRITE.value,
+                "protocols": ["rest", "mcp"],
+            },
+            {
+                "name": "list_jobs",
+                "description": "List recent flow runs from the compute plane.",
+                "permission": Permission.COMPUTE_READ.value,
+                "protocols": ["rest", "mcp"],
+            },
+        ]
+
     async def execute(self, user: User, intent: UserIntent) -> Any:
         dispatch = {
             "submit_job": self._submit_job,

@@ -9,16 +9,19 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 
 import httpx
 from fastapi import FastAPI
+from sqlalchemy import desc, func, select
 from redis.asyncio import Redis as AsyncRedis
 
 from gateway.core import config
 from gateway.core.redis import get_redis_client
+from gateway.db.audit_log import AuditLogORM
+from gateway.db.session import AsyncSessionLocal
 from gateway.db.session import engine
 
 
@@ -96,6 +99,113 @@ async def probe_infra_targets() -> dict[str, Any]:
                 }
 
     return {"targets": results}
+
+
+def _parse_audit_parameters(value: str | None) -> Any:
+    if not value:
+        return {}
+    try:
+        return json.loads(value)
+    except Exception:
+        return value
+
+
+def _parse_since_to_datetime(since: str | None) -> datetime:
+    now = datetime.now(timezone.utc)
+    if not since:
+        return now - timedelta(hours=1)
+
+    unit = since[-1].lower()
+    try:
+        amount = int(since[:-1])
+    except (ValueError, IndexError):
+        amount = 1
+        unit = "h"
+
+    if unit == "m":
+        return now - timedelta(minutes=amount)
+    if unit == "d":
+        return now - timedelta(days=amount)
+    return now - timedelta(hours=amount if amount > 0 else 1)
+
+
+async def fetch_audit_logs(
+    *,
+    since: str | None = "1h",
+    limit: int = 100,
+    request_id: str | None = None,
+    source_protocol: str | None = None,
+    domain: str | None = None,
+    action: str | None = None,
+    status_code: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    try:
+        limit = max(1, min(int(limit), 500))
+    except (TypeError, ValueError):
+        limit = 100
+    since_dt = _parse_since_to_datetime(since)
+
+    conditions = [AuditLogORM.timestamp >= since_dt]
+    if request_id:
+        conditions.append(AuditLogORM.request_id == request_id)
+    if source_protocol:
+        conditions.append(AuditLogORM.source_protocol == source_protocol)
+    if domain:
+        conditions.append(AuditLogORM.domain == domain)
+    if action:
+        conditions.append(AuditLogORM.action == action)
+    if status_code is not None:
+        conditions.append(AuditLogORM.status_code == int(status_code))
+    if user_id:
+        conditions.append(AuditLogORM.user_id == user_id)
+
+    stmt = (
+        select(AuditLogORM)
+        .where(*conditions)
+        .order_by(desc(AuditLogORM.timestamp), desc(AuditLogORM.id))
+        .limit(limit)
+    )
+    count_stmt = select(func.count()).select_from(AuditLogORM).where(*conditions)
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(stmt)
+        rows = result.scalars().all()
+        count_result = await db.execute(count_stmt)
+        total_count = int(count_result.scalar_one())
+
+    logs = [
+        {
+            "id": row.id,
+            "request_id": row.request_id,
+            "timestamp": row.timestamp.isoformat() if row.timestamp else None,
+            "user_id": row.user_id,
+            "domain": row.domain,
+            "action": row.action,
+            "parameters": _parse_audit_parameters(row.parameters),
+            "source_protocol": row.source_protocol,
+            "status_code": row.status_code,
+            "duration_ms": row.duration_ms,
+            "error_detail": row.error_detail,
+        }
+        for row in rows
+    ]
+
+    return {
+        "audit_logs": logs,
+        "count": total_count,
+        "returned_count": len(logs),
+        "query": {
+            "since": since,
+            "limit": limit,
+            "request_id": request_id,
+            "source_protocol": source_protocol,
+            "domain": domain,
+            "action": action,
+            "status_code": status_code,
+            "user_id": user_id,
+        },
+    }
 
 
 async def check_db_readiness() -> dict[str, Any]:

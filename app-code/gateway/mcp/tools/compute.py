@@ -1,74 +1,78 @@
-"""
-MCP Tools: Compute Domain
+from __future__ import annotations
 
-Exposes ComputeAdapter capabilities as MCP Tools.
-
-Registered Tools:
-  - submit_job:    Trigger a named Prefect deployment.
-  - get_job_status: Get the status of a running flow run.
-"""
-
-from mcp.server import Server
-from mcp.types import Tool, TextContent
-
-from gateway.core.registry import InterfaceRegistry, DomainNotFoundError
-from gateway.core.adapters import ActionNotFoundError, PermissionError
-from gateway.core.dispatch import dispatch, CircuitBreakerOpenError
-from gateway.models.user import User
+from gateway.mcp.tool_registry import GatewayMcpTool
 
 
-def register(server: Server, registry: InterfaceRegistry, user: User):
-    """Register all Compute domain tools onto the MCP server."""
-
-    @server.list_tools()
-    async def list_compute_tools() -> list[Tool]:
-        return [
-            Tool(
-                name="submit_job",
-                description="Trigger a named ETL pipeline on the Ray/Prefect cluster.",
-                inputSchema={
+TOOL_SPECS = [
+    GatewayMcpTool(
+        name="submit_job",
+        description="Trigger a named ETL pipeline on the compute plane.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "pipeline": {
+                    "type": "string",
+                    "description": "Name of the deployment or flow.",
+                },
+                "params": {
                     "type": "object",
-                    "properties": {
-                        "pipeline": {"type": "string", "description": "Name of the Prefect deployment."},
-                        "params": {"type": "object", "description": "Optional flow run parameters."},
-                    },
-                    "required": ["pipeline"],
+                    "description": "Optional run parameters.",
+                },
+            },
+            "required": ["pipeline"],
+        },
+        domain="compute",
+        action="submit_job",
+    ),
+    GatewayMcpTool(
+        name="get_job_status",
+        description="Get the status of a running job or flow run.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "job_id": {
+                    "type": "string",
+                    "description": "Identifier of the flow run.",
                 }
-            ),
-            Tool(
-                name="get_job_status",
-                description="Get the status of a previously submitted pipeline job.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "job_id": {"type": "string", "description": "UUID of the Prefect flow run."}
-                    },
-                    "required": ["job_id"],
+            },
+            "required": ["job_id"],
+        },
+        domain="compute",
+        action="get_status",
+    ),
+    GatewayMcpTool(
+        name="list_jobs",
+        description="List recent compute jobs visible to the gateway.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of jobs to return.",
                 }
-            ),
-        ]
+            },
+        },
+        domain="compute",
+        action="list_jobs",
+    ),
+    GatewayMcpTool(
+        name="cancel_job",
+        description="Cancel a running compute job.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "job_id": {
+                    "type": "string",
+                    "description": "Identifier of the flow run.",
+                }
+            },
+            "required": ["job_id"],
+        },
+        domain="compute",
+        action="cancel_job",
+    ),
+]
 
-    @server.call_tool()
-    async def handle_compute_tool(name: str, arguments: dict) -> list[TextContent]:
-        action_map = {
-            "submit_job": "submit_job",
-            "get_job_status": "get_status",
-        }
-        action = action_map.get(name)
-        if action is None:
-            return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
-        try:
-            result = await dispatch(
-                registry=registry,
-                user=user,
-                domain="compute",
-                action=action,
-                parameters=arguments,
-                source_protocol="mcp"
-            )
-            return [TextContent(type="text", text=str(result.data))]
-        except (CircuitBreakerOpenError, PermissionError, DomainNotFoundError, ActionNotFoundError, ValueError) as e:
-            return [TextContent(type="text", text=f"Error: {str(e)}")]
-        except Exception as e:
-            return [TextContent(type="text", text=f"Internal Error: {str(e)}")]
+def get_tool_specs() -> list[GatewayMcpTool]:
+    return list(TOOL_SPECS)
