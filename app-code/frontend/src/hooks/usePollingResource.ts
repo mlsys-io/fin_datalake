@@ -54,9 +54,10 @@ export function usePollingResource<T>(
       if (!mounted.current) return
       setError(err instanceof Error ? err.message : 'Request failed')
     } finally {
-      if (!mounted.current) return
-      setLoading(false)
-      setRefreshing(false)
+      if (mounted.current) {
+        setLoading(false)
+        setRefreshing(false)
+      }
     }
   }, [])
 

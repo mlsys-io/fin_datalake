@@ -26,8 +26,8 @@ export const Login: React.FC = () => {
             } else {
                 throw new Error('Could not fetch user profile')
             }
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Login failed')
         } finally {
             setLoading(false)
         }
@@ -52,8 +52,9 @@ export const Login: React.FC = () => {
 
                 <form onSubmit={handleLogin} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-stone-700 mb-2">Username</label>
+                        <label htmlFor="login-username" className="block text-sm font-medium text-stone-700 mb-2">Username</label>
                         <input
+                            id="login-username"
                             type="text"
                             required
                             className="w-full px-4 py-3 bg-white border border-stone-200 rounded text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent transition"
@@ -64,12 +65,13 @@ export const Login: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-stone-700 mb-2">Password</label>
+                        <label htmlFor="login-password" className="block text-sm font-medium text-stone-700 mb-2">Password</label>
                         <input
+                            id="login-password"
                             type="password"
                             required
                             className="w-full px-4 py-3 bg-white border border-stone-200 rounded text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:border-transparent transition"
-                            placeholder="••••••••"
+                            placeholder="Enter password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                         />

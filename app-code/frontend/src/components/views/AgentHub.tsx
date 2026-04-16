@@ -206,7 +206,7 @@ export const AgentHub: React.FC = () => {
         stale,
         refresh,
     } = usePollingResource(fetchAgents, { pollIntervalMs: POLL_INTERVAL_MS })
-    const agents = agentsData ?? []
+    const agents = useMemo(() => agentsData ?? [], [agentsData])
 
     const stateCounts = useMemo(() => {
         const counts = {
@@ -256,7 +256,7 @@ export const AgentHub: React.FC = () => {
         setActionLabel(null)
         setActionError(null)
         setActionResult(null)
-    }, [selectedAgentName])
+    }, [selectedAgent])
 
     const handleBroadcastPing = async () => {
         setBroadcasting(true)

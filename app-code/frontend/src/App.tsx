@@ -4,17 +4,30 @@ import { fetchMe } from './api/client'
 import { Login } from './components/Login'
 import { Dashboard } from './components/Dashboard'
 
+const DEMO_USER = {
+  username: 'demo',
+  email: null,
+  roles: ['Admin'],
+  permissions: ['compute:read', 'data:read', 'agent:read', 'agent:invoke', 'system:read'],
+}
+
 function App() {
   const { isAuthenticated, isLoading, setUser } = useAuthStore()
+  const demoAuthEnabled = import.meta.env.VITE_DEMO_AUTH === 'true'
 
   // On mount, check if there's a valid gateway_token cookie
   useEffect(() => {
+    if (demoAuthEnabled) {
+      setUser(DEMO_USER)
+      return
+    }
+
     const verifySession = async () => {
       const userProfile = await fetchMe()
       setUser(userProfile) // sets user and flips isLoading to false
     }
     verifySession()
-  }, [setUser])
+  }, [demoAuthEnabled, setUser])
 
   if (isLoading) {
     return (

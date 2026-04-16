@@ -39,6 +39,8 @@ export type AgentSummary = {
     capability_specs?: AgentCapabilitySpec[]
     metadata?: Record<string, unknown>
     deployment_metadata?: Record<string, unknown>
+    state_source?: string
+    state_updated_at?: string
     registered_at?: string
     last_seen_at?: string
     last_heartbeat_at?: string
@@ -67,7 +69,7 @@ export type AgentListResponse = {
 
 export type OverseerServiceMetrics = {
     healthy: boolean
-    data: any
+    data: unknown
     error: string | null
 }
 
@@ -108,6 +110,186 @@ export type ReadinessResponse = {
     }>
 }
 
+export type SystemHealthResponse = {
+    status?: string
+    message?: string
+    source?: string
+    timestamp?: string
+    components?: Record<string, {
+        healthy?: boolean
+        error?: string | null
+    }>
+}
+
+export type SystemLogEntry = {
+    time?: string
+    component?: string
+    level?: string
+    message?: string
+    trace_id?: string | null
+    agent_name?: string | null
+    metadata?: Record<string, unknown> | null
+}
+
+export type SystemLogsResponse = {
+    logs?: SystemLogEntry[]
+    count?: number
+    query?: Record<string, unknown>
+}
+
+export type AuditLogEntry = {
+    id?: string
+    request_id?: string
+    timestamp?: string
+    user_id?: string
+    domain?: string
+    action?: string
+    parameters?: Record<string, unknown> | unknown
+    source_protocol?: string
+    status_code?: number
+    duration_ms?: number
+    error_detail?: string | null
+}
+
+export type AuditLogsResponse = {
+    audit_logs?: AuditLogEntry[]
+    count?: number
+    returned_count?: number
+    query?: Record<string, unknown>
+}
+
+export type DataQueryResponse = {
+    success?: boolean
+    mode?: string
+    backend?: string
+    columns?: string[]
+    rows?: unknown[][]
+    row_count?: number
+    error_type?: string
+    error_message?: string
+}
+
+export type SystemLogFilters = {
+    component?: string
+    level?: string
+    since?: string
+    agent_name?: string
+    trace_id?: string
+    limit?: number
+}
+
+export type DataTableSummary = {
+    name: string
+    path: string
+    family?: string
+    source?: string
+    source_type?: string
+}
+
+export type DataCatalogResponse = {
+    tables?: DataTableSummary[]
+    source?: string
+    error?: string
+}
+
+export type CatalogSourceTable = {
+    name: string
+    path?: string
+    schema?: string
+    qualified_name?: string
+    family?: string
+}
+
+export type CatalogSource = {
+    id: string
+    label: string
+    kind: 'live' | 'static'
+    status: 'available' | 'partial' | 'pending' | 'planned'
+    detail: string
+    tables: CatalogSourceTable[]
+    source?: string
+    source_family?: string
+    source_type?: string
+    error?: string
+}
+
+export type CatalogSourcesResponse = {
+    generated_at?: string
+    live_sources?: CatalogSource[]
+    static_sources?: CatalogSource[]
+    summary?: {
+        total_sources?: number
+        available_sources?: number
+        total_tables?: number
+    }
+}
+
+export type DataSchemaResponse = {
+    table_path: string
+    fields?: {
+        name: string
+        type: string
+    }[]
+}
+
+export type InterfaceInventoryAction = {
+    name: string
+    description?: string
+    permission?: string
+    protocols?: string[]
+    state?: string
+    source?: string
+}
+
+export type InterfaceInventoryDomain = {
+    name: string
+    adapter?: string | null
+    actions: InterfaceInventoryAction[]
+    action_count?: number
+    state?: string
+    source?: string
+}
+
+export type InterfaceInventoryRoute = {
+    method: string
+    path: string
+    domain?: string
+    action?: string
+    state?: string
+    source?: string
+}
+
+export type InterfaceInventoryProxy = {
+    name: string
+    ok: boolean
+    status_code?: number | null
+    url?: string
+    detail?: string | null
+    state?: string
+    source?: string
+}
+
+export type InterfaceInventoryResponse = {
+    generated_at?: string
+    domains?: InterfaceInventoryDomain[]
+    mcp_tools?: {
+        name: string
+        description?: string
+        domain?: string
+        action?: string
+        input_schema?: Record<string, unknown>
+    }[]
+    routes?: InterfaceInventoryRoute[]
+    proxies?: InterfaceInventoryProxy[]
+    summary?: {
+        domains?: number
+        actions?: number
+        mcp_tools?: number
+        routes?: number
+        proxies?: number
+    }
+}
+
 async function parseAPIError(response: Response, fallback: string): Promise<APIError> {
     let detail = fallback
     let code = 'api_error'
@@ -141,7 +323,7 @@ async function parseJSONOrThrow<T>(response: Response, fallback: string): Promis
 /**
  * Send a Universal Intent to the Gateway.
  */
-export async function sendIntent<T = any>(domain: string, action: string, parameters: Record<string, any> = {}) {
+export async function sendIntent<T = unknown>(domain: string, action: string, parameters: Record<string, unknown> = {}) {
     const res = await fetch('/api/v1/intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -252,4 +434,58 @@ export async function fetchInfraStatus() {
 export async function fetchReadiness() {
     const res = await fetch('/readyz', { credentials: 'include' })
     return parseJSONOrThrow<ReadinessResponse>(res, 'Failed to fetch gateway readiness')
+}
+
+export async function fetchSystemHealth() {
+    return sendIntent<SystemHealthResponse>('system', 'health')
+}
+
+export async function fetchSystemLogs(filters: SystemLogFilters = {}) {
+    return sendIntent<SystemLogsResponse>('system', 'logs', filters)
+}
+
+export async function fetchAuditLogs(filters: {
+    since?: string
+    limit?: number
+    request_id?: string
+    source_protocol?: string
+    domain?: string
+    action?: string
+    status_code?: number
+    user_id?: string
+} = {}) {
+    const res = await fetch('/api/v1/system/audit-logs?' + new URLSearchParams(
+        Object.entries(filters)
+            .filter(([, value]) => value !== undefined && value !== null && value !== '')
+            .map(([key, value]) => [key, String(value)]),
+    ).toString(), { credentials: 'include' })
+    return parseJSONOrThrow<AuditLogsResponse>(res, 'Failed to fetch audit logs')
+}
+
+export async function queryStream(sql: string) {
+    return sendIntent<DataQueryResponse>('data', 'query_stream', { sql })
+}
+
+export async function runSql(sql: string) {
+    return sendIntent<DataQueryResponse>('data', 'run_sql', { sql })
+}
+
+export async function listDataTables() {
+    return sendIntent<DataCatalogResponse>('data', 'list_tables')
+}
+
+export async function listCatalogSources() {
+    return sendIntent<CatalogSourcesResponse>('data', 'catalog_sources')
+}
+
+export async function getDataSchema(tablePath: string) {
+    return sendIntent<DataSchemaResponse>('data', 'get_schema', { table_path: tablePath })
+}
+
+export async function previewDataTable(tablePath: string, limit: number = 10) {
+    return sendIntent<DataQueryResponse>('data', 'preview', { table_path: tablePath, limit })
+}
+
+export async function fetchInterfaceInventory() {
+    return sendIntent<InterfaceInventoryResponse>('system', 'interface_inventory')
 }

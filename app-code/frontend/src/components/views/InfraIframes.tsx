@@ -22,7 +22,7 @@ export const InfraIframes: React.FC = () => {
         stale,
         refresh,
     } = usePollingResource(fetchInfraStatus, { pollIntervalMs: 30_000 })
-    const statusById = data?.targets ?? {}
+    const statusById = useMemo(() => data?.targets ?? {}, [data?.targets])
 
     const activeStatus = useMemo(() => statusById[activeIframe.id], [statusById, activeIframe.id])
 
