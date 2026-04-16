@@ -226,7 +226,7 @@ def main():
     # ====================================================================
     section("3. ContextStore — Shared State")
 
-    from etl.agents.context import get_context
+    from etl.context.store import get_context
     ctx = get_context()
 
 

@@ -12,7 +12,7 @@ from loguru import logger
 from prefect import flow
 from prefect_ray.task_runners import RayTaskRunner
 
-from etl.agents.context import get_context
+from etl.context.store import get_context
 from etl.agents.manager import list_fleet_state
 from etl.config import config
 from etl.core.base_task import BaseTask

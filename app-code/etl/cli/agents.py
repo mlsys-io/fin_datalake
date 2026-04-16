@@ -1,24 +1,13 @@
-"""
-CLI for managing Ray Serve agent deployments.
-"""
-
 from __future__ import annotations
 
 import json
 
 import typer
 
-from etl.agents.manager import (
-    baseline_fleet_specs,
-    delete_agent,
-    delete_baseline_fleet,
-    deploy_agent,
-    deploy_baseline_fleet,
-    list_fleet_state,
-)
+import etl.agents.manager as manager
 
 
-app = typer.Typer(help="Manage Ray Serve agent deployments and fleet state.")
+app = typer.Typer(help="Deploy, inspect, and remove Ray Serve agents.")
 
 
 def _parse_json_option(raw: str, *, label: str) -> dict:
@@ -43,7 +32,7 @@ def deploy_command(
     config: str = typer.Option("{}", help="JSON object passed as agent config."),
     serve_options: str = typer.Option("{}", help="JSON object of Serve deployment options."),
 ):
-    deploy_agent(
+    manager.deploy_agent(
         agent_class,
         name=name,
         num_replicas=num_replicas,
@@ -63,13 +52,13 @@ def delete_command(
         help="Delete the durable catalog entry too. Clean catalog is recommended for intentional removal.",
     ),
 ):
-    result = delete_agent(name, clean_catalog=clean_catalog)
+    result = manager.delete_agent(name, clean_catalog=clean_catalog)
     typer.echo(json.dumps({"name": name, **result}, indent=2))
 
 
 @app.command("deploy-baseline")
 def deploy_baseline_command():
-    handles = deploy_baseline_fleet()
+    handles = manager.deploy_baseline_fleet()
     typer.echo(f"Deployed baseline fleet: {', '.join(sorted(handles))}")
 
 
@@ -81,24 +70,17 @@ def delete_baseline_command(
         help="Delete baseline catalog entries too.",
     ),
 ):
-    result = delete_baseline_fleet(clean_catalog=clean_catalog)
+    result = manager.delete_baseline_fleet(clean_catalog=clean_catalog)
     typer.echo(json.dumps(result, indent=2))
 
 
 @app.command("list")
 def list_command():
-    state = list_fleet_state()
+    state = manager.list_fleet_state()
     typer.echo(json.dumps(state, indent=2))
 
 
 @app.command("profiles")
 def profiles_command():
-    typer.echo(json.dumps({"baseline": [spec.__dict__.copy() for spec in baseline_fleet_specs()]}, indent=2))
+    typer.echo(json.dumps({"baseline": [spec.__dict__.copy() for spec in manager.baseline_fleet_specs()]}, indent=2))
 
-
-def main() -> None:
-    app()
-
-
-if __name__ == "__main__":
-    main()

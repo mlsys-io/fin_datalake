@@ -21,9 +21,10 @@ Required Permissions:
 """
 
 import os
+from urllib.parse import quote
 from typing import Any
 
-from gateway.core.adapters import BaseAdapter, ActionNotFoundError
+from gateway.core.adapters import AdapterExecutionError, BaseAdapter, ActionNotFoundError
 from gateway.core.rbac import Permission
 from gateway.models.intent import UserIntent
 from gateway.models.user import User
@@ -70,31 +71,100 @@ class BrokerAdapter(BaseAdapter):
             )
         return handler(user, intent)
 
+    def _require_broker_config(
+        self,
+        *,
+        label: str,
+        required_env: tuple[str, ...],
+        optional_env: tuple[str, ...] = (),
+    ) -> dict[str, str]:
+        config: dict[str, str] = {}
+        missing: list[str] = []
+
+        for name in required_env:
+            value = os.environ.get(name, "").strip()
+            if value:
+                config[name] = value
+            else:
+                missing.append(name)
+
+        for name in optional_env:
+            value = os.environ.get(name, "").strip()
+            if value:
+                config[name] = value
+
+        if missing:
+            raise AdapterExecutionError(
+                f"{label} is not configured. Missing environment variables: {', '.join(missing)}",
+                error_type="ConfigurationError",
+                context={"missing": missing},
+            )
+
+        return config
+
+    @staticmethod
+    def _build_postgres_connection_string(*, user: str, password: str, host: str, port: str, database: str) -> str:
+        return (
+            "postgresql://"
+            f"{quote(user, safe='')}:{quote(password, safe='')}@"
+            f"{host}:{port}/{quote(database, safe='')}"
+        )
+
     def _get_s3_creds(self, user: User, intent: UserIntent) -> dict:
         """Vend MinIO/S3 credentials for direct access. Requires broker:vend."""
         self._require_permission(user, Permission.BROKER_VEND)
+        config = self._require_broker_config(
+            label="MinIO/S3 credentials",
+            required_env=("MINIO_ENDPOINT", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"),
+            optional_env=("AWS_REGION",),
+        )
         # TODO: Integrate with AWS STS AssumeRole for time-limited tokens.
         return {
             "service": "minio",
-            "endpoint_url": os.environ.get("MINIO_ENDPOINT"),
-            "access_key_id": os.environ.get("AWS_ACCESS_KEY_ID"),
-            "secret_access_key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
-            "region": os.environ.get("AWS_REGION", "us-east-1"),
+            "endpoint_url": config["MINIO_ENDPOINT"],
+            "access_key_id": config["AWS_ACCESS_KEY_ID"],
+            "secret_access_key": config["AWS_SECRET_ACCESS_KEY"],
+            "region": config.get("AWS_REGION", "us-east-1"),
             "note": "Use with any S3-compatible client (boto3, Cyberduck, etc.).",
         }
 
     def _get_psql_string(self, user: User, intent: UserIntent) -> dict:
         """Vend a TimescaleDB connection string. Requires broker:vend."""
         self._require_permission(user, Permission.BROKER_VEND)
-        host = os.environ.get("TIMESCALE_HOST")
-        port = os.environ.get("TIMESCALE_PORT", "5432")
-        db = os.environ.get("TIMESCALE_DB", "etl")
-        usr = os.environ.get("TIMESCALE_USER")
-        pw = os.environ.get("TIMESCALE_PASSWORD")
+        config = self._require_broker_config(
+            label="TimescaleDB connection details",
+            required_env=("TIMESCALE_HOST", "TIMESCALE_USER", "TIMESCALE_PASSWORD"),
+            optional_env=("TIMESCALE_PORT", "TIMESCALE_DB"),
+        )
+        host = config["TIMESCALE_HOST"]
+        port = config.get("TIMESCALE_PORT", "5432")
+        db = config.get("TIMESCALE_DB", "etl")
+        usr = config["TIMESCALE_USER"]
+        pw = config["TIMESCALE_PASSWORD"]
+        try:
+            port_number = int(port)
+        except ValueError as exc:
+            raise AdapterExecutionError(
+                f"TIMESCALE_PORT must be a valid integer, got {port!r}.",
+                error_type="ConfigurationError",
+                context={"TIMESCALE_PORT": port},
+            ) from exc
+        if not 1 <= port_number <= 65535:
+            raise AdapterExecutionError(
+                f"TIMESCALE_PORT must be between 1 and 65535, got {port_number}.",
+                error_type="ConfigurationError",
+                context={"TIMESCALE_PORT": port_number},
+            )
         return {
             "service": "timescaledb",
-            "connection_string": f"postgresql://{usr}:{pw}@{host}:{port}/{db}",
-            "jdbc_url": f"jdbc:postgresql://{host}:{port}/{db}",
+            "connection_string": self._build_postgres_connection_string(
+                user=usr,
+                password=pw,
+                host=host,
+                port=str(port_number),
+                database=db,
+            ),
+            "jdbc_url": f"jdbc:postgresql://{host}:{port_number}/{quote(db, safe='')}",
             "note": "Connect via DBeaver, Tableau, or psycopg2 directly.",
         }
 

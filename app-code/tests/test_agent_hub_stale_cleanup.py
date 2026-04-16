@@ -22,11 +22,39 @@ def test_is_alive_prunes_stale_registration(monkeypatch) -> None:
     )
     hub._capability_index = {"demo.capability": ["stale-agent"]}
 
-    monkeypatch.setattr(hub, "_get_handle", lambda name: None)
+    import ray.serve as serve
+
+    def missing(_name: str):
+        raise ValueError("not found")
+
+    monkeypatch.setattr(serve, "get_app_handle", missing)
 
     assert hub._is_alive("stale-agent") is False
     assert "stale-agent" not in hub._agents
     assert hub._capability_index["demo.capability"] == []
+
+
+def test_is_alive_does_not_prune_on_temporary_handle_failure(monkeypatch) -> None:
+    hub = _make_hub()
+    hub._agents["temp-agent"] = AgentInfo(
+        name="temp-agent",
+        capabilities=["demo.capability"],
+        capability_specs=[{"id": "demo.capability", "aliases": []}],
+        registered_at=datetime.utcnow(),
+        metadata={},
+    )
+    hub._capability_index = {"demo.capability": ["temp-agent"]}
+
+    import ray.serve as serve
+
+    def boom(_name: str):
+        raise RuntimeError("temporary ray serve outage")
+
+    monkeypatch.setattr(serve, "get_app_handle", boom)
+
+    assert hub._is_alive("temp-agent") is False
+    assert "temp-agent" in hub._agents
+    assert hub._capability_index["demo.capability"] == ["temp-agent"]
 
 
 def test_list_agents_survives_stale_entries(monkeypatch) -> None:
@@ -52,12 +80,14 @@ def test_list_agents_survives_stale_entries(monkeypatch) -> None:
         "stale.capability": ["stale-agent"],
     }
 
+    import ray.serve as serve
+
     def fake_get_handle(name: str):
         if name == "healthy-agent":
             return object()
-        return None
+        raise ValueError("not found")
 
-    monkeypatch.setattr(hub, "_get_handle", fake_get_handle)
+    monkeypatch.setattr(serve, "get_app_handle", fake_get_handle)
 
     result = hub.list_agents()
 
@@ -86,12 +116,14 @@ def test_query_and_health_check_survive_stale_entries(monkeypatch) -> None:
     }
     hub._capability_index = {"demo.capability": ["healthy-agent", "stale-agent"], "demo": ["healthy-agent", "stale-agent"]}
 
+    import ray.serve as serve
+
     def fake_get_handle(name: str):
         if name == "healthy-agent":
             return object()
-        return None
+        raise ValueError("not found")
 
-    monkeypatch.setattr(hub, "_get_handle", fake_get_handle)
+    monkeypatch.setattr(serve, "get_app_handle", fake_get_handle)
 
     query_result = hub.query_agents(capability="demo.capability", alive_only=True)
     health = hub.health_check()

@@ -121,8 +121,8 @@ def monitor_service_flow(duration_seconds: int = 20, tick_interval: float = 1.0)
         logger.info("Stopping service...")
         try:
             svc.stop()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Service stop failed during cleanup: %s", exc)
         logger.info("Service stopped.")
 
 

@@ -12,7 +12,7 @@ from etl.io.base import DataSink, DataWriter
 if TYPE_CHECKING:
     import pyarrow as pa
     import pandas as pd
-    from etl.services.hive import HiveMetastore
+    from etl.integrations.hive import HiveMetastore
 
 
 @dataclass
@@ -266,7 +266,7 @@ class DeltaLakeWriter(DataWriter):
     def _register_in_hive(self, schema):
         """Register Delta table in Hive Metastore."""
         from loguru import logger
-        from etl.services.hive import HiveMetastore
+        from etl.integrations.hive import HiveMetastore
         
         try:
             db, table = "default", self.sink.hive_table_name

@@ -95,8 +95,12 @@ def run_gateway_ray_operation(operation_name: str, fn: Callable[[], T]) -> T:
         with _init_lock:
             try:
                 _run_on_ray_thread(_reset_gateway_ray_sync)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(
+                    "Failed to reset Gateway Ray client during reconnect: %s",
+                    exc,
+                    exc_info=True,
+                )
             _ray_ready = False
             if not init_gateway_ray():
                 raise

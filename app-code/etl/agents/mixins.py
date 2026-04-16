@@ -11,7 +11,7 @@ class ConversationManagerMixin:
     
     def _get_context_store(self):
         """Helper to get the ContextStore actor."""
-        from etl.agents.context import get_context
+        from etl.context.store import get_context
         return get_context()
 
     def save_conversation_state(self, conversation_id: str, messages: list, ttl: int = 3600):

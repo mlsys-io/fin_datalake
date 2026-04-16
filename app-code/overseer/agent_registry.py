@@ -18,6 +18,7 @@ import importlib.util
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
 from overseer.config import load_config
 
 _ENV_REGISTRY = "OVERSEER_AGENT_REGISTRY"
@@ -37,7 +38,8 @@ def load_agent_registry(config_path: str | Path | None = None) -> dict[str, str]
 
     try:
         cfg = load_config(config_path)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Failed to load Overseer agent registry from config: %s", exc)
         return {}
 
     agents = cfg.get("agents", {})

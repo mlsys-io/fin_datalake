@@ -168,6 +168,7 @@ class BaseAgent(ABC, ConversationManagerMixin):
                 health_status="healthy",
                 recovery_state="idle",
                 last_action_type="register",
+                state_source="catalog",
             )
         except Exception as e:
             logger.warning(f"[{self.name}] Failed to upsert durable agent catalog entry: {e}")
@@ -218,8 +219,8 @@ class BaseAgent(ABC, ConversationManagerMixin):
             hub = get_hub()
             ray.get(hub.unregister.remote(registered_name))
             logger.info(f"[{self.name}] Deregistered '{registered_name}' from AgentHub")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(f"[{self.name}] Failed to deregister '{registered_name}' from AgentHub: {exc}")
 
         try:
             from etl.agents.catalog import update_agent_catalog_status
@@ -229,9 +230,10 @@ class BaseAgent(ABC, ConversationManagerMixin):
                 status="offline",
                 mark_seen=True,
                 heartbeat=False,
+                state_source="catalog",
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(f"[{self.name}] Failed to update durable catalog status for '{registered_name}': {exc}")
 
     @abstractmethod
     def build_executor(self) -> Any:

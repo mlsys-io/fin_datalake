@@ -7,7 +7,7 @@ import traceback
 from loguru import logger
 
 from etl.agents.base import BaseAgent
-from etl.agents.context import get_context
+from etl.context.store import get_context
 from etl.agents.langchain_adapter import LangChainMixin
 
 

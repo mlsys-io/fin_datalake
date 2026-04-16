@@ -33,7 +33,7 @@ def setup_storage(buckets: List[str]) -> bool:
     Returns:
         True if all buckets are ready, False on any failure.
     """
-    from etl.services.minio import MinIOService
+    from etl.integrations.minio import MinIOService
     
     logger.info("🪣 Setting up MinIO storage buckets...")
     
@@ -83,7 +83,7 @@ def main():
     args = parser.parse_args()
     
     if args.list:
-        from etl.services.minio import MinIOService
+        from etl.integrations.minio import MinIOService
         minio = MinIOService.from_env()
         buckets = minio.list_buckets()
         print("Existing buckets:")

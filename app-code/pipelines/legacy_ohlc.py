@@ -29,7 +29,7 @@ class OhlcProcessTask(BaseTask):
         from pyarrow import csv
         from etl.io.sources.file import FileSource
         from etl.io.sinks.delta_lake import DeltaLakeSink
-        from etl.services.hive import HiveMetastore
+        from etl.integrations.hive import HiveMetastore
         from transformations.ohlc import transform_ohlc
         
         print(f"[{self.name}] finding files matching {input_pattern}...")

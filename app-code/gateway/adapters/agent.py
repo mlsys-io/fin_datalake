@@ -183,12 +183,6 @@ class AgentAdapter(BaseAdapter):
                 live_by_name[agent_name] = normalized_agent
 
         async with AsyncSessionLocal() as db:
-            for agent in live_by_name.values():
-                try:
-                    await crud.upsert_agent_definition(db, agent, state_source="runtime")
-                except Exception as e:
-                    logger.warning("Failed to sync agent '%s' into catalog: %s", agent.get("name"), e, exc_info=True)
-
             catalog_agents = await crud.list_agent_definitions(db)
 
         merged = []

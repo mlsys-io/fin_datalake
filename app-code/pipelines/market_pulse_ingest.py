@@ -11,7 +11,7 @@ from loguru import logger
 from prefect import flow
 from prefect_ray.task_runners import RayTaskRunner
 
-from etl.agents.context import get_context
+from etl.context.store import get_context
 from etl.config import config
 from etl.core.base_service import ServiceTask
 from etl.core.base_task import BaseTask
@@ -20,6 +20,7 @@ from etl.io.sources.websocket import WebSocketSource
 from etl.io.tasks.delta_lake_write_task import DeltaLakeWriteTask
 from etl.io.tasks.risingwave_write_task import RisingWaveWriteTask
 from etl.runtime import ensure_ray
+from etl.ops.service_ops import delete_named_service
 
 
 DEFAULT_PROVIDER = str(os.environ.get("DEMO_MARKET_DATA_PROVIDER", "fmp")).strip().lower() or "fmp"
@@ -679,11 +680,6 @@ class ReadLatestPriceWindowTask(BaseTask):
         }
 
 
-class EnsurePriceServiceTask(BaseTask):
-    def run(self, *, symbol: str, window_size: int) -> Dict[str, Any]:
-        return _ensure_price_service(symbol=symbol, window_size=window_size)
-
-
 def _price_service_cfg(*, symbol: str, window_size: int) -> Dict[str, Any]:
     return {
         "symbol": symbol,
@@ -703,13 +699,6 @@ def _price_service_fingerprint(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {field: payload.get(field) for field in PRICE_SERVICE_CONFIG_FIELDS}
 
 
-def _clear_price_context() -> None:
-    store = get_context()
-    store.delete(PRICE_WINDOW_CONTEXT_KEY)
-    store.delete(PRICE_META_CONTEXT_KEY)
-    store.delete(PRICE_METRICS_CONTEXT_KEY)
-
-
 def _read_price_context_snapshot() -> Dict[str, Any]:
     store = get_context()
     return {
@@ -720,25 +709,10 @@ def _read_price_context_snapshot() -> Dict[str, Any]:
 
 
 def _restart_price_service(service_name: str, service_cfg: Dict[str, Any]) -> Any:
-    import ray
-
-    try:
-        stale = MarketPriceIngestService.connect(service_name)
-        try:
-            stale.stop()
-        except Exception as exc:
-            logger.warning(f"[Ingest] Could not stop stale price service cooperatively: {exc}")
-    except Exception:
-        stale = None
-
-    try:
-        actor = ray.get_actor(service_name)
-        ray.kill(actor, no_restart=True)
-        logger.info(f"[Ingest] Killed stale price service actor '{service_name}'.")
-    except Exception as exc:
-        logger.debug(f"[Ingest] No existing actor kill needed for '{service_name}': {exc}")
-
-    _clear_price_context()
+    delete_named_service(
+        service_name,
+        context_keys=[PRICE_WINDOW_CONTEXT_KEY, PRICE_META_CONTEXT_KEY, PRICE_METRICS_CONTEXT_KEY],
+    )
     svc = MarketPriceIngestService.deploy(
         name=service_name,
         config=service_cfg,
@@ -818,10 +792,10 @@ def market_pulse_ingest(
 ) -> Dict[str, Any]:
     logger.info(f"=== Starting Market Pulse Ingest Flow for {symbol} (provider={provider}) ===")
 
-    service_status = EnsurePriceServiceTask(name="Ensure Price Service").submit(
+    service_status = _ensure_price_service(
         symbol=symbol,
         window_size=DEFAULT_PRICE_WINDOW_SIZE,
-    ).result()
+    )
 
     news_task = MarketNewsIngestTask()
     read_price_task = ReadLatestPriceWindowTask(name="Read Latest Price Window")

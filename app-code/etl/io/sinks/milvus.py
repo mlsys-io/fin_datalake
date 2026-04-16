@@ -2,10 +2,13 @@
 Milvus Sink for writing to Milvus Vector Database.
 Heavy imports are deferred to runtime for Ray worker execution.
 """
+import logging
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Union, List, TYPE_CHECKING
 
 from etl.io.base import DataSink, DataWriter
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -77,8 +80,8 @@ class MilvusWriter(DataWriter):
             try:
                 from pymilvus import connections
                 connections.disconnect("default")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(f"[MilvusWriter] Failed to disconnect cleanly: {exc}")
             self._conn = None
             self._collection = None
 

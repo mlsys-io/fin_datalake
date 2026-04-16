@@ -85,7 +85,7 @@ async def probe_infra_targets() -> dict[str, Any]:
             try:
                 response = await client.get(url)
                 results[name] = {
-                    "ok": response.status_code < 500,
+                    "ok": response.status_code < 400 or response.status_code in {401, 403},
                     "status_code": response.status_code,
                     "url": url,
                     "detail": None,

@@ -112,24 +112,24 @@ The same commands are also available through the packaging-oriented alias
 
 ```bash
 cd ~/zdb_deployment/app-code
-uv run etl-agents profiles
-uv run lakehouse-client profiles
+uv run etl-agents agents profiles
+uv run lakehouse-client agents profiles
 ```
 
 ### Deploy one named agent
 
 ```bash
 cd ~/zdb_deployment/app-code
-uv run etl-agents deploy SupportAgent --name SupportAgent
-uv run lakehouse-client deploy SupportAgent --name SupportAgent
+uv run etl-agents agents deploy SupportAgent --name SupportAgent
+uv run lakehouse-client agents deploy SupportAgent --name SupportAgent
 ```
 
 ### Deploy the baseline fleet
 
 ```bash
 cd ~/zdb_deployment/app-code
-uv run etl-agents deploy-baseline
-uv run lakehouse-client deploy-baseline
+uv run etl-agents agents deploy-baseline
+uv run lakehouse-client agents deploy-baseline
 ```
 
 ### Delete one deployment intentionally
@@ -138,24 +138,24 @@ Use catalog cleanup when you do not want Overseer to bring the deployment back.
 
 ```bash
 cd ~/zdb_deployment/app-code
-uv run etl-agents delete SupportAgent --clean-catalog
-uv run lakehouse-client delete SupportAgent --clean-catalog
+uv run etl-agents agents delete SupportAgent --clean-catalog
+uv run lakehouse-client agents delete SupportAgent --clean-catalog
 ```
 
 ### Delete the baseline fleet
 
 ```bash
 cd ~/zdb_deployment/app-code
-uv run etl-agents delete-baseline --clean-catalog
-uv run lakehouse-client delete-baseline --clean-catalog
+uv run etl-agents agents delete-baseline --clean-catalog
+uv run lakehouse-client agents delete-baseline --clean-catalog
 ```
 
 ### Inspect merged catalog and runtime state
 
 ```bash
 cd ~/zdb_deployment/app-code
-uv run etl-agents list
-uv run lakehouse-client list
+uv run etl-agents agents list
+uv run lakehouse-client agents list
 ```
 
 ## Demo And Validation Workflows

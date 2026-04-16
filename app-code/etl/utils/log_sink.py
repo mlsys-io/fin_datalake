@@ -22,11 +22,15 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 import atexit
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -290,8 +294,8 @@ class TimescaleLogSink:
         if self._conn:
             try:
                 self._conn.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to close TimescaleDB log sink connection cleanly: %s", exc)
             self._conn = None
 
     # ------------------------------------------------------------------

@@ -326,7 +326,7 @@ class DataAdapter(BaseAdapter):
 
         # 2. Try Hive Metastore (in executor to avoid blocking loop)
         try:
-            from etl.services.hive import HiveMetastore
+            from etl.integrations.hive import HiveMetastore
             
             hms_host = os.environ.get("HMS_HOST", "localhost")
             hms_port = int(os.environ.get("HMS_PORT", 9083))
@@ -352,8 +352,8 @@ class DataAdapter(BaseAdapter):
             try:
                 async with r:
                     await r.setex(cache_key, 60, json.dumps(normalized_tables))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(f"Redis cache write failed for table inventory: {exc}")
                 
             return {"tables": normalized_tables, "source": "hive", "source_family": "lakehouse"}
             

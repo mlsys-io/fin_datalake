@@ -93,9 +93,9 @@ The project exposes the lifecycle helper through the `etl-agents` command.
 
 ```bash
 cd ~/zdb_deployment/app-code
-uv run etl-agents deploy-baseline
-uv run etl-agents list
-uv run etl-agents delete SupportAgent --clean-catalog
+uv run etl-agents agents deploy-baseline
+uv run etl-agents agents list
+uv run etl-agents agents delete SupportAgent --clean-catalog
 ```
 
 This CLI is the recommended operator entrypoint for intentional agent lifecycle actions.

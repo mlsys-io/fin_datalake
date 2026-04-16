@@ -18,6 +18,18 @@ _DEFAULT_CONFIG = Path(__file__).parent / "config.yaml"
 _ENV_CONFIG_PATH = "OVERSEER_CONFIG_PATH"
 
 
+def _coerce_port(raw: object, *, name: str, fallback: int) -> int:
+    if raw in (None, ""):
+        return fallback
+    try:
+        port = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a valid integer port, got {raw!r}.") from exc
+    if not 1 <= port <= 65535:
+        raise ValueError(f"{name} must be between 1 and 65535, got {port}.")
+    return port
+
+
 def resolve_config_path(path: str | Path | None = None) -> Path:
     """Resolve the active Overseer config path."""
     if path:
@@ -46,7 +58,7 @@ def load_endpoints(path: str | Path | None = None) -> list[ServiceEndpoint]:
         # Allow env-var overrides: OVERSEER_RAY_HOST, OVERSEER_RAY_PORT, etc.
         env_prefix = f"OVERSEER_{name.upper()}_"
         host = os.environ.get(f"{env_prefix}HOST", cfg.get("host", "localhost"))
-        port = int(os.environ.get(f"{env_prefix}PORT", cfg.get("port", 8080)))
+        port = _coerce_port(os.environ.get(f"{env_prefix}PORT", cfg.get("port", 8080)), name=f"{env_prefix}PORT", fallback=8080)
         protocol = os.environ.get(f"{env_prefix}PROTOCOL", cfg.get("protocol", "http"))
 
         endpoints.append(ServiceEndpoint(

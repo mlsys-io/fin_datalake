@@ -461,7 +461,8 @@ class Overseer:
         }
 
     def _in_respawn_recovery_window(self, entry: dict[str, Any]) -> bool:
-        if self.respawn_recovery_timeout_seconds <= 0:
+        timeout = float(getattr(self, "respawn_recovery_timeout_seconds", 0) or 0)
+        if timeout <= 0:
             return False
         raw = entry.get("last_reconciled_at")
         if not raw:
@@ -475,7 +476,7 @@ class Overseer:
         age_seconds = (
             datetime.now(timezone.utc) - reconciled_at.astimezone(timezone.utc)
         ).total_seconds()
-        return age_seconds <= self.respawn_recovery_timeout_seconds
+        return age_seconds <= timeout
 
     def _is_agent_control_healthy(
         self,
@@ -509,6 +510,7 @@ class Overseer:
                 update_agent_catalog_status(
                     name=str(deployment.get("name") or ""),
                     status=self._legacy_catalog_status(deployment),
+                    state_source="control",
                     mark_seen=bool(deployment.get("alive")),
                     heartbeat=False,
                     observed_status=str(deployment.get("observed_status") or "unknown"),
@@ -536,6 +538,7 @@ class Overseer:
             update_agent_catalog_status,
             name=action.deployment_name,
             status="alive",
+            state_source="control",
             mark_seen=False,
             heartbeat=False,
             observed_status="recovering",
@@ -561,6 +564,7 @@ class Overseer:
                     update_agent_catalog_status,
                     name=action.deployment_name,
                     status="alive",
+                    state_source="control",
                     mark_seen=False,
                     heartbeat=False,
                     observed_status="recovering",
@@ -576,6 +580,7 @@ class Overseer:
                     update_agent_catalog_status,
                     name=action.deployment_name,
                     status="alive",
+                    state_source="control",
                     mark_seen=False,
                     heartbeat=False,
                     observed_status=None,
@@ -592,6 +597,7 @@ class Overseer:
             update_agent_catalog_status,
             name=action.deployment_name,
             status="offline",
+            state_source="control",
             mark_seen=False,
             heartbeat=False,
             observed_status="missing",

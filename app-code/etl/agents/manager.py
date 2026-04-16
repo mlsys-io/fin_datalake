@@ -116,11 +116,6 @@ def delete_agent(name: str, *, clean_catalog: bool = True) -> dict[str, bool]:
     }
 
 
-def delete_agent_deployment(name: str, *, clean_catalog: bool = True) -> dict[str, bool]:
-    """Backward-compatible alias for callers using the older helper name."""
-    return delete_agent(name, clean_catalog=clean_catalog)
-
-
 def delete_fleet(
     specs: list[DeploymentSpec] | tuple[DeploymentSpec, ...],
     *,
@@ -174,6 +169,8 @@ def list_fleet_state() -> dict[str, Any]:
                 "desired_status": catalog_agent.get("desired_status"),
                 "observed_status": catalog_agent.get("observed_status"),
                 "health_status": catalog_agent.get("health_status"),
+                "state_source": catalog_agent.get("state_source") or runtime_agent.get("state_source") or ("catalog+runtime" if catalog_agent and runtime_agent else "catalog" if catalog_agent else "runtime"),
+                "state_updated_at": catalog_agent.get("state_updated_at") or runtime_agent.get("state_updated_at"),
                 "alive": bool(runtime_agent.get("alive", catalog_agent.get("alive", False))),
                 "source": (
                     "catalog+runtime"

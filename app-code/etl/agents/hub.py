@@ -324,16 +324,22 @@ class AgentHub:
         import ray.serve as serve
         try:
             return serve.get_app_handle(name)
-        except Exception:
+        except ValueError:
             self.unregister(name)
+            return None
+        except Exception:
+            from loguru import logger
+
+            logger.warning(
+                "Unable to resolve agent handle '{}'; treating as temporarily unavailable.",
+                name,
+                exc_info=True,
+            )
             return None
 
     def _is_alive(self, name: str) -> bool:
         handle = self._get_handle(name)
-        if handle is None:
-            self.unregister(name)
-            return False
-        return True
+        return handle is not None
 
 
 def get_hub(*, create_if_missing: bool = True) -> ray.actor.ActorHandle:

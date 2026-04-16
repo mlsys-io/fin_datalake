@@ -126,8 +126,8 @@ all = [
 gateway-api = "gateway.api.main:app"
 gateway-mcp = "gateway.mcp.server:main"
 overseer = "overseer.main:main"
-etl-agents = "etl.agents.cli:main"
-lakehouse-client = "lakehouse_client.cli:main"
+etl-agents = "etl.cli.main:main"
+lakehouse-client = "etl.cli.main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

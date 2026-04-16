@@ -30,7 +30,7 @@ class JoinProcessTask(BaseTask):
         # Heavy imports inside run() - executes on Ray worker
         from etl.io.sources.file import FileSource
         from etl.io.sinks.delta_lake import DeltaLakeSink
-        from etl.services.hive import HiveMetastore
+        from etl.integrations.hive import HiveMetastore
         
         print(f"[{self.name}] Starting Distributed Join Pipeline...")
         

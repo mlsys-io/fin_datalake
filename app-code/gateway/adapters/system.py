@@ -108,8 +108,8 @@ class SystemAdapter(BaseAdapter):
             if not r:
                 return {"status": "unknown", "message": "Redis not configured"}
 
-            snapshot_data = await r.lindex("overseer:snapshots", 0)
-            await r.aclose()
+            async with r:
+                snapshot_data = await r.lindex("overseer:snapshots", 0)
 
             if snapshot_data:
                 snap = json.loads(snapshot_data)
@@ -220,7 +220,7 @@ class SystemAdapter(BaseAdapter):
         agent_name = params.get("agent_name")
         trace_id = params.get("trace_id")
         try:
-            limit = min(int(params.get("limit", 100)), 500)
+            limit = max(1, min(int(params.get("limit", 100)), 500))
         except (TypeError, ValueError):
             limit = 100
 

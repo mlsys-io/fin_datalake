@@ -1,5 +1,7 @@
 from overseer.collectors.ray import map_serve_applications_by_name, parse_serve_applications
+from overseer.config import load_endpoints
 from overseer.loop import Overseer
+import pytest
 
 
 def _make_overseer() -> Overseer:
@@ -112,3 +114,21 @@ def test_normalize_catalog_deployment_marks_missing_only_when_app_absent() -> No
     assert deployment["observed_status"] == "missing"
     assert deployment["health_status"] == "offline"
     assert deployment["alive"] is False
+
+
+def test_load_endpoints_rejects_invalid_port_override(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        """
+services:
+  ray:
+    host: localhost
+    port: 8080
+    protocol: http
+""".strip()
+    )
+    monkeypatch.setenv("OVERSEER_CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("OVERSEER_RAY_PORT", "not-a-port")
+
+    with pytest.raises(ValueError, match="OVERSEER_RAY_PORT must be a valid integer port"):
+        load_endpoints()
