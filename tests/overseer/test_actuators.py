@@ -22,8 +22,15 @@ async def test_overseer_loop_timeout():
     """Test that the overseer loop cancels actuators that take longer than 30s."""
     from overseer.loop import Overseer
     import time
-    
-    overseer = Overseer()
+
+    from unittest.mock import patch
+
+    with patch("overseer.loop.load_config", return_value={"overseer": {}}), \
+         patch("overseer.loop.load_endpoints", return_value=[]), \
+         patch("overseer.loop.MetricsStore"), \
+         patch("overseer.loop.CooldownTracker"):
+        overseer = Overseer()
+
     # Mocking self.actuators to only have SlowActuator
     overseer.actuators = {"slow": SlowActuator()}
     

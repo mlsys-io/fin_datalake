@@ -3,8 +3,9 @@ Tests for BaseAdapter permission enforcement and ActionNotFoundError.
 """
 
 import pytest
-from gateway.core.adapters import BaseAdapter, ActionNotFoundError
-from gateway.models.user import Permission, User
+from gateway.core.adapters import BaseAdapter, ActionNotFoundError, PermissionError as AdapterPermissionError
+from gateway.core.rbac import DEFAULT_ROLES, Permission, rbac_provider
+from gateway.models.user import User
 from gateway.models.intent import UserIntent
 
 
@@ -20,6 +21,7 @@ class ConcreteAdapter(BaseAdapter):
 
 class TestBaseAdapterPermissions:
     def setup_method(self):
+        rbac_provider._roles = dict(DEFAULT_ROLES)
         self.adapter = ConcreteAdapter()
         self.admin = User(username="admin", hashed_password="x", role_names=["Admin"])
         self.analyst = User(username="analyst", hashed_password="x", role_names=["Analyst"])
@@ -30,7 +32,7 @@ class TestBaseAdapterPermissions:
 
     def test_require_permission_raises_for_analyst(self):
         """Analyst does NOT have SYSTEM_ADMIN."""
-        with pytest.raises(PermissionError):
+        with pytest.raises(AdapterPermissionError):
             self.adapter._require_permission(self.analyst, Permission.SYSTEM_ADMIN)
 
     def test_analyst_can_read_data(self):

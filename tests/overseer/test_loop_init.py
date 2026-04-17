@@ -19,13 +19,13 @@ def mock_overseer_deps():
 
 
 def test_overseer_init_starts_with_zero_policies(mock_overseer_deps):
-    """Since all policies come from S3, init should produce an empty list."""
+    """The current Overseer boots with its built-in policies."""
     mock_load_config = mock_overseer_deps
     mock_load_config.return_value = {"overseer": {}}
     
     overseer = Overseer()
     
-    assert len(overseer.policies) == 0
+    assert len(overseer.policies) == 2
 
 
 def test_overseer_init_has_expected_actuators(mock_overseer_deps):

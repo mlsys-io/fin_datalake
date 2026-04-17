@@ -9,7 +9,8 @@ from overseer.models import SystemSnapshot, OverseerAction, ActionType
 @pytest.fixture
 def mock_redis():
     from unittest.mock import MagicMock
-    with patch("redis.asyncio.from_url") as mock_from_url:
+    with patch("redis.asyncio.from_url") as mock_from_url, \
+         patch("overseer.redis_utils.get_redis_client") as mock_get_client:
         mock_client = AsyncMock()
         mock_pipeline = AsyncMock()
         
@@ -21,6 +22,7 @@ def mock_redis():
         mock_client.pipeline = MagicMock(return_value=mock_pipeline)
         
         mock_from_url.return_value = mock_client
+        mock_get_client.return_value = mock_client
         yield mock_client, mock_pipeline
 
 

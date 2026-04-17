@@ -23,7 +23,7 @@ except ModuleNotFoundError as exc:
     if exc.name == "prefect":
         raise ModuleNotFoundError(
             "lakehouse_client.etl requires Prefect. Install the client dependencies "
-            "with `pip install -r requirements-client.txt` or the package client extra."
+            "with `uv sync --extra client --group dev` or the package client extra."
         ) from exc
     raise
 

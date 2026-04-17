@@ -31,6 +31,28 @@ def make_snapshot(kafka_lag: dict | None = None, actors: list | None = None) -> 
             service="ray", healthy=True,
             data={"actors": actors, "actors_alive": alive, "actors_dead": dead},
         )
+        deployments = []
+        for actor in actors:
+            is_alive = actor["state"] == "ALIVE"
+            deployments.append({
+                "name": actor["actor_id"],
+                "agent_class": actor["class_name"],
+                "managed_by_overseer": True,
+                "desired_status": "running",
+                "observed_status": "ready" if is_alive else "offline",
+                "health_status": "healthy" if is_alive else "offline",
+                "recovery_state": "idle",
+                "metadata": {
+                    "class": actor["class_name"],
+                    "app_name": actor["class_name"],
+                },
+                "deployment_metadata": {"replication_mode": "serve"},
+            })
+        snap.services["agent_control"] = ServiceMetrics(
+            service="agent_control",
+            healthy=True,
+            data={"deployments": deployments},
+        )
     return snap
 
 

@@ -41,7 +41,7 @@ def test_write_batch_calls_deltalake(mock_write_deltalake):
 
 def test_foolproof_hive_registration(mock_write_deltalake):
     # Mock Hive
-    with patch("etl.services.hive.HiveMetastore") as mock_hms_class:
+    with patch("etl.integrations.hive.HiveMetastore") as mock_hms_class:
         mock_hms = mock_hms_class.return_value
         mock_client = MagicMock()
         mock_hms.open.return_value.__enter__.return_value = mock_client

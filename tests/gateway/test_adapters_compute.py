@@ -6,19 +6,21 @@ Focuses on async execution and Prefect integration.
 import pytest
 from unittest.mock import AsyncMock, patch
 from gateway.adapters.compute import ComputeAdapter
+from gateway.core.rbac import DEFAULT_ROLES, rbac_provider
 from gateway.models.intent import UserIntent
 from gateway.models.user import User
 
 def make_intent(domain: str, action: str, **params) -> UserIntent:
     return UserIntent(
         domain=domain, action=action, parameters=params,
-        user_id="test", role="admin",
+        user_id="test", roles=["Admin"],
     )
 
 ADMIN = User(username="admin", hashed_password="x", role_names=["Admin"])
 
 class TestComputeAdapter:
     def setup_method(self):
+        rbac_provider._roles = dict(DEFAULT_ROLES)
         self.adapter = ComputeAdapter()
 
     @pytest.mark.asyncio
@@ -31,7 +33,7 @@ class TestComputeAdapter:
         
         # Mock flow run response
         mock_flow_run = AsyncMock()
-        mock_flow_run.state.type.value = "COMPLETED"
+        mock_flow_run.state_name = "COMPLETED"
         mock_client.read_flow_run.return_value = mock_flow_run
 
         intent = make_intent("compute", "get_status", job_id="test-job-123")

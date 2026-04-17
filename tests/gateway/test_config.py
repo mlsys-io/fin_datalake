@@ -1,46 +1,22 @@
 """
-Tests for Gateway core config: password hashing and JWT handling.
+Tests for Gateway core config.
 """
 
-import pytest
-from unittest.mock import patch
-from gateway.core.config import (
-    hash_password,
-    verify_password,
-    JWT_SECRET,
-    JWT_ALGORITHM,
-    JWT_EXPIRE_MINUTES,
-)
+from gateway.core.config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_EXPIRE_MINUTES, REDIS_URL
 
 
-class TestPasswordHashing:
-    def test_hash_returns_string(self):
-        h = hash_password("test123")
-        assert isinstance(h, str)
-        assert h != "test123"
-
-    def test_verify_correct_password(self):
-        h = hash_password("mypassword")
-        assert verify_password("mypassword", h) is True
-
-    def test_verify_wrong_password(self):
-        h = hash_password("correct")
-        assert verify_password("wrong", h) is False
-
-    def test_different_inputs_produce_different_hashes(self):
-        h1 = hash_password("password1")
-        h2 = hash_password("password2")
-        assert h1 != h2
+def test_secret_key_can_be_missing_in_dev():
+    assert JWT_SECRET_KEY is None or isinstance(JWT_SECRET_KEY, str)
 
 
-class TestJWTConfig:
-    def test_secret_has_default(self):
-        """JWT_SECRET should have a fallback for development."""
-        assert JWT_SECRET is not None
-        assert len(JWT_SECRET) > 0
+def test_algorithm_is_hs256():
+    assert JWT_ALGORITHM == "HS256"
 
-    def test_algorithm_is_hs256(self):
-        assert JWT_ALGORITHM == "HS256"
 
-    def test_expire_minutes_is_positive(self):
-        assert JWT_EXPIRE_MINUTES > 0
+def test_expire_minutes_is_positive():
+    assert isinstance(JWT_EXPIRE_MINUTES, int)
+    assert JWT_EXPIRE_MINUTES > 0
+
+
+def test_redis_url_is_optional():
+    assert REDIS_URL is None or isinstance(REDIS_URL, str)

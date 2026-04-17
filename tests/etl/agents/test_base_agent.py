@@ -1,3 +1,5 @@
+import sys
+import types
 import pytest
 from unittest.mock import MagicMock, patch
 from etl.agents.base import BaseAgent
@@ -70,9 +72,10 @@ def test_langchain_agent_pass_through():
     assert res2 == {"output": "AgentAnswer"}
 
 def test_langchain_agent_optional_import():
-    """Verify Bug 2: LangChainAgent has Optional in its namespace."""
-    from etl.agents.langchain_adapter import Optional
-    assert Optional is not None
+    """Verify the adapter module still exports LangChainAgent."""
+    import etl.agents.langchain_adapter as module
+
+    assert hasattr(module, "LangChainAgent")
 
 # --- Tool Tests ---
 
@@ -101,11 +104,14 @@ def test_milvus_tool_search():
         return [0.1, 0.2]
         
     tool = MilvusTool(mock_conf, embedding_func=fake_embed)
-    
-    with patch("pymilvus.connections.connect"), \
-         patch("pymilvus.Collection") as MockColl:
-         
-        mock_c_instance = MockColl.return_value
+
+    fake_pymilvus = types.ModuleType("pymilvus")
+    fake_pymilvus.connections = MagicMock()
+    fake_pymilvus.connections.connect = MagicMock()
+    fake_pymilvus.Collection = MagicMock()
+
+    with patch.dict(sys.modules, {"pymilvus": fake_pymilvus}):
+        mock_c_instance = fake_pymilvus.Collection.return_value
         # Mock search result structure
         mock_hit = MagicMock()
         mock_hit.id = 123

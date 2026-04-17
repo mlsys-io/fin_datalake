@@ -118,7 +118,7 @@ export const ComputePipelines: React.FC = () => {
                   </button>
                 </div>
                 <p className="mt-4 text-xs leading-5 text-amber-900/80">
-                  The local dev frontend does not proxy the Prefect app by itself. When the gateway or Nginx route is available, this page will embed it automatically.
+                  The local dev frontend does not proxy the Prefect app by itself. When the gateway or cluster ingress route is available, this page will embed it automatically.
                 </p>
               </div>
             </div>

@@ -7,7 +7,7 @@ from gateway.core.registry import InterfaceRegistry, DomainNotFoundError
 from gateway.core.adapters import BaseAdapter, ActionNotFoundError, PermissionError
 from gateway.models.intent import UserIntent
 from gateway.models.user import User
-from gateway.core.rbac import Permission, Role
+from gateway.core.rbac import DEFAULT_ROLES, Permission, rbac_provider
 
 
 # ---------------------------------------------------------------------------
@@ -18,7 +18,7 @@ class StubDataAdapter(BaseAdapter):
     def handles(self) -> str:
         return "data"
 
-    def execute(self, user, intent):
+    async def execute(self, user, intent):
         if intent.action == "list_tables":
             return {"tables": ["market_data"]}
         raise ActionNotFoundError(f"Unknown action '{intent.action}'")
@@ -28,7 +28,7 @@ class StubComputeAdapter(BaseAdapter):
     def handles(self) -> str:
         return "compute"
 
-    def execute(self, user, intent):
+    async def execute(self, user, intent):
         self._require_permission(user, Permission.COMPUTE_WRITE)
         return {"status": "submitted"}
 
@@ -43,7 +43,7 @@ def make_intent(domain: str, action: str, **params) -> UserIntent:
         action=action,
         parameters=params,
         user_id="test-user",
-        roles=["admin"],
+        roles=["Admin"],
     )
 
 
@@ -80,6 +80,7 @@ class TestRegistration:
 
 class TestRouting:
     def setup_method(self):
+        rbac_provider._roles = dict(DEFAULT_ROLES)
         self.reg = InterfaceRegistry()
         self.reg.register(StubDataAdapter())
         self.reg.register(StubComputeAdapter())

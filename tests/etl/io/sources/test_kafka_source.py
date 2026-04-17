@@ -1,5 +1,7 @@
 """Unit tests for KafkaSource."""
 import pytest
+import sys
+import types
 from unittest.mock import MagicMock, patch
 
 
@@ -49,8 +51,12 @@ def test_kafka_reader_read_batch():
         topics=["test-topic"]
     )
     
-    with patch("etl.io.sources.kafka.Consumer") as MockConsumer:
-        mock_consumer = MockConsumer.return_value
+    fake_kafka = types.ModuleType("confluent_kafka")
+    fake_kafka.Consumer = MagicMock()
+    fake_kafka.KafkaError = types.SimpleNamespace(_PARTITION_EOF=-191)
+
+    with patch.dict(sys.modules, {"confluent_kafka": fake_kafka}):
+        mock_consumer = fake_kafka.Consumer.return_value
         
         # Create mock messages
         mock_msg1 = MagicMock()
@@ -75,11 +81,10 @@ def test_kafka_reader_read_batch():
         mock_consumer.poll.side_effect = [mock_msg1, mock_msg2, None]
         
         with source.open() as reader:
-            reader._running = False  # Stop after first batch
-            batches = list(reader.read_batch())
-        
-        assert len(batches) == 1
-        batch = batches[0]
+            batch_iter = reader.read_batch()
+            batch = next(batch_iter)
+            reader._running = False
+
         assert len(batch) == 2
         assert batch[0]["key"] == "key1"
         assert batch[0]["value"] == {"id": 1}

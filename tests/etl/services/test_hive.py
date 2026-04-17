@@ -1,7 +1,7 @@
 import pytest
 import pyarrow as pa
 from unittest.mock import MagicMock, patch
-from etl.services.hive import HiveMetastore, HiveClient
+from etl.integrations.hive import HiveMetastore, HiveClient
 
 def test_hive_connection():
     # Setup

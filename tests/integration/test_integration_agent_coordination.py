@@ -50,6 +50,7 @@ class TestAgentHubIntegration:
         
         # Deploy and setup
         actor = AutoRegisterAgent.options(name="AutoRegAgent").remote()
+        ray.get(actor.set_app_name.remote("AutoRegAgent"))
         ray.get(actor.setup.remote())
         
         # Verify registration
@@ -117,39 +118,36 @@ class TestAgentNotifications:
     def test_notify_capability_delivers_messages(self, clean_hub):
         """Test that notifications are delivered to specific capabilities."""
         from etl.agents.base import BaseAgent
-        
-        @ray.remote
+
         class ListenerAgent(BaseAgent):
             CAPABILITIES = ["listener"]
-            
+
             def build_executor(self):
                 return lambda x: x
             
-            def on_message(self, event):
+            def handle_event(self, event):
                 self.last_message = event
-            
+
             def get_last_message(self):
                 return getattr(self, 'last_message', None)
-        
-        # Deploy listener
-        listener = ListenerAgent.options(name="ListenerAgent").remote()
-        ray.get(listener.setup.remote())
-        
-        # Send Notification via Hub (simulating another agent publishing an event)
-        event = {"topic": "test_topic", "payload": {"data": "hello"}}
-        ray.get(clean_hub.notify_capability.remote("listener", event))
-        
-        # Give time for async delivery
-        time.sleep(0.5)
-        
-        # Verify receipt
-        msg = ray.get(listener.get_last_message.remote())
-        assert msg is not None
-        assert msg["payload"] == {"data": "hello"}
-        assert msg["topic"] == "test_topic"
-        
-        # Cleanup
-        ray.kill(listener)
+
+        listener = ListenerAgent.deploy(name="ListenerAgent")
+        try:
+            event = {"topic": "test_topic", "payload": {"data": "hello"}}
+            delivered = ray.get(clean_hub.notify_capability.remote("listener", event))
+            assert delivered == 1
+
+            time.sleep(0.5)
+
+            msg = listener.get_last_message.remote().result()
+            assert msg is not None
+            assert msg["payload"] == {"data": "hello"}
+            assert msg["topic"] == "test_topic"
+        finally:
+            from ray import serve
+
+            serve.delete("ListenerAgent")
+            ray.get(clean_hub.unregister.remote("ListenerAgent"))
 
 
 # ============================================================================
@@ -162,76 +160,68 @@ class TestAgentDelegationIntegration:
     def test_delegate_routes_to_capable_agent(self, clean_hub):
         """Test that delegate() finds and calls the right agent via the Hub."""
         from etl.agents.base import BaseAgent
-        
-        @ray.remote
+
         class AnalystAgent(BaseAgent):
             CAPABILITIES = ["analysis"]
             def build_executor(self):
                 return lambda x: f"Analyzed: {x}"
-        
-        @ray.remote
+
         class CoordinatorAgent(BaseAgent):
             CAPABILITIES = ["coordination"]
             def build_executor(self):
                 return lambda x: x
             
             def run_analysis(self, data):
-                from etl.core.handles import SyncHandle
+                from etl.core.base_service import SyncHandle
                 from etl.agents.hub import get_hub
                 hub = SyncHandle(get_hub())
                 return hub.call_by_capability("analysis", data)
-        
-        # Deploy agents
-        analyst = AnalystAgent.options(name="Analyst").remote()
-        coordinator = CoordinatorAgent.options(name="Coordinator").remote()
-        
-        ray.get(analyst.setup.remote())
-        ray.get(coordinator.setup.remote())
-        
-        # Coordinator delegates to Analyst
-        result = ray.get(coordinator.run_analysis.remote("test data"))
-        assert result == "Analyzed: test data"
-        
-        # Cleanup
-        ray.kill(analyst)
-        ray.kill(coordinator)
+
+        analyst = AnalystAgent.deploy(name="Analyst")
+        coordinator = CoordinatorAgent.deploy(name="Coordinator")
+        try:
+            result = coordinator.run_analysis.remote("test data").result()
+            assert result == "Analyzed: test data"
+        finally:
+            from ray import serve
+
+            serve.delete("Coordinator")
+            serve.delete("Analyst")
+            ray.get(clean_hub.unregister.remote("Coordinator"))
+            ray.get(clean_hub.unregister.remote("Analyst"))
     
     def test_delegate_retry_on_failure(self, clean_hub):
-        """Test that delegation retries with next agent on failure."""
+        """Test that capability routing skips dead registry entries and uses an alive deployment."""
         ray.get(clean_hub.register.remote("DeadAgent", ["retry_test"]))
-        ray.get(clean_hub.register.remote("AliveAgent", ["retry_test"]))
-        
         from etl.agents.base import BaseAgent
-        
-        @ray.remote
+
         class AliveTestAgent(BaseAgent):
             CAPABILITIES = ["retry_test"]
             def build_executor(self):
                 return lambda x: f"Success: {x}"
-        
-        # Only deploy the second agent, first remains just a registry entry without backing actor
-        alive = AliveTestAgent.options(name="AliveAgent").remote()
-        ray.get(alive.setup.remote())
-        
-        @ray.remote  
+
+        alive = AliveTestAgent.deploy(name="AliveAgent")
+
         class DelegatorAgent(BaseAgent):
             CAPABILITIES = []
             def build_executor(self):
                 return lambda x: x
             
             def test_delegation(self, data):
-                from etl.core.handles import SyncHandle
+                from etl.core.base_service import SyncHandle
                 from etl.agents.hub import get_hub
                 hub = SyncHandle(get_hub())
-                return hub.call_by_capability("retry_test", data, retry_on_failure=True)
-        
-        delegator = DelegatorAgent.options(name="Delegator").remote()
-        ray.get(delegator.setup.remote())
-        
-        # Should skip DeadAgent and succeed with AliveAgent
-        result = ray.get(delegator.test_delegation.remote("data"))
-        assert "Success" in result
-        
-        # Cleanup
-        ray.kill(alive)
-        ray.kill(delegator)
+                return hub.call_by_capability("retry_test", data)
+
+        delegator = DelegatorAgent.deploy(name="Delegator")
+        try:
+            result = delegator.test_delegation.remote("data").result()
+            assert result == "Success: data"
+        finally:
+            from ray import serve
+
+            serve.delete("Delegator")
+            serve.delete("AliveAgent")
+            ray.get(clean_hub.unregister.remote("Delegator"))
+            ray.get(clean_hub.unregister.remote("AliveAgent"))
+            ray.get(clean_hub.unregister.remote("DeadAgent"))

@@ -4,8 +4,8 @@ This directory contains the runnable platform code: ETL framework modules, Ray S
 
 For final-project packaging, the client-facing core API now also ships as the
 `lakehouse_client` package with a matching `lakehouse-client` CLI entrypoint.
-At the moment this package is consumed from the repository workspace via an
-editable install rather than from a published package index.
+At the moment this package is consumed from the repository workspace via `uv`
+against the local checkout rather than from a published package index.
 
 ## Environment Setup
 
@@ -16,36 +16,42 @@ agent-management CLI, or integrate with the platform SDK while the project is
 distributed as source.
 
 ```bash
+cd ~/zdb_deployment
+bash ./scripts/setup-config.sh --both
+bash ./scripts/setup-local-env.sh
+source ./env.sh
+```
+
+If you want to sync the workspace manually with `uv`, the preferred install path is:
+
+```bash
 cd ~/zdb_deployment/app-code
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[client]"
-source ~/zdb_deployment/.env
+uv sync --extra client --group dev
 ```
 
 Common install options:
 
 ```bash
 # Client SDK + ETL authoring surface
-pip install -e ".[client]"
+uv sync --extra client --group dev
 
 # Full Python platform workspace
-pip install -e ".[all]"
+uv sync --extra all --group dev
 
 # Service-focused installs
-pip install -e ".[gateway]"
-pip install -e ".[overseer]"
+uv sync --extra gateway --group dev
+uv sync --extra overseer --group dev
 ```
 
-If you prefer the legacy dependency file, `requirements-client.txt` remains
-available, but the extras above are now the preferred install path.
+If you need the old dependency files for a one-off fallback, `requirements-client.txt`
+and `requirements-worker.txt` remain available, but `uv sync` is now the preferred path.
 
 ## Distribution Model
 
 The current distribution model is:
 
 - clone the repository for full-system deployment, docs, demos, frontend, and Helm assets
-- install `app-code/` in editable mode when you want to use the client SDK or CLI locally
+- use `uv sync` in `app-code/` when you want to use the client SDK, CLI, or local services
 
 The intended user-facing Python surface is:
 

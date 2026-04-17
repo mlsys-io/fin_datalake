@@ -1,18 +1,18 @@
 import pytest
 import ray
+from ray import serve
 from .mock_agent import MockAgent
 
 
 @pytest.fixture(scope="module")
 def ray_cluster():
     if not ray.is_initialized():
-        # Use local_mode to get direct tracebacks for debugging init failures
         ray.init(
             ignore_reinit_error=True, 
-            local_mode=True
         )
     yield
     if ray.is_initialized():
+        serve.shutdown()
         ray.shutdown()
 
 def test_base_agent_standalone(ray_cluster):
@@ -25,8 +25,8 @@ def test_base_agent_standalone(ray_cluster):
     assert hasattr(agent_handle, "setup")
     assert hasattr(agent_handle, "shutdown")
     
-    # Test synchronous ask execution
-    result = agent_handle.ask("test")
+    # Test Serve handle execution
+    result = agent_handle.ask.remote("test").result()
     assert result == "MOCK_TEST"
     
     # Clean up

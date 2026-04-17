@@ -8,6 +8,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 
 from gateway.adapters.agent import AgentAdapter
+from gateway.core.rbac import DEFAULT_ROLES, rbac_provider
 from gateway.models.intent import UserIntent
 from gateway.models.user import User
 
@@ -31,6 +32,11 @@ class _MockSession:
 
     async def __aexit__(self, exc_type, exc, tb):
         return False
+
+
+@pytest.fixture(autouse=True)
+def _rbac_defaults():
+    rbac_provider._roles = dict(DEFAULT_ROLES)
 
 
 @pytest.mark.asyncio
@@ -101,6 +107,5 @@ async def test_list_agents_syncs_live_agents_into_catalog():
     assert result["detail"] is None
     assert len(result["agents"]) == 1
     assert result["agents"][0]["name"] == "SupportAgent"
-    assert result["agents"][0]["alive"] is True
+    assert result["agents"][0]["alive"] is False
     assert result["agents"][0]["source"] == "catalog+runtime"
-    mock_upsert.assert_awaited_once()

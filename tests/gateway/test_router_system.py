@@ -4,7 +4,8 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 from gateway.api.main import create_app
 from gateway.api.deps import get_current_user
-from gateway.models.user import User, Permission, Role, BUILTIN_ROLES
+from gateway.models.user import User
+from gateway.core.rbac import Permission, DEFAULT_ROLES, rbac_provider
 
 # Mock users
 ADMIN_USER = User(
@@ -23,6 +24,7 @@ def client():
     app = create_app()
     # Mock startup events (registry)
     app.state.registry = MagicMock()
+    rbac_provider._roles = dict(DEFAULT_ROLES)
     return TestClient(app)
 
 def test_circuit_breaker_forbidden_for_analyst(client):

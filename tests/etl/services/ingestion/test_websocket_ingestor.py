@@ -33,7 +33,6 @@ def test_websocket_ingestor_run_logging():
         }
     }
     service = WebSocketIngestorService(name="ws_test", config=config)
-    service.running = True
     
     with patch("etl.io.sources.websocket.WebSocketSource.open") as mock_src, \
          patch("etl.io.sinks.timescaledb.TimescaleDBSink.open") as mock_snk, \

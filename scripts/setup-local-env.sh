@@ -2,17 +2,25 @@
 # =============================================================================
 # ETL Framework - Local Environment Setup
 # =============================================================================
+#
+# Modernized for uv:
+# - syncs dependencies into app-code/.venv via uv
+# - keeps local env variables in a helper script
+# - avoids manual venv / pip management
+# =============================================================================
 
-set -e
+set -euo pipefail
 
-# Get script location and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 APP_DIR="${PROJECT_ROOT}/app-code"
 ENV_FILE="${PROJECT_ROOT}/.env"
 USER_ENV_FILE="${PROJECT_ROOT}/.env.user"
-PYTHON_BIN="${PYTHON_BIN:-python3.12}"
-EXPECTED_PYTHON_PREFIX="${EXPECTED_PYTHON_PREFIX:-3.12.9}"
+HELPER_FILE="${PROJECT_ROOT}/activate.sh"
+ENV_HELPER_FILE="${PROJECT_ROOT}/env.sh"
+
+UV_EXTRAS="${UV_EXTRAS:-client}"
+UV_GROUPS="${UV_GROUPS:-dev}"
 
 # Colors
 GREEN='\033[0;32m'
@@ -20,98 +28,92 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-load_env_file() {
-    local file_path="$1"
-    local label="$2"
+usage() {
+    cat <<EOF
+Usage: ./setup-local-env.sh
 
-    if [ -f "$file_path" ]; then
-        set -a
-        source "$file_path"
-        set +a
-        echo "  Loaded ${label}"
-    fi
+Optional overrides:
+  UV_EXTRAS=client,gateway,overseer
+  UV_GROUPS=dev
+EOF
 }
 
-detect_python() {
-    if command -v "$PYTHON_BIN" >/dev/null 2>&1; then
-        echo "$PYTHON_BIN"
-        return
-    fi
-    if command -v python3.12 >/dev/null 2>&1; then
-        echo "python3.12"
-        return
-    fi
-    if command -v python3 >/dev/null 2>&1; then
-        echo "python3"
-        return
-    fi
-    if command -v python >/dev/null 2>&1; then
-        echo "python"
-        return
-    fi
-    return 1
-}
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    usage
+    exit 0
+fi
+
+if ! command -v uv >/dev/null 2>&1; then
+    echo -e "${RED}uv not found.${NC}"
+    echo "Install uv first: https://docs.astral.sh/uv/"
+    exit 1
+fi
 
 echo -e "${GREEN}================================================================${NC}"
 echo -e "${GREEN}    ETL Framework - Local Environment Setup${NC}"
 echo -e "${GREEN}================================================================${NC}"
 echo ""
+echo "Using uv: $(uv --version)"
 
-PYTHON_CMD="$(detect_python)" || {
-    echo -e "${RED}No Python interpreter found.${NC}"
-    exit 1
-}
-echo "Using interpreter: ${PYTHON_CMD}"
+IFS=',' read -r -a EXTRA_LIST <<< "$UV_EXTRAS"
+IFS=',' read -r -a GROUP_LIST <<< "$UV_GROUPS"
 
-# 1. Setup Virtual Environment
-echo -e "${YELLOW}[1/4] Setting up virtual environment in app-code...${NC}"
-if [ ! -d "${APP_DIR}/.venv" ]; then
-    "${PYTHON_CMD}" -m venv "${APP_DIR}/.venv"
-    echo -e "  ${GREEN}Created .venv${NC}"
-else
-    echo -e "  ${GREEN}.venv already exists${NC}"
-fi
+SYNC_ARGS=(sync --project "$APP_DIR")
 
-source "${APP_DIR}/.venv/bin/activate"
-echo "  Python: $(python --version)"
-if ! python -c "import sys; raise SystemExit(0 if sys.version.startswith('${EXPECTED_PYTHON_PREFIX}') else 1)"; then
-    echo -e "  ${YELLOW}Warning:${NC} local Python does not match expected ${EXPECTED_PYTHON_PREFIX}."
-    echo "  Set PYTHON_BIN to a matching interpreter before rerunning if Ray Client version checks fail."
-fi
-
-# 2. Install Dependencies
-echo -e "${YELLOW}[2/4] Installing dependencies...${NC}"
-pip install -e "${APP_DIR}" -q
-pip install -r "${APP_DIR}/requirements-client.txt" -q
-echo "  Installed etl-framework package and requirements"
-
-# 3. Load Environment
-echo -e "${YELLOW}[3/4] Loading configuration...${NC}"
-if [ -f "${ENV_FILE}" ]; then
-    load_env_file "${ENV_FILE}" ".env"
-    if [ -f "${USER_ENV_FILE}" ]; then
-        load_env_file "${USER_ENV_FILE}" ".env.user (overrides)"
-    else
-        echo "  .env.user not found (optional personal overrides)"
+for extra in "${EXTRA_LIST[@]}"; do
+    extra="${extra// /}"
+    if [[ -n "$extra" ]]; then
+        SYNC_ARGS+=(--extra "$extra")
     fi
+done
+
+for group in "${GROUP_LIST[@]}"; do
+    group="${group// /}"
+    if [[ -n "$group" ]]; then
+        SYNC_ARGS+=(--group "$group")
+    fi
+done
+
+echo -e "${YELLOW}[1/3] Syncing dependencies with uv...${NC}"
+uv "${SYNC_ARGS[@]}"
+echo "  Synchronized app-code/.venv"
+
+echo -e "${YELLOW}[2/3] Checking local environment files...${NC}"
+if [[ -f "$ENV_FILE" ]]; then
+    echo "  Found .env"
 else
-    echo -e "  ${RED}.env not found. Run scripts/setup-config.sh first.${NC}"
+    echo -e "  ${YELLOW}.env not found. Run scripts/setup-config.sh first.${NC}"
 fi
 
-# 4. Create Activation Helper
-cat > "${PROJECT_ROOT}/activate.sh" << EOF
+if [[ -f "$USER_ENV_FILE" ]]; then
+    echo "  Found .env.user"
+else
+    echo "  .env.user not found (optional personal overrides)"
+fi
+
+echo -e "${YELLOW}[3/3] Writing helper scripts...${NC}"
+cat > "$ENV_HELPER_FILE" <<EOF
 #!/bin/bash
 set -a
-source "${ENV_FILE}"
+[ -f "${ENV_FILE}" ] && source "${ENV_FILE}"
 [ -f "${USER_ENV_FILE}" ] && source "${USER_ENV_FILE}"
 set +a
-source "${APP_DIR}/.venv/bin/activate"
-echo "Environment activated"
+echo "Environment variables loaded. Use uv run from app-code for commands."
 EOF
-chmod +x "${PROJECT_ROOT}/activate.sh"
-echo -e "${GREEN}Created project-root activate.sh helper script${NC}"
-echo "  Shared config: .env"
-echo "  Personal override: .env.user (optional)"
+chmod +x "$ENV_HELPER_FILE"
 
-echo -e "\n${GREEN}Setup Complete!${NC}"
-echo "To activate:  source ./activate.sh"
+cat > "$HELPER_FILE" <<EOF
+#!/bin/bash
+source "${ENV_HELPER_FILE}"
+EOF
+chmod +x "$HELPER_FILE"
+
+echo -e "${GREEN}Created project-root helper scripts:${NC}"
+echo "  source ./env.sh"
+echo "  source ./activate.sh   # compatibility wrapper"
+echo ""
+echo "Run commands with uv from app-code, for example:"
+echo "  cd app-code && uv run etl-agents agents list"
+echo "  cd app-code && uv run python -m pipelines.market_pulse_demo --chunk main"
+echo ""
+echo -e "${GREEN}Setup complete.${NC}"

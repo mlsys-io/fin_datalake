@@ -6,7 +6,7 @@ from etl.config import Config, config
 from etl.agents.base import BaseAgent
 from etl.agents.langchain_adapter import LangChainAgent
 from etl.io.sources.rest_api import RestApiSource, RestApiReader
-from etl.services.hive import HiveMetastore, HiveClient
+from etl.integrations.hive import HiveMetastore, HiveClient
 from etl.io.sinks.delta_lake import DeltaLakeSink, DeltaLakeWriter
 from etl.io.sources.delta_lake import DeltaLakeSource, DeltaLakeReader
 from etl.services.ingestion.websocket_ingestor import WebSocketIngestorService
@@ -79,12 +79,23 @@ def test_bug6_8_websocket_ingestor():
 def test_bug7_hive_partition_keys():
     """Verify HiveClient doesn't share mutable default list."""
     client = HiveClient(HiveMetastore())
-    # This is a bit hard to test without real HMS, but we can check the signature or behavior via mock
+    class NoSuchObjectException(Exception):
+        pass
+
+    fake_hms = MagicMock()
+    fake_hms.NoSuchObjectException = NoSuchObjectException
+    client._HMS = fake_hms
+    client._client = MagicMock()
+    client._client.get_database.side_effect = NoSuchObjectException
+    client._client.get_table.side_effect = NoSuchObjectException
+
     with patch.object(HiveClient, "_connect"):
-        with patch.object(HiveClient, "_create_table"):
+        with patch.object(HiveClient, "_create_database"), patch.object(HiveClient, "_create_table") as mock_create_table:
             client.register_delta_table("db", "tbl", "loc", MagicMock())
-            # Check if it didn't crash and partition_keys is initialized to [] in locls
-            # We can't easily check local variables, but we fixed the signature.
+            assert mock_create_table.call_args.args[4] == []
+
+            client.register_delta_table("db", "tbl2", "loc", MagicMock(), partition_keys=["p1"])
+            assert mock_create_table.call_args.args[4] == ["p1"]
 
 def test_bug9_10_config_reload_and_types():
     """Verify Config reload and default types."""

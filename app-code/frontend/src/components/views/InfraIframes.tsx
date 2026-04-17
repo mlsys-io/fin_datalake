@@ -4,8 +4,8 @@ import { fetchInfraStatus } from '../../api/client'
 import { ErrorState, LoadingState, ResourceMeta } from '../shared/AsyncState'
 import { usePollingResource } from '../../hooks/usePollingResource'
 
-// In production (via Nginx on port 8080): iframes load through the auth bouncer.
-// In local dev (no Nginx): open localUrl directly in a separate tab.
+// In production behind the cluster ingress: iframes load through the authenticated proxy route.
+// In local dev: open localUrl directly in a separate tab.
 const IFRAMES = [
     { id: 'prefect', name: 'Prefect Dashboard', icon: MonitorPlay, url: '/prefect/', localUrl: 'http://localhost:4200' },
     { id: 'ray', name: 'Ray Cluster UI', icon: Server, url: '/ray/', localUrl: 'http://localhost:32382' },

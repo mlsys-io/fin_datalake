@@ -58,12 +58,16 @@ def test_rest_source_pagination():
         # Response 1: Has next link
         resp1 = MagicMock()
         resp1.json.return_value = {"items": [{"p": 1}], "next": "http://mock.api/page2"}
-        
+
         # Response 2: No next link
         resp2 = MagicMock()
         resp2.json.return_value = {"items": [{"p": 2}], "next": None}
-        
-        mock_instance.request.side_effect = [resp1, resp2]
+
+        # The current reader stops when a page comes back empty, not when "next" is None.
+        resp3 = MagicMock()
+        resp3.json.return_value = {"items": [], "next": None}
+
+        mock_instance.request.side_effect = [resp1, resp2, resp3]
         
         with source_config.open() as reader:
             batches = list(reader.read_batch())
