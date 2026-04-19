@@ -252,7 +252,16 @@ class SystemAdapter(BaseAdapter):
         )
         values.append(limit)
 
-        rows = self._execute_query(sql, values)
+        try:
+            rows = self._execute_query(sql, values)
+            available = True
+            error = None
+        except Exception as exc:
+            logger.warning(f"System log query unavailable: {exc}")
+            rows = []
+            available = False
+            error = str(exc)
+
         return {
             "logs": [
                 {
@@ -267,6 +276,8 @@ class SystemAdapter(BaseAdapter):
                 for row in rows
             ],
             "count": len(rows),
+            "available": available,
+            "error": error,
             "query": {
                 "component": component,
                 "level": level,

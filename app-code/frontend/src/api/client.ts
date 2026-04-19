@@ -134,6 +134,8 @@ export type SystemLogEntry = {
 export type SystemLogsResponse = {
     logs?: SystemLogEntry[]
     count?: number
+    available?: boolean
+    error?: string | null
     query?: Record<string, unknown>
 }
 
@@ -278,6 +280,8 @@ export type InterfaceInventoryResponse = {
         domain?: string
         action?: string
         input_schema?: Record<string, unknown>
+        state?: string
+        source?: string
     }[]
     routes?: InterfaceInventoryRoute[]
     proxies?: InterfaceInventoryProxy[]

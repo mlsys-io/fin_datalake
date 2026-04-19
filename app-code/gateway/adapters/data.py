@@ -328,13 +328,13 @@ class DataAdapter(BaseAdapter):
         try:
             from etl.integrations.hive import HiveMetastore
             
-            hms_host = os.environ.get("HMS_HOST", "localhost")
-            hms_port = int(os.environ.get("HMS_PORT", 9083))
+            hms_host = os.environ.get("HMS_HOST") or os.environ.get("HIVE_HOST", "localhost")
+            hms_port = int(os.environ.get("HMS_PORT") or os.environ.get("HIVE_PORT", 9083))
             
             def fetch_from_hive():
                 config = HiveMetastore(host=hms_host, port=hms_port)
                 with config.open() as client:
-                    return client.get_all_tables(db="default")
+                    return client.get_all_tables(db_name="default")
             
             loop = asyncio.get_event_loop()
             tables = await loop.run_in_executor(None, fetch_from_hive)
