@@ -62,7 +62,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if .Values.global.externalServices.prefectUiUrl -}}
 {{- .Values.global.externalServices.prefectUiUrl -}}
 {{- else -}}
-{{- printf "http://prefect-server.%s.svc.cluster.local:4200" .Release.Namespace -}}
+{{- printf "http://prefect-server.%s.svc.cluster.local:4200/prefect/" .Release.Namespace -}}
 {{- end -}}
 {{- end -}}
 
