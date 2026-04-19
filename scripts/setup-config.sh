@@ -30,7 +30,7 @@ PREFECT_SERVICE_NAME="prefect-server"
 RAY_SERVICE_NAME="etl-ray-head-svc"
 TSDB_SERVICE_NAME="tsdb-ha"
 RISINGWAVE_SERVICE_NAME="risingwave"
-HIVE_SERVICE_NAME="hms-hms"
+HIVE_SERVICE_NAME="hms-hive-metastore"
 
 DEFAULT_MINIO_URL="https://luyao-storage-head.ddns.comp.nus.edu.sg:4000"
 MODE="${1:---both}"
@@ -157,26 +157,30 @@ if [[ -z "$NODE_IP" ]]; then
 fi
 echo -e "${GREEN}Node IP: ${NODE_IP}${NC}"
 
-GATEWAY_PORT="$(discover_nodeport "$NS_COMPUTE" "$GATEWAY_SERVICE_NAME" "" 30801)"
-PREFECT_PORT="$(discover_nodeport "$NS_PREFECT" "$PREFECT_SERVICE_NAME" "" 30420)"
-RAY_CLIENT_PORT="$(discover_nodeport "$NS_COMPUTE" "$RAY_SERVICE_NAME" "client" 30282)"
-RAY_DASHBOARD_PORT="$(discover_nodeport "$NS_COMPUTE" "$RAY_SERVICE_NAME" "dashboard" 30742)"
-TSDB_PORT="$(discover_nodeport "$NS_TSDB" "$TSDB_SERVICE_NAME" "" 30543)"
-RISINGWAVE_PORT="$(discover_nodeport "$NS_TSDB" "$RISINGWAVE_SERVICE_NAME" "" 31001)"
-HIVE_PORT="$(discover_nodeport "$NS_STORAGE" "$HIVE_SERVICE_NAME" "" 30983)"
+if [[ "$MODE" == "--env" || "$MODE" == "--both" ]]; then
+    GATEWAY_PORT="$(discover_nodeport "$NS_COMPUTE" "$GATEWAY_SERVICE_NAME" "" 30801)"
+    PREFECT_PORT="$(discover_nodeport "$NS_PREFECT" "$PREFECT_SERVICE_NAME" "" 30420)"
+    RAY_CLIENT_PORT="$(discover_nodeport "$NS_COMPUTE" "$RAY_SERVICE_NAME" "client" 30282)"
+    RAY_DASHBOARD_PORT="$(discover_nodeport "$NS_COMPUTE" "$RAY_SERVICE_NAME" "dashboard" 30742)"
+    TSDB_PORT="$(discover_nodeport "$NS_TSDB" "$TSDB_SERVICE_NAME" "" 30543)"
+    RISINGWAVE_PORT="$(discover_nodeport "$NS_TSDB" "$RISINGWAVE_SERVICE_NAME" "" 31001)"
+    HIVE_PORT="$(discover_nodeport "$NS_STORAGE" "$HIVE_SERVICE_NAME" "" 30983)"
 
-API_PORT="$(discover_nodeport "$NS_DEMO" "demo-api" "" 30800)"
-WS_PORT="$(discover_nodeport "$NS_DEMO" "demo-websocket" "" 30876)"
-STATIC_PORT="$(discover_nodeport "$NS_DEMO" "static-server" "" 30880)"
-KAFKA_PORT="$(discover_nodeport "$NS_DEMO" "kafka" "" 30909)"
+    API_PORT="$(discover_nodeport "$NS_DEMO" "demo-api" "" 30800)"
+    WS_PORT="$(discover_nodeport "$NS_DEMO" "demo-websocket" "" 30876)"
+    STATIC_PORT="$(discover_nodeport "$NS_DEMO" "static-server" "" 30880)"
+    KAFKA_PORT="$(discover_nodeport "$NS_DEMO" "kafka" "" 30909)"
 
-echo -e "${GREEN}Gateway NodePort: ${GATEWAY_PORT}${NC}"
-echo -e "${GREEN}Prefect NodePort: ${PREFECT_PORT}${NC}"
-echo -e "${GREEN}Ray client NodePort: ${RAY_CLIENT_PORT}${NC}"
-echo -e "${GREEN}Ray dashboard NodePort: ${RAY_DASHBOARD_PORT}${NC}"
-echo -e "${GREEN}TSDB NodePort: ${TSDB_PORT}${NC}"
-echo -e "${GREEN}RisingWave NodePort: ${RISINGWAVE_PORT}${NC}"
-echo -e "${GREEN}Hive NodePort: ${HIVE_PORT}${NC}"
+    echo -e "${GREEN}Gateway NodePort: ${GATEWAY_PORT}${NC}"
+    echo -e "${GREEN}Prefect NodePort: ${PREFECT_PORT}${NC}"
+    echo -e "${GREEN}Ray client NodePort: ${RAY_CLIENT_PORT}${NC}"
+    echo -e "${GREEN}Ray dashboard NodePort: ${RAY_DASHBOARD_PORT}${NC}"
+    echo -e "${GREEN}TSDB NodePort: ${TSDB_PORT}${NC}"
+    echo -e "${GREEN}RisingWave NodePort: ${RISINGWAVE_PORT}${NC}"
+    echo -e "${GREEN}Hive NodePort: ${HIVE_PORT}${NC}"
+else
+    echo -e "${GREEN}Skipping NodePort discovery for configmap-only mode.${NC}"
+fi
 
 TSDB_PASSWORD=""
 if kubectl get secret tsdb-pguser-app -n "$NS_TSDB" >/dev/null 2>&1; then

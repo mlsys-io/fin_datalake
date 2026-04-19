@@ -22,6 +22,9 @@ spec:
             image: docker.io/library/etl-ray:latest-py312
             imagePullPolicy: Never # Use local image
             envFrom:
+              - configMapRef:
+                  name: etl-config
+                  optional: true
               - secretRef:
                   name: etl-user-secret-ray
                   optional: true
@@ -107,6 +110,9 @@ spec:
               image: docker.io/library/etl-ray:latest-py312
               imagePullPolicy: Never # Use local image
               envFrom:
+                - configMapRef:
+                    name: etl-config
+                    optional: true
                 - secretRef:
                     name: etl-user-secret-ray
                     optional: true

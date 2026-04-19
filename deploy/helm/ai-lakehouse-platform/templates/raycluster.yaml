@@ -26,8 +26,11 @@ spec:
           - name: ray-head
             image: "{{ .Values.rayCluster.image.repository }}:{{ .Values.rayCluster.image.tag }}"
             imagePullPolicy: {{ .Values.rayCluster.image.pullPolicy }}
-            {{- if .Values.rayCluster.userSecretRef }}
             envFrom:
+              - configMapRef:
+                  name: etl-config
+                  optional: true
+            {{- if .Values.rayCluster.userSecretRef }}
               - secretRef:
                   name: {{ .Values.rayCluster.userSecretRef }}
                   optional: true
@@ -114,8 +117,11 @@ spec:
             - name: ray-worker
               image: "{{ .Values.rayCluster.image.repository }}:{{ .Values.rayCluster.image.tag }}"
               imagePullPolicy: {{ .Values.rayCluster.image.pullPolicy }}
-              {{- if .Values.rayCluster.userSecretRef }}
               envFrom:
+                - configMapRef:
+                    name: etl-config
+                    optional: true
+              {{- if .Values.rayCluster.userSecretRef }}
                 - secretRef:
                     name: {{ .Values.rayCluster.userSecretRef }}
                     optional: true
