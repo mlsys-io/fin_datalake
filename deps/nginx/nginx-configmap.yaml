@@ -69,6 +69,15 @@ data:
                 proxy_pass http://gateway_backend;
             }
 
+            # 2b. Gateway readiness endpoints used by the React app
+            location = /readyz {
+                proxy_pass http://gateway_backend;
+            }
+
+            location = /healthz {
+                proxy_pass http://gateway_backend;
+            }
+
             # 3a. Prefect API — handles runtime JS fetch() calls from Prefect UI
             #     Must be declared BEFORE /prefect/ to take priority
             location /prefect/api/ {
