@@ -206,6 +206,9 @@ gateway:
     GATEWAY_JWT_SECRET:
       secretName: ""
       key: GATEWAY_JWT_SECRET
+    TSDB_PASSWORD:
+      secretName: ""
+      key: TSDB_PASSWORD
     AWS_ACCESS_KEY_ID:
       secretName: ""
       key: AWS_ACCESS_KEY_ID

@@ -132,7 +132,7 @@ lakehouse-client = "etl.cli.main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["agents*", "etl*", "lakehouse_client*", "pipelines*", "sample_agents*", "transformations*", "gateway*", "overseer*"]
+include = ["agents*", "etl*", "fb303*", "lakehouse_client*", "pipelines*", "sample_agents*", "transformations*", "gateway*", "overseer*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.json"]

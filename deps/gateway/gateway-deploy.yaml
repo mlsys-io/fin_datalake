@@ -50,6 +50,12 @@ spec:
                 secretKeyRef:
                   name: etl-secrets
                   key: GATEWAY_JWT_SECRET
+
+            - name: TSDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: etl-secrets
+                  key: TSDB_PASSWORD
             
             # External Storage / Lakehouse Connection
             - name: MINIO_ENDPOINT

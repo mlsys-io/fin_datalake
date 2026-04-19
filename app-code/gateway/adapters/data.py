@@ -533,12 +533,16 @@ class DataAdapter(BaseAdapter):
                 }
 
         async def discover_timescale() -> dict[str, Any]:
-            host = os.environ.get("TIMESCALE_HOST")
-            db_name = os.environ.get("TIMESCALE_DB", "etl")
+            host = os.environ.get("TIMESCALE_HOST") or os.environ.get("TSDB_HOST")
+            db_name = (
+                os.environ.get("TIMESCALE_DB")
+                or os.environ.get("TSDB_DATABASE")
+                or "etl"
+            )
             schema_name = os.environ.get("TIMESCALE_SCHEMA", "public")
-            user_name = os.environ.get("TIMESCALE_USER")
-            password = os.environ.get("TIMESCALE_PASSWORD")
-            port = os.environ.get("TIMESCALE_PORT", "5432")
+            user_name = os.environ.get("TIMESCALE_USER") or os.environ.get("TSDB_USER")
+            password = os.environ.get("TIMESCALE_PASSWORD") or os.environ.get("TSDB_PASSWORD")
+            port = os.environ.get("TIMESCALE_PORT") or os.environ.get("TSDB_PORT", "5432")
 
             if not host or not user_name or not password:
                 return {
