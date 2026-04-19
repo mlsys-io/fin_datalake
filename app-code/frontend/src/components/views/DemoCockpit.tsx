@@ -45,6 +45,14 @@ function asString(value: unknown): string {
   return String(value)
 }
 
+function errorMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : 'request failed'
+}
+
+function isMissingTableError(reason: unknown): boolean {
+  return /table or source not found|relation .* does not exist|catalog error/i.test(errorMessage(reason))
+}
+
 function asNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value === 'string' && value.trim() && !Number.isNaN(Number(value))) return Number(value)
@@ -227,13 +235,13 @@ export const DemoCockpit: React.FC = () => {
     const signalRows = signalRes.status === 'fulfilled' ? rowsToObjects(signalRes.value) : []
     const priceRows = pricesRes.status === 'fulfilled' ? rowsToObjects(pricesRes.value) : []
 
-    if (readinessRes.status === 'rejected') errors.push(`Readiness: ${readinessRes.reason instanceof Error ? readinessRes.reason.message : 'request failed'}`)
-    if (healthRes.status === 'rejected') errors.push(`System health: ${healthRes.reason instanceof Error ? healthRes.reason.message : 'request failed'}`)
-    if (agentsRes.status === 'rejected') errors.push(`Agents: ${agentsRes.reason instanceof Error ? agentsRes.reason.message : 'request failed'}`)
-    if (snapshotsRes.status === 'rejected') errors.push(`Overseer snapshots: ${snapshotsRes.reason instanceof Error ? snapshotsRes.reason.message : 'request failed'}`)
-    if (alertsRes.status === 'rejected') errors.push(`Overseer alerts: ${alertsRes.reason instanceof Error ? alertsRes.reason.message : 'request failed'}`)
-    if (signalRes.status === 'rejected') errors.push(`Signal query: ${signalRes.reason instanceof Error ? signalRes.reason.message : 'request failed'}`)
-    if (pricesRes.status === 'rejected') errors.push(`Price query: ${pricesRes.reason instanceof Error ? pricesRes.reason.message : 'request failed'}`)
+    if (readinessRes.status === 'rejected') errors.push(`Readiness: ${errorMessage(readinessRes.reason)}`)
+    if (healthRes.status === 'rejected') errors.push(`System health: ${errorMessage(healthRes.reason)}`)
+    if (agentsRes.status === 'rejected') errors.push(`Agents: ${errorMessage(agentsRes.reason)}`)
+    if (snapshotsRes.status === 'rejected') errors.push(`Overseer snapshots: ${errorMessage(snapshotsRes.reason)}`)
+    if (alertsRes.status === 'rejected') errors.push(`Overseer alerts: ${errorMessage(alertsRes.reason)}`)
+    if (signalRes.status === 'rejected' && !isMissingTableError(signalRes.reason)) errors.push(`Signal query: ${errorMessage(signalRes.reason)}`)
+    if (pricesRes.status === 'rejected' && !isMissingTableError(pricesRes.reason)) errors.push(`Price query: ${errorMessage(pricesRes.reason)}`)
 
     return { readiness, health, agents, snapshots, alerts, signalRows, priceRows, errors }
   }, [risingwaveSchema])

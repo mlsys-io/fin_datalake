@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  ChevronDown,
+  ChevronRight,
   Columns3,
   Database,
   Eye,
@@ -11,12 +13,10 @@ import {
 import {
   getDataSchema,
   listCatalogSources,
-  listDataTables,
   previewDataTable,
   queryStream,
   type CatalogSource,
   type CatalogSourcesResponse,
-  type DataCatalogResponse,
   type DataQueryResponse,
   type DataSchemaResponse,
   type DataTableSummary,
@@ -29,6 +29,7 @@ type TableDetails = {
   schema: DataSchemaResponse | null
   preview: DataQueryResponse | null
   errors: string[]
+  note?: string
 }
 
 type LiveDataDetails = {
@@ -46,6 +47,19 @@ type StorageGroup = {
 
 type Row = Record<string, unknown>
 
+type CatalogBrowserTable = DataTableSummary & {
+  schema?: string
+  qualified_name?: string
+  source_id?: string
+  source_label?: string
+  source_status?: CatalogSource['status']
+  source_kind?: CatalogSource['kind']
+}
+
+type SourceWithTables = CatalogSource & {
+  browserTables: CatalogBrowserTable[]
+}
+
 function rowsToObjects(result: DataQueryResponse | null | undefined): Row[] {
   if (!result?.columns?.length || !result.rows?.length) return []
   return result.rows.map(row => Object.fromEntries(result.columns!.map((column, index) => [column, row[index]])))
@@ -57,6 +71,14 @@ function asString(value: unknown): string {
   if (typeof value === 'number' && Number.isFinite(value)) return String(value)
   if (typeof value === 'boolean') return value ? 'true' : 'false'
   return String(value)
+}
+
+function errorMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : 'request failed'
+}
+
+function isMissingTableError(reason: unknown): boolean {
+  return /table or source not found|relation .* does not exist|catalog error/i.test(errorMessage(reason))
 }
 
 function titleCase(value: string): string {
@@ -102,25 +124,91 @@ function toneForSource(status: CatalogSource['status']): string {
   return 'border-stone-200 bg-stone-50 text-stone-600'
 }
 
-function SourceCard({ source }: { source: CatalogSource }) {
+function sourceDetail(source: CatalogSource): string {
+  if (source.source === 'cache') {
+    return 'Served from the gateway cache after a recent Hive metastore read.'
+  }
+  return source.detail
+}
+
+function SourceCard({
+  source,
+  expanded,
+  selectedPath,
+  onToggle,
+  onSelect,
+}: {
+  source: SourceWithTables
+  expanded: boolean
+  selectedPath: string | null
+  onToggle: () => void
+  onSelect: (table: CatalogBrowserTable) => void
+}) {
+  const visibleTables = expanded ? source.browserTables : source.browserTables.slice(0, 4)
+  const hiddenCount = Math.max(source.browserTables.length - visibleTables.length, 0)
+
   return (
     <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">{source.label}</p>
-          <p className="mt-2 text-sm text-stone-500">{source.detail}</p>
+          <p className="mt-2 text-sm text-stone-500">{sourceDetail(source)}</p>
+          <p className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-400">
+            {source.browserTables.length} tables / {source.source ?? 'gateway'} / {source.source_type ?? 'metadata'}
+          </p>
         </div>
-        <span className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${toneForSource(source.status)}`}>
-          {source.status}
-        </span>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {source.tables.slice(0, 4).map(table => (
-          <span key={`${source.id}-${table.qualified_name ?? table.path ?? table.name}`} className="rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-600">
-            {table.name}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${toneForSource(source.status)}`}>
+            {source.status}
           </span>
-        ))}
+          <button
+            type="button"
+            onClick={onToggle}
+            className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500 transition hover:bg-stone-100"
+          >
+            {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            {expanded ? 'Collapse' : 'Tables'}
+          </button>
+        </div>
       </div>
+      {visibleTables.length ? (
+        <div className={expanded ? 'mt-3 max-h-72 space-y-2 overflow-y-auto pr-1' : 'mt-3 flex flex-wrap gap-2'}>
+          {visibleTables.map(table => {
+            const selected = selectedPath === table.path
+            return (
+              <button
+                key={`${source.id}-${table.qualified_name ?? table.path ?? table.name}`}
+                type="button"
+                onClick={() => onSelect(table)}
+                className={expanded
+                  ? `w-full rounded-md border px-3 py-2 text-left text-sm transition ${selected ? 'border-stone-900 bg-white text-stone-900' : 'border-stone-200 bg-white text-stone-600 hover:border-stone-400'}`
+                  : `rounded-md border px-2 py-1 text-xs transition ${selected ? 'border-stone-900 bg-white text-stone-900' : 'border-stone-200 bg-white text-stone-600 hover:border-stone-400'}`
+                }
+              >
+                <span className="font-medium">{table.name}</span>
+                {expanded ? (
+                  <span className="mt-1 block break-all text-xs text-stone-400">
+                    {table.qualified_name ?? table.path}
+                  </span>
+                ) : null}
+              </button>
+            )
+          })}
+          {hiddenCount ? (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-500 transition hover:bg-stone-100"
+            >
+              +{hiddenCount} more
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mt-3">
+          <EmptyState title="No tables reported" detail="This source did not return table-level metadata." />
+        </div>
+      )}
     </div>
   )
 }
@@ -142,6 +230,22 @@ function groupTablesByStorage(tables: DataTableSummary[]): StorageGroup[] {
       count: grouped.length,
       tables: grouped,
     }))
+}
+
+function isSafeSqlIdentifier(value?: string): value is string {
+  return Boolean(value && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value))
+}
+
+function risingWaveIdentifier(table: CatalogBrowserTable): string | null {
+  const schema = table.schema ?? table.qualified_name?.split('.')[0]
+  const name = table.name ?? table.qualified_name?.split('.').at(-1)
+  if (!isSafeSqlIdentifier(schema) || !isSafeSqlIdentifier(name)) return null
+  return `"${schema}"."${name}"`
+}
+
+function supportsDeltaPreview(table: CatalogBrowserTable): boolean {
+  const path = table.path ?? ''
+  return path.startsWith('s3://') || path.startsWith('/') || path.includes('://')
 }
 
 function TableRowPreview({ row }: { row: Row }) {
@@ -239,22 +343,9 @@ function QuerySnapshotCard({
 
 export const DataCatalog: React.FC = () => {
   const [search, setSearch] = useState('')
-  const [selectedTable, setSelectedTable] = useState<DataTableSummary | null>(null)
+  const [selectedTable, setSelectedTable] = useState<CatalogBrowserTable | null>(null)
+  const [expandedSourceIds, setExpandedSourceIds] = useState<Set<string>>(() => new Set())
   const risingwaveSchema = getRisingWaveSchema()
-
-  const loadTables = useCallback(async (): Promise<DataCatalogResponse> => {
-    return listDataTables()
-  }, [])
-
-  const {
-    data: catalog,
-    loading,
-    refreshing,
-    error,
-    lastUpdated,
-    stale,
-    refresh,
-  } = usePollingResource(loadTables, { pollIntervalMs: 60_000 })
 
   const loadLiveData = useCallback(async (): Promise<LiveDataDetails> => {
     const errors: string[] = []
@@ -270,10 +361,14 @@ export const DataCatalog: React.FC = () => {
     const prices = pricesRes.status === 'fulfilled' ? pricesRes.value : null
 
     if (signalsRes.status === 'rejected') {
-      errors.push(`Signals: ${signalsRes.reason instanceof Error ? signalsRes.reason.message : 'request failed'}`)
+      if (!isMissingTableError(signalsRes.reason)) {
+        errors.push(`Signals: ${errorMessage(signalsRes.reason)}`)
+      }
     }
     if (pricesRes.status === 'rejected') {
-      errors.push(`Prices: ${pricesRes.reason instanceof Error ? pricesRes.reason.message : 'request failed'}`)
+      if (!isMissingTableError(pricesRes.reason)) {
+        errors.push(`Prices: ${errorMessage(pricesRes.reason)}`)
+      }
     }
 
     return { signals, prices, errors }
@@ -303,18 +398,95 @@ export const DataCatalog: React.FC = () => {
     refresh: refreshCatalogSources,
   } = usePollingResource(loadCatalogSources, { pollIntervalMs: 60_000 })
 
-  const tables = useMemo(() => catalog?.tables ?? [], [catalog?.tables])
+  const liveSources = useMemo(() => catalogSources?.live_sources ?? [], [catalogSources?.live_sources])
+  const staticSources = useMemo(() => catalogSources?.static_sources ?? [], [catalogSources?.static_sources])
+  const sourceSummary = catalogSources?.summary ?? null
+  const tables = useMemo<CatalogBrowserTable[]>(() => {
+    return [...liveSources, ...staticSources].flatMap(source => source.tables.map(table => {
+      const qualifiedName = table.qualified_name ?? (table.schema ? `${table.schema}.${table.name}` : undefined)
+      return {
+        name: table.name,
+        path: table.path ?? qualifiedName ?? table.name,
+        schema: table.schema,
+        qualified_name: qualifiedName,
+        family: table.family ?? source.source_family,
+        source: source.source,
+        source_type: source.source_type,
+        source_id: source.id,
+        source_label: source.label,
+        source_status: source.status,
+        source_kind: source.kind,
+      }
+    }))
+  }, [liveSources, staticSources])
+  const sourcesWithTables = useMemo<SourceWithTables[]>(() => {
+    return [...liveSources, ...staticSources].map(source => ({
+      ...source,
+      browserTables: tables.filter(table => table.source_id === source.id),
+    }))
+  }, [liveSources, staticSources, tables])
   const filteredTables = useMemo(() => tables.filter(table => {
-    const haystack = `${table.name} ${table.path}`.toLowerCase()
+    const haystack = `${table.name} ${table.path} ${table.source_label ?? ''} ${table.family ?? ''}`.toLowerCase()
     return haystack.includes(search.trim().toLowerCase())
   }), [search, tables])
 
   const effectiveSelectedTable = selectedTable ?? tables[0] ?? null
   const selectedTablePath = effectiveSelectedTable?.path ?? null
 
+  const toggleSource = useCallback((sourceId: string) => {
+    setExpandedSourceIds(current => {
+      const next = new Set(current)
+      if (next.has(sourceId)) {
+        next.delete(sourceId)
+      } else {
+        next.add(sourceId)
+      }
+      return next
+    })
+  }, [])
+
   const loadTableDetails = useCallback(async (): Promise<TableDetails> => {
     if (!effectiveSelectedTable) {
       return { schema: null, preview: null, errors: [] }
+    }
+
+    if (effectiveSelectedTable.family === 'streaming_sql') {
+      const identifier = risingWaveIdentifier(effectiveSelectedTable)
+      if (!identifier) {
+        return {
+          schema: null,
+          preview: null,
+          errors: [],
+          note: 'RisingWave preview needs a valid schema and table name.',
+        }
+      }
+      const preview = await queryStream(`SELECT * FROM ${identifier} LIMIT 10`)
+      return {
+        schema: {
+          table_path: effectiveSelectedTable.qualified_name ?? effectiveSelectedTable.path,
+          fields: (preview.columns ?? []).map(column => ({ name: column, type: 'reported by preview' })),
+        },
+        preview,
+        errors: [],
+      }
+    }
+
+    if (effectiveSelectedTable.family === 'postgres') {
+      return {
+        schema: null,
+        preview: null,
+        errors: [],
+        note: 'Operational SQL metadata is listed here; row preview is not exposed through the data adapter.',
+      }
+    }
+
+    if (!supportsDeltaPreview(effectiveSelectedTable)) {
+      return {
+        schema: null,
+        preview: null,
+        errors: [],
+        note: 'Hive metadata is available, but this table did not report a Delta path for schema or preview.',
+      }
     }
 
     const [schemaRes, previewRes] = await Promise.allSettled([
@@ -327,10 +499,10 @@ export const DataCatalog: React.FC = () => {
     const preview = previewRes.status === 'fulfilled' ? previewRes.value : null
 
     if (schemaRes.status === 'rejected') {
-      errors.push(`Schema: ${schemaRes.reason instanceof Error ? schemaRes.reason.message : 'request failed'}`)
+      errors.push(`Schema: ${errorMessage(schemaRes.reason)}`)
     }
     if (previewRes.status === 'rejected') {
-      errors.push(`Preview: ${previewRes.reason instanceof Error ? previewRes.reason.message : 'request failed'}`)
+      errors.push(`Preview: ${errorMessage(previewRes.reason)}`)
     }
 
     return { schema, preview, errors }
@@ -352,17 +524,13 @@ export const DataCatalog: React.FC = () => {
 
   const selectedRows = useMemo(() => rowsToObjects(tableDetails?.preview), [tableDetails?.preview])
   const schemaFields = tableDetails?.schema?.fields ?? []
-  const totalTables = tables.length
+  const totalTables = sourceSummary?.total_tables ?? tables.length
   const selectedLabel = effectiveSelectedTable?.name ?? 'None'
-  const sourceLabel = catalog?.source ?? 'n/a'
+  const sourceLabel = effectiveSelectedTable?.source_label ?? 'Source-aware'
   const previewCount = tableDetails?.preview?.row_count ?? selectedRows.length
   const storageGroups = useMemo(() => groupTablesByStorage(tables), [tables])
-  const liveSources = catalogSources?.live_sources ?? []
-  const staticSources = catalogSources?.static_sources ?? []
-  const sourceSummary = catalogSources?.summary ?? null
   const hasPartialState = Boolean(
-    error
-    || tableDetails?.errors.length
+    tableDetails?.errors.length
     || detailsError
     || liveError
     || liveData?.errors.length
@@ -384,7 +552,7 @@ export const DataCatalog: React.FC = () => {
         <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">Source</p>
           <p className="mt-2 text-2xl font-bold text-stone-900">{sourceLabel}</p>
-          <p className="mt-2 text-sm text-stone-500">{catalog?.error ?? 'Catalog source reported by the gateway'}</p>
+          <p className="mt-2 text-sm text-stone-500">Tables reported by the gateway source inventory</p>
         </div>
         <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">Selected table</p>
@@ -449,11 +617,15 @@ export const DataCatalog: React.FC = () => {
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {liveSources.map(source => (
-                <SourceCard key={source.id} source={source} />
-              ))}
-              {staticSources.map(source => (
-                <SourceCard key={source.id} source={source} />
+              {sourcesWithTables.map(source => (
+                <SourceCard
+                  key={source.id}
+                  source={source}
+                  expanded={expandedSourceIds.has(source.id)}
+                  selectedPath={effectiveSelectedTable?.path ?? null}
+                  onToggle={() => toggleSource(source.id)}
+                  onSelect={setSelectedTable}
+                />
               ))}
             </div>
           </>
@@ -463,9 +635,9 @@ export const DataCatalog: React.FC = () => {
       <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">Live data catalog</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">Demo stream snapshots</p>
             <p className="mt-2 text-sm text-stone-500">
-              The live catalog surfaces current gateway-backed rows first, while the static catalog below keeps the storage inventory grouped by backend family.
+              Market Pulse rows read through the gateway from RisingWave.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -505,26 +677,26 @@ export const DataCatalog: React.FC = () => {
         )}
       </section>
 
-      {loading && !catalog ? (
-        <LoadingState label="Loading catalog..." />
-      ) : error && tables.length === 0 ? (
-        <ErrorState title="Data catalog unavailable" detail={error} onRetry={() => void refresh()} />
+      {sourcesLoading && !catalogSources ? (
+        <LoadingState label="Loading catalog browser..." />
+      ) : sourcesError && tables.length === 0 ? (
+        <ErrorState title="Data catalog unavailable" detail={sourcesError} onRetry={() => void refreshCatalogSources()} />
       ) : (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-4">
               <h3 className="flex items-center gap-2 text-lg font-semibold text-stone-900">
                 <Table2 size={18} className="text-stone-500" />
-                Static data catalog
+                Catalog browser
               </h3>
               <div className="flex items-center gap-3">
-                <ResourceMeta lastUpdated={lastUpdated} refreshing={refreshing} stale={stale} />
+                <ResourceMeta lastUpdated={sourcesLastUpdated} refreshing={sourcesRefreshing} stale={sourcesStale} />
                 <button
                   type="button"
-                  onClick={() => void refresh()}
+                  onClick={() => void refreshCatalogSources()}
                   className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100"
                 >
-                  <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                  <RefreshCw size={14} className={sourcesRefreshing ? 'animate-spin' : ''} />
                   Refresh
                 </button>
               </div>
@@ -595,6 +767,9 @@ export const DataCatalog: React.FC = () => {
                           <p className="mt-1 break-words text-sm text-stone-500">
                             Path: <span className="font-mono text-xs text-stone-700">{table.path}</span>
                           </p>
+                          <p className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-400">
+                            {table.source_label ?? 'Unknown source'} / {storageFamilyLabel(table.family ?? 'other')}
+                          </p>
                         </div>
                         {active ? (
                           <span className="rounded-md border border-stone-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500">
@@ -619,7 +794,7 @@ export const DataCatalog: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => void refreshDetails()}
-                  disabled={!selectedTable}
+                  disabled={!effectiveSelectedTable}
                   className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <RefreshCw size={14} className={detailsRefreshing ? 'animate-spin' : ''} />
@@ -627,19 +802,25 @@ export const DataCatalog: React.FC = () => {
                 </button>
               </div>
 
-              {selectedTable ? (
+              {effectiveSelectedTable ? (
                 <div className="mt-4 space-y-4">
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">Table name</p>
-                      <p className="mt-2 text-sm font-semibold text-stone-900">{selectedTable.name}</p>
+                      <p className="mt-2 text-sm font-semibold text-stone-900">{effectiveSelectedTable.name}</p>
                     </div>
                     <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">Source</p>
                       <p className="mt-2 text-sm font-semibold text-stone-900">{sourceLabel}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-500">{storageFamilyLabel(selectedTable.family ?? 'other')}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-500">{storageFamilyLabel(effectiveSelectedTable.family ?? 'other')}</p>
                     </div>
                   </div>
+
+                  {tableDetails?.note ? (
+                    <div className="rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600">
+                      {tableDetails.note}
+                    </div>
+                  ) : null}
 
                   <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
                     <div className="flex items-center gap-2">
@@ -695,7 +876,7 @@ export const DataCatalog: React.FC = () => {
                           </thead>
                           <tbody className="divide-y divide-stone-100">
                             {selectedRows.map((row, index) => (
-                              <TableRowPreview key={`${selectedTable.path}-${index}`} row={row} />
+                              <TableRowPreview key={`${effectiveSelectedTable.path}-${index}`} row={row} />
                             ))}
                           </tbody>
                         </table>
@@ -708,7 +889,7 @@ export const DataCatalog: React.FC = () => {
                   </div>
 
                   <div className="rounded-lg border border-stone-200 bg-white p-4 text-sm text-stone-600">
-                    Path: <span className="font-mono text-stone-700">{selectedTable.path}</span>
+                    Path: <span className="font-mono text-stone-700">{effectiveSelectedTable.path}</span>
                   </div>
                 </div>
               ) : (
@@ -717,7 +898,6 @@ export const DataCatalog: React.FC = () => {
 
               {hasPartialState ? (
                 <div className="mt-4 space-y-2">
-                  {error ? <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Catalog: {error}</div> : null}
                   {liveData?.errors?.length ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                       {liveData.errors.map(item => (
