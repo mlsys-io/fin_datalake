@@ -20,7 +20,7 @@ CONFIGMAP_FILE="${PROJECT_ROOT}/k8s-config.yaml"
 USER_ENV_FILE="${PROJECT_ROOT}/.env.user"
 
 NS_DEMO="demo-sources"
-NS_MINIO="etl-storage"
+NS_STORAGE="etl-storage"
 NS_TSDB="etl-data"
 NS_PREFECT="etl-orchestrate"
 NS_COMPUTE="etl-compute"

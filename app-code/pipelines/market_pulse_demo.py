@@ -69,6 +69,72 @@ def _structured_signal_line(signal_result: Dict[str, Any]) -> str:
     )
 
 
+def _build_intelligence_trace(result: Dict[str, Any]) -> List[Dict[str, str]]:
+    signal = dict(result.get("signal") or {})
+    payload_summary = dict(result.get("payload_summary") or {})
+    persistence = dict(result.get("signal_persistence") or {})
+    market_state = dict(result.get("market_state") or {})
+
+    headline_count = int(payload_summary.get("headline_count") or 0)
+    ohlc_rows = int(payload_summary.get("ohlc_rows") or 0)
+    market_fields = [
+        key
+        for key in ["last_price", "sma_5", "sma_20", "vwap", "price_return_pct", "volatility_estimate"]
+        if market_state.get(key) is not None
+    ]
+    sentiment_label = str(signal.get("sentiment_label", "neutral"))
+    sentiment_score = _fmt_float(signal.get("sentiment_score"))
+    trend_score = _fmt_float(signal.get("trend_score"))
+    action = str(signal.get("action", "HOLD")).upper()
+    confidence = _fmt_percent(signal.get("confidence"))
+
+    delta_status = "Delta ok" if persistence.get("delta", {}).get("persisted") else "Delta pending/error"
+    risingwave_status = (
+        "RisingWave ok"
+        if persistence.get("risingwave", {}).get("persisted")
+        else "RisingWave pending/error"
+    )
+
+    delegation_detail = (
+        f"{headline_count} headlines sent for market_news_analysis"
+        if headline_count
+        else "No headlines available, specialist delegation skipped"
+    )
+
+    return [
+        {
+            "step": "1",
+            "stage": "Inputs prepared",
+            "component": "Market Pulse ingest",
+            "evidence": f"{ohlc_rows} OHLC rows, {headline_count} headlines, market fields: {', '.join(market_fields) or 'n/a'}",
+        },
+        {
+            "step": "2",
+            "stage": "Decision agent invoked",
+            "component": STRATEGY_AGENT_NAME,
+            "evidence": "StrategyAgent receives market_state, headlines, and OHLC payload through Ray Serve",
+        },
+        {
+            "step": "3",
+            "stage": "Specialist analysis",
+            "component": f"{STRATEGY_AGENT_NAME} -> {MARKET_ANALYST_AGENT_NAME}",
+            "evidence": f"{delegation_detail}; returned sentiment={sentiment_label} ({sentiment_score})",
+        },
+        {
+            "step": "4",
+            "stage": "Evidence fusion",
+            "component": STRATEGY_AGENT_NAME,
+            "evidence": f"Fused trend={trend_score} with sentiment={sentiment_score} into {action} at {confidence}",
+        },
+        {
+            "step": "5",
+            "stage": "Platform state published",
+            "component": "ContextStore + persistence layer",
+            "evidence": f"Signal written for later access ({delta_status}, {risingwave_status})",
+        },
+    ]
+
+
 def _signal_history_row(signal: Dict[str, Any]) -> Dict[str, Any]:
     market_state = dict(signal.get("market_state") or {})
     return {
@@ -245,7 +311,7 @@ def market_pulse_demo_workflow(
 
     total_duration = time.perf_counter() - workflow_started
 
-    return {
+    result = {
         "symbol": symbol,
         "provider_requested": provider,
         "signal": signal_result.get("signal", {}),
@@ -272,6 +338,8 @@ def market_pulse_demo_workflow(
         "agent_state": visibility_result.get("agent_state") or agent_result.get("agent_state") or [],
         "visibility": visibility_result,
     }
+    result["intelligence_trace"] = _build_intelligence_trace(result)
+    return result
 
 
 def run_market_pulse_flow(*, provider: str = DEFAULT_PROVIDER, symbol: str = DEFAULT_SYMBOL) -> Dict[str, Any]:
@@ -279,6 +347,11 @@ def run_market_pulse_flow(*, provider: str = DEFAULT_PROVIDER, symbol: str = DEF
     result = market_pulse_demo_workflow(provider=provider, symbol=symbol)
     logger.success(f"[MarketPulse] Workflow completed in {float(result.get('duration_seconds', 0.0)):.2f}s")
     logger.info(f"[MarketPulse] {_structured_signal_line(result.get('signal', {}))}")
+    for item in result.get("intelligence_trace", []):
+        logger.info(
+            "[MarketPulse][IntelligenceTrace] "
+            f"{item.get('step')}. {item.get('stage')} | {item.get('component')} | {item.get('evidence')}"
+        )
     return result
 
 
@@ -365,6 +438,8 @@ def _print_fallback_summary(result: Dict[str, Any]) -> None:
     signal = result.get("signal", {})
     logger.success(f"Market Pulse Result: {_structured_signal_line(signal)}")
     logger.info(f"Analyst: {signal.get('sentiment_label', '-')} ({signal.get('sentiment_score', '-')})")
+    for item in result.get("intelligence_trace", []):
+        logger.info(f"Trace {item.get('step')}: {item.get('stage')} - {item.get('evidence')}")
 
 
 def _render_rich_summary(result: Dict[str, Any]) -> None:
@@ -390,6 +465,20 @@ def _render_rich_summary(result: Dict[str, Any]) -> None:
     signal_table.add_row("Sentiment", f"{signal.get('sentiment_label', '-')} ({_fmt_float(signal.get('sentiment_score'))})")
     signal_table.add_row("Analyst Summary", str(signal.get("analyst_summary", "-")))
     console.print(signal_table)
+
+    trace_table = Table(title="Intelligence Trace", show_header=True, header_style="bold magenta")
+    trace_table.add_column("#", justify="right")
+    trace_table.add_column("Stage")
+    trace_table.add_column("Component")
+    trace_table.add_column("Evidence")
+    for item in result.get("intelligence_trace", []):
+        trace_table.add_row(
+            str(item.get("step", "-")),
+            str(item.get("stage", "-")),
+            str(item.get("component", "-")),
+            str(item.get("evidence", "-")),
+        )
+    console.print(trace_table)
 
     market_table = Table(title="Market State", show_header=True, header_style="bold green")
     market_table.add_column("Field")
