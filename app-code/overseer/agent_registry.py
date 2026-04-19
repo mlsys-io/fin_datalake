@@ -25,6 +25,14 @@ _ENV_REGISTRY = "OVERSEER_AGENT_REGISTRY"
 _ENV_DEFAULT_AGENT = "OVERSEER_DEFAULT_AGENT"
 
 
+class AgentResolutionError(RuntimeError):
+    """Base class for agent import resolution failures."""
+
+
+class UnrecoverableAgentResolutionError(AgentResolutionError):
+    """Raised when a catalog recovery contract cannot resolve deterministically."""
+
+
 def load_agent_registry(config_path: str | Path | None = None) -> dict[str, str]:
     """Load agent registry mapping {ClassName: import_target}."""
     raw = os.getenv(_ENV_REGISTRY)
@@ -74,6 +82,46 @@ def resolve_agent_class(name: str, config_path: str | Path | None = None) -> Any
     if not target:
         return None
     return _import_from_target(target)
+
+
+def resolve_agent_import_target(target: str) -> Any:
+    """Resolve a catalog class_path module import target.
+
+    Catalog recovery targets are a durable contract, so they must be explicit
+    module imports. File-path targets remain supported by the mutable registry,
+    but are intentionally rejected here.
+    """
+    target = str(target or "").strip()
+    if ":" not in target:
+        raise UnrecoverableAgentResolutionError(
+            "Missing or invalid catalog class_path; expected 'module.path:ClassName'."
+        )
+
+    module_path, class_name = target.split(":", 1)
+    module_path = module_path.strip()
+    class_name = class_name.strip()
+    if not module_path or not class_name:
+        raise UnrecoverableAgentResolutionError(
+            "Missing or invalid catalog class_path; expected 'module.path:ClassName'."
+        )
+
+    if module_path.endswith(".py") or "/" in module_path or "\\" in module_path:
+        raise UnrecoverableAgentResolutionError(
+            f"Catalog class_path '{target}' must use a module path, not a file path."
+        )
+
+    try:
+        resolved = _import_from_target(target)
+    except Exception as exc:
+        raise UnrecoverableAgentResolutionError(
+            f"Catalog class_path '{target}' could not be imported: {exc}"
+        ) from exc
+
+    if resolved is None:
+        raise UnrecoverableAgentResolutionError(
+            f"Catalog class_path '{target}' did not resolve to an agent class."
+        )
+    return resolved
 
 
 def _import_from_target(target: str) -> Any:

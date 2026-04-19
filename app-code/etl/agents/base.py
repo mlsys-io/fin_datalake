@@ -122,8 +122,10 @@ class BaseAgent(ABC, ConversationManagerMixin):
         )
         runtime_namespace = resolve_ray_namespace()
         deployment_metadata = dict(self.runtime_metadata.get("deployment_metadata") or {})
+        class_path = f"{self.__class__.__module__}:{self.__class__.__name__}"
         metadata_payload = {
             "class": self.__class__.__name__,
+            "class_path": class_path,
             "app_name": registered_name,
             "interaction_modes": self.get_interaction_modes(),
             "route_prefix": route_prefix,

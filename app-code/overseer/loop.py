@@ -350,6 +350,11 @@ class Overseer:
         metadata = dict(entry.get("metadata") or {})
         deployment_metadata = dict(entry.get("deployment_metadata") or {})
         deployment_name = str(metadata.get("app_name") or entry.get("name") or "").strip()
+        class_path = str(
+            metadata.get("class_path")
+            or entry.get("class_path")
+            or ""
+        ).strip()
         desired_status = str(entry.get("desired_status") or "running")
         previous_observed = str(entry.get("observed_status") or "unknown")
         previous_health = str(entry.get("health_status") or "unknown")
@@ -391,6 +396,17 @@ class Overseer:
             failure_reason = app_state.get("failure_reason")
             notes = str(
                 app_state.get("notes") or "Deployment state derived from Ray Serve."
+            )
+        elif previous_recovery == "blocked":
+            observed_status = "missing"
+            health_status = "offline"
+            recovery_state = "blocked"
+            failure_reason = entry.get("last_failure_reason") or (
+                f"Deployment '{deployment_name}' recovery is blocked."
+            )
+            notes = (
+                entry.get("reconcile_notes")
+                or "Overseer recovery is blocked until the catalog class_path contract is corrected."
             )
         elif previous_recovery == "recovering":
             observed_status = "recovering"
@@ -444,6 +460,7 @@ class Overseer:
             **entry,
             "name": deployment_name,
             "metadata": metadata,
+            "class_path": class_path,
             "deployment_metadata": deployment_metadata,
             "route_prefix": route_prefix,
             "managed_by_overseer": managed,
@@ -593,6 +610,15 @@ class Overseer:
                 )
             return
 
+        retryable = bool(getattr(result, "retryable", True))
+        recovery_state = "failed" if retryable else "blocked"
+        health_status = "degraded" if retryable else "offline"
+        reconcile_notes = (
+            "Overseer action failed; manual inspection may be required."
+            if retryable
+            else "Overseer recovery is blocked until the catalog class_path contract is corrected."
+        )
+
         await asyncio.to_thread(
             update_agent_catalog_status,
             name=action.deployment_name,
@@ -601,11 +627,11 @@ class Overseer:
             mark_seen=False,
             heartbeat=False,
             observed_status="missing",
-            health_status="degraded",
-            recovery_state="failed",
+            health_status=health_status,
+            recovery_state=recovery_state,
             last_failure_reason=result.error or result.detail or action.reason,
             last_action_type=action.type.value,
-            reconcile_notes="Overseer action failed; manual inspection may be required.",
+            reconcile_notes=reconcile_notes,
             reconciled=False,
         )
 

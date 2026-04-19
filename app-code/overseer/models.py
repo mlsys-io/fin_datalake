@@ -82,6 +82,7 @@ class OverseerAction:
     target: str = "ray"             # Which actuator handles this
     agent: str = ""                 # Agent class name (for scaling/respawn)
     agent_class: str = ""           # Explicit deployment class name
+    class_path: str = ""            # Durable import contract for respawn
     deployment_name: str = ""       # Exact deployment/app identity to recover
     runtime_namespace: str = ""     # Ray namespace for the target deployment
     route_prefix: str = ""          # Serve route prefix to preserve on recovery
@@ -99,6 +100,7 @@ class OverseerAction:
             "target": self.target,
             "agent": self.agent,
             "agent_class": self.agent_class or self.agent,
+            "class_path": self.class_path,
             "deployment_name": self.deployment_name,
             "runtime_namespace": self.runtime_namespace,
             "route_prefix": self.route_prefix,
@@ -116,3 +118,4 @@ class ActionResult:
     success: bool
     detail: str = ""
     error: str | None = None
+    retryable: bool = True

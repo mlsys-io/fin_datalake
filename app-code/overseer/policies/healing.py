@@ -46,7 +46,14 @@ class ActorHealthPolicy(BasePolicy):
                 or deployment.get("agent_class")
                 or ""
             ).strip()
-            if not class_name or class_name not in managed_agents:
+            class_path = str(
+                metadata.get("class_path")
+                or deployment.get("class_path")
+                or ""
+            ).strip()
+            if not class_name:
+                continue
+            if not class_path and class_name not in managed_agents:
                 continue
 
             replication_mode = str(
@@ -67,7 +74,7 @@ class ActorHealthPolicy(BasePolicy):
             health_status = str(deployment.get("health_status") or "unknown")
             recovery_state = str(deployment.get("recovery_state") or "idle")
 
-            if recovery_state == "recovering":
+            if recovery_state in {"recovering", "blocked"}:
                 continue
 
             if observed_status in {"missing", "offline"}:
@@ -77,6 +84,7 @@ class ActorHealthPolicy(BasePolicy):
                         target="ray",
                         agent=class_name,
                         agent_class=class_name,
+                        class_path=class_path,
                         deployment_name=deployment_name,
                         runtime_namespace=str(
                             deployment.get("runtime_namespace")
@@ -105,6 +113,7 @@ class ActorHealthPolicy(BasePolicy):
                         target="alert",
                         agent=class_name,
                         agent_class=class_name,
+                        class_path=class_path,
                         deployment_name=deployment_name,
                         runtime_namespace=str(
                             deployment.get("runtime_namespace")

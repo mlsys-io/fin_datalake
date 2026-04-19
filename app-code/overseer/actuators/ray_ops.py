@@ -14,7 +14,11 @@ from uuid import uuid4
 
 from overseer.actuators.base import BaseActuator
 from overseer.models import ActionResult, ActionType, OverseerAction
-from overseer.agent_registry import resolve_agent_class
+from overseer.agent_registry import (
+    UnrecoverableAgentResolutionError,
+    resolve_agent_class,
+    resolve_agent_import_target,
+)
 from overseer.redis_utils import get_redis_client
 
 
@@ -42,6 +46,9 @@ class RayActuator(BaseActuator):
 
             return ActionResult(success=False, error=f"RayActuator does not handle {action.type}")
 
+        except UnrecoverableAgentResolutionError as e:
+            logger.error(f"RayActuator cannot recover deployment: {e}")
+            return ActionResult(success=False, error=str(e), retryable=False)
         except Exception as e:
             logger.error(f"RayActuator failed: {e}")
             return ActionResult(success=False, error=str(e))
@@ -83,9 +90,11 @@ class RayActuator(BaseActuator):
 
         ensure_ray(address=self.ray_address, namespace=self.ray_namespace)
         class_name = action.agent_class or action.agent
-        agent_cls = self._resolve_agent_class(class_name)
-        if agent_cls is None:
-            raise RuntimeError(f"Unknown agent class: {class_name}")
+        if not action.class_path:
+            raise UnrecoverableAgentResolutionError(
+                f"Missing catalog class_path for '{class_name}'. Durable recovery requires an explicit class path."
+            )
+        agent_cls = self._resolve_agent_class(class_name, class_path=action.class_path)
 
         deployment_name = action.deployment_name or self._make_actor_name(class_name)
         deployment_metadata = dict(action.deployment_metadata or {})
@@ -107,8 +116,11 @@ class RayActuator(BaseActuator):
         )
         return class_name, deployment_name
 
-    def _resolve_agent_class(self, class_name: str):
-        """Dynamically resolve an agent class from registry or etl.agents."""
+    def _resolve_agent_class(self, class_name: str, class_path: str = ""):
+        """Dynamically resolve an agent class from a catalog path or registry."""
+        if class_path:
+            return resolve_agent_import_target(class_path)
+
         resolved = resolve_agent_class(class_name)
         if resolved is not None:
             return resolved
