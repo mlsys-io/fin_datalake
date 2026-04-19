@@ -183,6 +183,11 @@ gateway:
     RAY_NAMESPACE: serve
     RAY_DASHBOARD_URL: ""
     MINIO_CONSOLE_URL: https://luyao-storage-head.ddns.comp.nus.edu.sg:4000
+    RISINGWAVE_HOST: risingwave.etl-data.svc.cluster.local
+    RISINGWAVE_PORT: "4567"
+    RISINGWAVE_USER: root
+    RISINGWAVE_DATABASE: dev
+    RISINGWAVE_SCHEMA: public
     SSL_CERT_FILE: /opt/certs/public.crt
     CA_PATH: /opt/certs/public.crt
   userSecretRef: etl-user-secret-gateway

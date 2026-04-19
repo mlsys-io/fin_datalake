@@ -20,6 +20,9 @@ spec:
           image: etl-gateway:latest
           imagePullPolicy: Never # Use image built locally and imported to k0s
           envFrom:
+            - configMapRef:
+                name: etl-config
+                optional: true
             - secretRef:
                 name: etl-user-secret-gateway
                 optional: true
