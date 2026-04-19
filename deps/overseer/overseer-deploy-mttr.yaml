@@ -50,8 +50,6 @@ spec:
               value: "ray://etl-ray-head-svc.etl-compute.svc.cluster.local:10001"
             - name: RAY_NAMESPACE
               value: "serve"
-            - name: OVERSEER_AGENT_REGISTRY
-              value: '{"SupportAgent":"agents.dummy_agents:SupportAgent","SentimentModelAgent":"agents.dummy_agents:SentimentModelAgent","ForecastAgent":"agents.dummy_agents:ForecastAgent","RouterAgent":"agents.dummy_agents:RouterAgent"}'
             - name: TSDB_HOST
               value: "tsdb-ha.etl-data.svc.cluster.local"
             - name: TSDB_PORT

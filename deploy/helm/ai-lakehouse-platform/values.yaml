@@ -233,7 +233,6 @@ overseer:
     GATEWAY_INTERNAL_URL: ""
     RAY_ADDRESS: ""
     RAY_NAMESPACE: serve
-    OVERSEER_AGENT_REGISTRY: '{"SupportAgent":"agents.dummy_agents:SupportAgent","SentimentModelAgent":"agents.dummy_agents:SentimentModelAgent","ForecastAgent":"agents.dummy_agents:ForecastAgent","RouterAgent":"agents.dummy_agents:RouterAgent"}'
     TSDB_HOST: ""
     TSDB_PORT: ""
     TSDB_USER: ""
