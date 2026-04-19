@@ -70,6 +70,19 @@ def signal_history_uri() -> str:
     return f"{market_pulse_root()}/signals"
 
 
+def delta_hive_options(table_name: str) -> Dict[str, Any]:
+    hive_host = str(os.environ.get("HMS_HOST") or config.HIVE_HOST or "").strip()
+    if not hive_host:
+        return {}
+
+    hive_port = int(os.environ.get("HMS_PORT") or config.HIVE_PORT or 9083)
+    hive_database = str(os.environ.get("DEMO_HIVE_DATABASE", "default")).strip() or "default"
+    return {
+        "hive_table_name": f"{hive_database}.{table_name}",
+        "hive_config": {"host": hive_host, "port": hive_port},
+    }
+
+
 def risingwave_price_table() -> str:
     return PRICE_STREAM_RISINGWAVE_TABLE
 
@@ -536,6 +549,7 @@ class MarketPriceIngestService(ServiceTask):
                 name="Persist Price Stream To Delta",
                 uri=self.delta_uri,
                 mode=delta_mode,
+                **delta_hive_options("market_pulse_ohlc_stream"),
             ).local(rows)
         except Exception as exc:
             errors.append(f"delta={exc}")
@@ -815,11 +829,13 @@ def market_pulse_ingest(
         name="Persist Market News",
         uri=news_result["table_uri"],
         mode="overwrite",
+        **delta_hive_options("market_pulse_news"),
     ).submit(news_result["records"])
     price_write_future = DeltaLakeWriteTask(
         name="Persist Latest Price Window",
         uri=price_result["table_uri"],
         mode="overwrite",
+        **delta_hive_options("market_pulse_ohlc"),
     ).submit(price_result["records"])
 
     news_write_error = None

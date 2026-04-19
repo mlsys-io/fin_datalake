@@ -22,6 +22,7 @@ from etl.runtime import ensure_ray, resolve_serve_response
 from pipelines.market_pulse_ingest import (
     DEFAULT_PROVIDER,
     DEFAULT_SYMBOL,
+    delta_hive_options,
     market_pulse_ingest,
     risingwave_price_table,
     risingwave_signal_table,
@@ -214,6 +215,7 @@ class PersistSignalHistoryTask(BaseTask):
                 name="Persist Signal History To Delta",
                 uri=signal_history_uri(),
                 mode="append",
+                **delta_hive_options("market_pulse_signals"),
             ).local([row])
         except Exception as exc:
             delta_error = str(exc)

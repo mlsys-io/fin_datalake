@@ -3,7 +3,6 @@ import {
   ChevronDown,
   ChevronRight,
   Columns3,
-  Database,
   Eye,
   FileSearch,
   RefreshCw,
@@ -23,19 +22,12 @@ import {
 } from '../../api/client'
 import { EmptyState, ErrorState, LoadingState, ResourceMeta } from '../shared/AsyncState'
 import { usePollingResource } from '../../hooks/usePollingResource'
-import { getRisingWaveSchema } from '../../lib/risingwave'
 
 type TableDetails = {
   schema: DataSchemaResponse | null
   preview: DataQueryResponse | null
   errors: string[]
   note?: string
-}
-
-type LiveDataDetails = {
-  signals: DataQueryResponse | null
-  prices: DataQueryResponse | null
-  errors: string[]
 }
 
 type StorageGroup = {
@@ -75,10 +67,6 @@ function asString(value: unknown): string {
 
 function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : 'request failed'
-}
-
-function isMissingTableError(reason: unknown): boolean {
-  return /table or source not found|relation .* does not exist|catalog error/i.test(errorMessage(reason))
 }
 
 function titleCase(value: string): string {
@@ -262,127 +250,10 @@ function TableRowPreview({ row }: { row: Row }) {
   )
 }
 
-function QuerySnapshotCard({
-  title,
-  description,
-  storage,
-  response,
-  kind,
-}: {
-  title: string
-  description: string
-  storage: string
-  response: DataQueryResponse | null
-  kind: 'signals' | 'prices'
-}) {
-  const rows = rowsToObjects(response)
-  const latest = rows[0] ?? null
-  const count = response?.row_count ?? rows.length
-
-  const summaryRows = kind === 'signals'
-    ? [
-        { label: 'Symbol', value: asString(latest?.symbol) },
-        { label: 'Action', value: asString(latest?.action) },
-        { label: 'Confidence', value: asString(latest?.confidence) },
-      ]
-    : [
-        { label: 'Symbol', value: asString(latest?.symbol) },
-        { label: 'Close', value: asString(latest?.close) },
-        { label: 'Return', value: asString(latest?.price_return_pct) },
-      ]
-
-  return (
-    <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">{title}</p>
-          <p className="mt-1 text-sm text-stone-500">{description}</p>
-          <p className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-400">{storage}</p>
-        </div>
-        <span className="rounded-md border border-stone-200 bg-stone-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500">
-          {count} rows
-        </span>
-      </div>
-
-      {latest ? (
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          {summaryRows.map(item => (
-            <div key={item.label} className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-400">{item.label}</p>
-              <p className="mt-1 break-words text-sm text-stone-700">{item.value}</p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="mt-4">
-          <EmptyState title="No rows loaded yet" detail="Refresh the live snapshot when the RisingWave tables are available." />
-        </div>
-      )}
-
-      {rows.length ? (
-        <div className="mt-4 overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-stone-50 text-[11px] uppercase tracking-[0.16em] text-stone-400">
-              <tr>
-                {(response?.columns ?? []).slice(0, 6).map(column => (
-                  <th key={column} className="px-3 py-3">{column}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {rows.slice(0, 5).map((row, index) => (
-                <TableRowPreview key={`${title}-${index}`} row={row} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
 export const DataCatalog: React.FC = () => {
   const [search, setSearch] = useState('')
   const [selectedTable, setSelectedTable] = useState<CatalogBrowserTable | null>(null)
   const [expandedSourceIds, setExpandedSourceIds] = useState<Set<string>>(() => new Set())
-  const risingwaveSchema = getRisingWaveSchema()
-
-  const loadLiveData = useCallback(async (): Promise<LiveDataDetails> => {
-    const errors: string[] = []
-    const signalSql = `SELECT symbol, action, confidence, sentiment_label, sentiment_score, analyst_summary, last_price, sma_5, sma_20, vwap, price_return_pct, volatility_estimate, timestamp_ms FROM ${risingwaveSchema}.market_pulse_signals ORDER BY timestamp_ms DESC LIMIT 5`
-    const priceSql = `SELECT symbol, close, vwap, sma_5, sma_20, price_return_pct, volatility_estimate, timestamp_ms FROM ${risingwaveSchema}.market_pulse_prices ORDER BY timestamp_ms DESC LIMIT 5`
-
-    const [signalsRes, pricesRes] = await Promise.allSettled([
-      queryStream(signalSql),
-      queryStream(priceSql),
-    ])
-
-    const signals = signalsRes.status === 'fulfilled' ? signalsRes.value : null
-    const prices = pricesRes.status === 'fulfilled' ? pricesRes.value : null
-
-    if (signalsRes.status === 'rejected') {
-      if (!isMissingTableError(signalsRes.reason)) {
-        errors.push(`Signals: ${errorMessage(signalsRes.reason)}`)
-      }
-    }
-    if (pricesRes.status === 'rejected') {
-      if (!isMissingTableError(pricesRes.reason)) {
-        errors.push(`Prices: ${errorMessage(pricesRes.reason)}`)
-      }
-    }
-
-    return { signals, prices, errors }
-  }, [risingwaveSchema])
-
-  const {
-    data: liveData,
-    loading: liveLoading,
-    refreshing: liveRefreshing,
-    error: liveError,
-    lastUpdated: liveLastUpdated,
-    stale: liveStale,
-    refresh: refreshLiveData,
-  } = usePollingResource(loadLiveData, { pollIntervalMs: 45_000 })
 
   const loadCatalogSources = useCallback(async (): Promise<CatalogSourcesResponse> => {
     return listCatalogSources()
@@ -524,48 +395,16 @@ export const DataCatalog: React.FC = () => {
 
   const selectedRows = useMemo(() => rowsToObjects(tableDetails?.preview), [tableDetails?.preview])
   const schemaFields = tableDetails?.schema?.fields ?? []
-  const totalTables = sourceSummary?.total_tables ?? tables.length
-  const selectedLabel = effectiveSelectedTable?.name ?? 'None'
   const sourceLabel = effectiveSelectedTable?.source_label ?? 'Source-aware'
-  const previewCount = tableDetails?.preview?.row_count ?? selectedRows.length
   const storageGroups = useMemo(() => groupTablesByStorage(tables), [tables])
   const hasPartialState = Boolean(
     tableDetails?.errors.length
     || detailsError
-    || liveError
-    || liveData?.errors.length
     || sourcesError
   )
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="flex items-center gap-4 rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-          <div className="rounded-lg bg-stone-100 p-3 text-stone-700">
-            <Database size={24} />
-          </div>
-          <div>
-            <p className="text-sm text-stone-500">Active tables</p>
-            <p className="text-2xl font-bold text-stone-900">{totalTables}</p>
-          </div>
-        </div>
-        <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">Source</p>
-          <p className="mt-2 text-2xl font-bold text-stone-900">{sourceLabel}</p>
-          <p className="mt-2 text-sm text-stone-500">Tables reported by the gateway source inventory</p>
-        </div>
-        <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">Selected table</p>
-          <p className="mt-2 text-2xl font-bold text-stone-900">{selectedLabel}</p>
-          <p className="mt-2 text-sm text-stone-500">{effectiveSelectedTable?.path ?? 'Pick a table to inspect schema and preview rows.'}</p>
-        </div>
-        <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">Preview rows</p>
-          <p className="mt-2 text-2xl font-bold text-stone-900">{previewCount}</p>
-          <p className="mt-2 text-sm text-stone-500">Selected table preview</p>
-        </div>
-      </div>
-
       <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
@@ -629,51 +468,6 @@ export const DataCatalog: React.FC = () => {
               ))}
             </div>
           </>
-        )}
-      </section>
-
-      <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">Demo stream snapshots</p>
-            <p className="mt-2 text-sm text-stone-500">
-              Market Pulse rows read through the gateway from RisingWave.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <ResourceMeta lastUpdated={liveLastUpdated} refreshing={liveRefreshing} stale={liveStale} />
-            <button
-              type="button"
-              onClick={() => void refreshLiveData()}
-              className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100"
-            >
-              <RefreshCw size={14} className={liveRefreshing ? 'animate-spin' : ''} />
-              Refresh live data
-            </button>
-          </div>
-        </div>
-
-        {liveLoading && !liveData ? (
-          <LoadingState label="Loading live data rows..." />
-        ) : liveError && !liveData ? (
-          <ErrorState title="Live data catalog unavailable" detail={liveError} onRetry={() => void refreshLiveData()} />
-        ) : (
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            <QuerySnapshotCard
-              title="Live signal stream"
-              description={`Schema ${risingwaveSchema}.market_pulse_signals`}
-              storage="RisingWave"
-              response={liveData?.signals ?? null}
-              kind="signals"
-            />
-            <QuerySnapshotCard
-              title="Live price stream"
-              description={`Schema ${risingwaveSchema}.market_pulse_prices`}
-              storage="RisingWave"
-              response={liveData?.prices ?? null}
-              kind="prices"
-            />
-          </div>
         )}
       </section>
 
@@ -898,13 +692,6 @@ export const DataCatalog: React.FC = () => {
 
               {hasPartialState ? (
                 <div className="mt-4 space-y-2">
-                  {liveData?.errors?.length ? (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      {liveData.errors.map(item => (
-                        <p key={item}>{item}</p>
-                      ))}
-                    </div>
-                  ) : null}
                   {tableDetails?.errors?.length ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                       {tableDetails.errors.map(item => (
