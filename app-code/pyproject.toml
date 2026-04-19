@@ -69,6 +69,7 @@ gateway = [
     "deltalake>=0.14",
     "pandas>=2.0,<3.0.0",
     "pyarrow>=14.0",
+    "psycopg2-binary>=2.9",
     "ray[default]==2.54.0",
     "thrift>=0.16",
 ]
