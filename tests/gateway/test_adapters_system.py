@@ -1,7 +1,6 @@
 import pytest
-import json
 from datetime import datetime
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import patch
 
 from gateway.adapters.system import SystemAdapter
 from gateway.models.intent import UserIntent
@@ -28,12 +27,7 @@ async def test_system_adapter_health_redis(test_user):
         }
     }
 
-    mock_client = AsyncMock()
-    mock_client.lindex.return_value = json.dumps(mock_snapshot)
-    mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
-
-    with patch("gateway.core.redis.get_redis_client", return_value=mock_client):
+    with patch("gateway.services.system.fetch_overseer_snapshots", return_value=[mock_snapshot]) as fetch_snapshots:
         result = await adapter.execute(test_user, intent)
 
     assert result["status"] == "degraded"
@@ -41,7 +35,7 @@ async def test_system_adapter_health_redis(test_user):
     assert result["components"]["ray"]["healthy"] is True
     assert result["components"]["kafka"]["healthy"] is False
     assert result["components"]["kafka"]["error"] == "Connection refused"
-    mock_client.lindex.assert_called_once_with("overseer:snapshots", 0)
+    fetch_snapshots.assert_called_once_with(1)
 
 
 @pytest.mark.asyncio
@@ -49,8 +43,19 @@ async def test_system_adapter_health_fallback(test_user):
     adapter = SystemAdapter()
     intent = UserIntent(action="health", domain="system", user_id="admin", roles=["Admin"])
 
-    with patch("gateway.core.redis.get_redis_client", side_effect=Exception("Redis down")):
+    with patch("gateway.services.system.fetch_overseer_snapshots", side_effect=Exception("Redis down")):
         result = await adapter.execute(test_user, intent)
 
     assert result["status"] == "error"
     assert "Redis down" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_system_adapter_health_no_snapshots(test_user):
+    adapter = SystemAdapter()
+    intent = UserIntent(action="health", domain="system", user_id="admin", roles=["Admin"])
+
+    with patch("gateway.services.system.fetch_overseer_snapshots", return_value=[]):
+        result = await adapter.execute(test_user, intent)
+
+    assert result == {"status": "unknown", "message": "No health snapshots available"}

@@ -99,36 +99,13 @@ class SystemAdapter(BaseAdapter):
     async def _get_health_async(self, user: User, intent: UserIntent) -> dict:
         """Get system health summary (async)."""
         self._require_permission(user, Permission.SYSTEM_READ)
-        import json
-
-        # Try to get health from Redis (written by Overseer MetricsStore)
         try:
-            from gateway.core.redis import get_redis_client
-            r = get_redis_client()
-            if not r:
-                return {"status": "unknown", "message": "Redis not configured"}
+            from gateway.services.system import fetch_overseer_snapshots
 
-            async with r:
-                snapshot_data = await r.lindex("overseer:snapshots", 0)
+            snapshots = await fetch_overseer_snapshots(1)
+            if snapshots:
+                return self._summarize_health_snapshot(snapshots[-1])
 
-            if snapshot_data:
-                snap = json.loads(snapshot_data)
-                summary = {}
-                all_healthy = True
-                for name, metrics in snap.get("services", {}).items():
-                    summary[name] = {
-                        "healthy": metrics.get("healthy", False),
-                        "error": metrics.get("error", None)
-                    }
-                    if not metrics.get("healthy", False):
-                        all_healthy = False
-
-                return {
-                    "source": "redis (overseer)",
-                    "status": "healthy" if all_healthy else "degraded",
-                    "components": summary,
-                    "timestamp": snap.get("timestamp")
-                }
             return {"status": "unknown", "message": "No health snapshots available"}
         except Exception as e:
             logger.warning("Redis health fetch failed: %s", e)
@@ -293,6 +270,31 @@ class SystemAdapter(BaseAdapter):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _summarize_health_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+        summary = {}
+        all_healthy = True
+        for name, metrics in snapshot.get("services", {}).items():
+            if not isinstance(metrics, dict):
+                summary[name] = {"healthy": False, "error": "Invalid service metrics"}
+                all_healthy = False
+                continue
+
+            healthy = bool(metrics.get("healthy", False))
+            summary[name] = {
+                "healthy": healthy,
+                "error": metrics.get("error", None),
+            }
+            if not healthy:
+                all_healthy = False
+
+        return {
+            "source": "redis (overseer)",
+            "status": "healthy" if all_healthy else "degraded",
+            "components": summary,
+            "timestamp": snapshot.get("timestamp"),
+        }
 
     @staticmethod
     def _parse_since(since: str) -> datetime:
