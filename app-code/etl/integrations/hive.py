@@ -239,6 +239,22 @@ class HiveClient(DependencyAwareMixin):
         """Convert PyArrow schema to Hive column definitions."""
         import pyarrow as pa
 
+        for attr_name in ("base_schema", "arrow_schema", "pyarrow_schema"):
+            nested_schema = getattr(schema, attr_name, None)
+            if callable(nested_schema):
+                nested_schema = nested_schema()
+            if nested_schema is not None and nested_schema is not schema:
+                schema = nested_schema
+                break
+
+        if not hasattr(schema, "__iter__"):
+            names = getattr(schema, "names", None)
+            types = getattr(schema, "types", None)
+            if names is not None and types is not None:
+                schema = [pa.field(name, typ) for name, typ in zip(names, types)]
+            else:
+                raise TypeError(f"Unsupported schema object for Hive registration: {type(schema).__name__}")
+
         cols = []
         for f in schema:
             t = f.type

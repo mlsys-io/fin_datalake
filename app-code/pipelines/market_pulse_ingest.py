@@ -565,7 +565,6 @@ class MarketPriceIngestService(ServiceTask):
                 name="Persist Price Stream To Delta",
                 uri=self.delta_uri,
                 mode=delta_mode,
-                **delta_hive_options("market_pulse_ohlc_stream"),
             ).local(rows)
         except Exception as exc:
             errors.append(f"delta={exc}")
