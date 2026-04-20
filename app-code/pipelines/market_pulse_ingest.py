@@ -52,6 +52,15 @@ PRICE_SERVICE_CONFIG_FIELDS = (
     "batch_size",
     "read_timeout",
 )
+PRICE_SERVICE_RESTART_FIELDS = (
+    "websocket_url",
+    "symbol",
+    "context_key",
+    "meta_key",
+    "metrics_key",
+    "delta_uri",
+    "risingwave_table",
+)
 
 
 def market_pulse_root() -> str:
@@ -624,7 +633,14 @@ class MarketPriceIngestService(ServiceTask):
                         self.last_tick_at = time.time()
                         self._update_metrics(rows)
                         self._publish_window()
-                        self._persist_rows(rows, delta_mode=delta_mode)
+
+                        minimum_ready_rows = min(self.window_size, 20)
+                        if len(self.window) < minimum_ready_rows:
+                            self._log_batch_summary(rows)
+                            continue
+
+                        rows_to_persist = list(self.window) if delta_mode == "overwrite" else rows
+                        self._persist_rows(rows_to_persist, delta_mode=delta_mode)
                         self._publish_window()
                         self._log_batch_summary(rows)
                     except Exception as exc:
@@ -727,6 +743,10 @@ def _price_service_fingerprint(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {field: payload.get(field) for field in PRICE_SERVICE_CONFIG_FIELDS}
 
 
+def _price_service_restart_fingerprint(payload: Dict[str, Any]) -> Dict[str, Any]:
+    return {field: payload.get(field) for field in PRICE_SERVICE_RESTART_FIELDS}
+
+
 def _read_price_context_snapshot() -> Dict[str, Any]:
     store = get_context()
     return {
@@ -753,7 +773,7 @@ def _restart_price_service(service_name: str, service_cfg: Dict[str, Any]) -> An
 
 
 def _service_status_matches_config(status: Dict[str, Any], service_cfg: Dict[str, Any]) -> bool:
-    return _price_service_fingerprint(status) == _price_service_fingerprint(service_cfg)
+    return _price_service_restart_fingerprint(status) == _price_service_restart_fingerprint(service_cfg)
 
 
 def _ensure_price_service(*, symbol: str, window_size: int) -> Dict[str, Any]:
@@ -766,12 +786,17 @@ def _ensure_price_service(*, symbol: str, window_size: int) -> Dict[str, Any]:
         status = svc.get_status()
         if not _service_status_matches_config(status, service_cfg):
             logger.warning(
-                "[Ingest] Existing price service config is stale. Replacing service. "
-                f"expected={json.dumps(_price_service_fingerprint(service_cfg), default=str)} "
-                f"observed={json.dumps(_price_service_fingerprint(status), default=str)}"
+                "[Ingest] Existing price service contract is stale. Replacing service. "
+                f"expected={json.dumps(_price_service_restart_fingerprint(service_cfg), default=str)} "
+                f"observed={json.dumps(_price_service_restart_fingerprint(status), default=str)}"
             )
             svc = _restart_price_service(service_name, service_cfg)
             status = svc.get_status()
+        else:
+            logger.info(
+                "[Ingest] Reusing existing price service. "
+                f"status={json.dumps({key: status.get(key) for key in ['running', 'mode', 'window_size', 'websocket_url', 'last_error']}, default=str)}"
+            )
     except Exception:
         logger.info(f"[Ingest] No reusable price service found for '{service_name}'. Deploying a fresh service.")
         svc = _restart_price_service(service_name, service_cfg)
