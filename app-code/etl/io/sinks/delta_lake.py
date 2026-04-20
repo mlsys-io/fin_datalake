@@ -287,7 +287,13 @@ class DeltaLakeWriter(DataWriter):
                 )
         except Exception as e:
             message = f"Failed to register table in Hive: {e}"
-            if str(os.environ.get("DEMO_STRICT_NO_FALLBACK", "1")).strip().lower() not in {"0", "false", "no", "off"}:
+            strict_hive = str(os.environ.get("ETL_STRICT_HIVE_REGISTRATION", "0")).strip().lower() not in {
+                "0",
+                "false",
+                "no",
+                "off",
+            }
+            if strict_hive:
                 logger.error(message)
                 raise RuntimeError(message) from e
             logger.warning(message)

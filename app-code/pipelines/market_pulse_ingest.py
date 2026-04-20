@@ -90,9 +90,10 @@ def delta_hive_options(table_name: str) -> Dict[str, Any]:
 
     hive_port = int(os.environ.get("HMS_PORT") or config.HIVE_PORT or 9083)
     hive_database = str(os.environ.get("DEMO_HIVE_DATABASE", "default")).strip() or "default"
+    hive_timeout_ms = int(os.environ.get("DEMO_HIVE_REGISTRATION_TIMEOUT_MS", "10000"))
     return {
         "hive_table_name": f"{hive_database}.{table_name}",
-        "hive_config": {"host": hive_host, "port": hive_port},
+        "hive_config": {"host": hive_host, "port": hive_port, "timeout_ms": hive_timeout_ms},
     }
 
 
