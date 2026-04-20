@@ -112,7 +112,7 @@ class RayActuator(BaseActuator):
             num_replicas=num_replicas,
             num_cpus=num_cpus,
             serve_options=serve_options,
-            wait_for_post_deploy_sync=False,
+            wait_for_post_deploy_sync=True,
         )
         return class_name, deployment_name
 
