@@ -588,6 +588,11 @@ class MarketPriceIngestService(ServiceTask):
         if not self._begin_run_loop():
             return
 
+        # Publish a deterministic window immediately so downstream demo steps
+        # are not blocked by a quiet-but-connected websocket source.
+        if not self.window:
+            self._load_fallback_window()
+
         source = WebSocketSource(
             url=self.websocket_url,
             batch_size=self.batch_size,
