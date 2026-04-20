@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 import json
+import os
 import traceback
 
 from loguru import logger
@@ -18,6 +19,9 @@ class StrategyAgent(BaseAgent, LangChainMixin):
     """
 
     CAPABILITIES = ["strategy", "trading_signal"]
+
+    def _strict_no_fallback(self) -> bool:
+        return str(os.environ.get("DEMO_STRICT_NO_FALLBACK", "1")).strip().lower() not in {"0", "false", "no", "off"}
 
     def build_executor(self):
         def _execute(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -50,6 +54,8 @@ class StrategyAgent(BaseAgent, LangChainMixin):
                     if isinstance(response, dict):
                         analyst_result = self._normalize_analyst_result(response)
                 except Exception as exc:
+                    if self._strict_no_fallback():
+                        raise RuntimeError(f"[StrategyAgent] Market analyst delegation failed and fallback is disabled: {exc}") from exc
                     logger.error(f"[StrategyAgent] Market analyst delegation failed: {exc}")
 
             sentiment_label = analyst_result["label"]
@@ -68,6 +74,8 @@ class StrategyAgent(BaseAgent, LangChainMixin):
                     llm=llm,
                 )
             else:
+                if self._strict_no_fallback():
+                    raise RuntimeError("[StrategyAgent] No LLM is configured and fallback is disabled.")
                 logger.debug("[StrategyAgent] No LLM available. Using programmatic fallback.")
                 action, confidence = self._generate_signal_heuristic(trend_score, sentiment_score)
 
@@ -184,6 +192,8 @@ class StrategyAgent(BaseAgent, LangChainMixin):
             confidence = float(parsed.get("confidence", 0.0))
             return action, min(max(confidence, 0.0), 1.0)
         except Exception as exc:
+            if self._strict_no_fallback():
+                raise RuntimeError(f"[StrategyAgent] LLM signal failed and fallback is disabled: {exc}") from exc
             logger.error(f"[StrategyAgent] LLM signal failed: {exc}. Falling back to heuristic.")
             return self._generate_signal_heuristic(trend_score, sentiment_score)
 

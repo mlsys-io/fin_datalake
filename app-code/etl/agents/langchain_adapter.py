@@ -138,7 +138,8 @@ class LangChainMixin:
                 }
                 if json_mode:
                     kwargs["convert_system_message_to_human"] = True
-                return ChatGoogleGenerativeAI(**kwargs)
+                with self._public_llm_ssl_env():
+                    return ChatGoogleGenerativeAI(**kwargs)
             else:
                 logger.warning("[LangChainMixin] GOOGLE_API_KEY not set or is a placeholder.")
         except ImportError:

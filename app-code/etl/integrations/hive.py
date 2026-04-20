@@ -126,7 +126,7 @@ class HiveClient(DependencyAwareMixin):
             self._create_database(db_name)
 
         try:
-            self._client.get_table(db_name, table_name)
+            self.get_table(db_name, table_name)
             return
         except HMS.NoSuchObjectException:
             pass
@@ -160,7 +160,12 @@ class HiveClient(DependencyAwareMixin):
         Returns the raw Hive Table object.
         """
         self._connect()
-        return self._client.get_table(db_name, table_name)
+        if hasattr(self._client, "get_table"):
+            return self._client.get_table(db_name, table_name)
+        if hasattr(self._client, "get_table_req"):
+            request = self._HMS.GetTableRequest(dbName=db_name, tblName=table_name)
+            return self._client.get_table_req(request)
+        raise AttributeError("Hive metastore client supports neither get_table nor get_table_req")
 
     def _create_database(self, db_name: str):
         HMS = self._HMS
@@ -256,4 +261,3 @@ class HiveClient(DependencyAwareMixin):
                 ht = "binary"
             cols.append((f.name, ht))
         return cols
-

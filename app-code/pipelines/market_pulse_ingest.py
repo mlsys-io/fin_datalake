@@ -36,6 +36,7 @@ PRICE_STREAM_RISINGWAVE_TABLE = str(os.environ.get("DEMO_RISINGWAVE_PRICE_TABLE"
 SIGNAL_RISINGWAVE_TABLE = str(os.environ.get("DEMO_RISINGWAVE_SIGNAL_TABLE", "market_pulse_signals")).strip() or "market_pulse_signals"
 
 FMP_API_KEY = str(os.environ.get("FMP_API_KEY", "")).strip()
+STRICT_NO_FALLBACK = str(os.environ.get("DEMO_STRICT_NO_FALLBACK", "1")).strip().lower() not in {"0", "false", "no", "off"}
 PRICE_SERVICE_CONFIG_FIELDS = (
     "websocket_url",
     "symbol",
@@ -295,6 +296,8 @@ class MarketNewsIngestTask(BaseTask):
             fallback_used = False
             source_error = None
         except Exception as exc:
+            if STRICT_NO_FALLBACK:
+                raise RuntimeError(f"[Ingest] News provider '{provider}' failed and fallback is disabled: {exc}") from exc
             logger.warning(f"[Ingest] News provider '{provider}' unavailable. Falling back to deterministic sample data: {exc}")
             rows = self._fallback_records(symbol)
             mode = "fallback"
@@ -588,9 +591,7 @@ class MarketPriceIngestService(ServiceTask):
         if not self._begin_run_loop():
             return
 
-        # Publish a deterministic window immediately so downstream demo steps
-        # are not blocked by a quiet-but-connected websocket source.
-        if not self.window:
+        if not STRICT_NO_FALLBACK and not self.window:
             self._load_fallback_window()
 
         source = WebSocketSource(
@@ -628,6 +629,9 @@ class MarketPriceIngestService(ServiceTask):
                         logger.warning(f"[{self.name}] Failed to persist live stream batch: {exc}")
         except Exception as exc:
             self.last_error = str(exc)
+            if STRICT_NO_FALLBACK:
+                self._publish_window()
+                raise RuntimeError(f"[{self.name}] WebSocket stream failed and fallback is disabled: {exc}") from exc
             logger.warning(f"[{self.name}] WebSocket stream failed. Publishing fallback window: {exc}")
             self._load_fallback_window()
             while self.running:
@@ -785,9 +789,10 @@ def _ensure_price_service(*, symbol: str, window_size: int) -> Dict[str, Any]:
         meta_source = str(meta.get("source") or "")
         status_matches_cfg = _service_status_matches_config(status, service_cfg)
         has_required_rows = row_count >= minimum_rows
-        has_acceptable_mode = meta_mode in {"live_stream", "fallback"}
+        acceptable_modes = {"live_stream"} if STRICT_NO_FALLBACK else {"live_stream", "fallback"}
+        has_acceptable_mode = meta_mode in acceptable_modes
         source_matches = meta_mode != "live_stream" or meta_source == service_cfg["websocket_url"]
-        fallback_ready = meta_mode == "fallback" and status_matches_cfg
+        fallback_ready = (not STRICT_NO_FALLBACK) and meta_mode == "fallback" and status_matches_cfg
         if has_required_rows and has_acceptable_mode and (source_matches or fallback_ready):
             return status
         time.sleep(1)

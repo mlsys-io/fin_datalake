@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 import json
+import os
 
 from loguru import logger
 
@@ -12,6 +13,9 @@ class MarketAnalystAgent(LangChainAgent):
     """Structured market-news analysis agent used by StrategyAgent."""
 
     CAPABILITIES = ["market_news_analysis"]
+
+    def _strict_no_fallback(self) -> bool:
+        return str(os.environ.get("DEMO_STRICT_NO_FALLBACK", "1")).strip().lower() not in {"0", "false", "no", "off"}
 
     def build_executor(self):
         llm = self._get_llm(model_name="gemini-2.5-flash", temperature=0.0, json_mode=True)
@@ -31,7 +35,11 @@ class MarketAnalystAgent(LangChainAgent):
                 try:
                     return self._analyze_with_llm(headlines, market_state, llm)
                 except Exception as exc:
+                    if self._strict_no_fallback():
+                        raise RuntimeError(f"[MarketAnalystAgent] LLM analysis failed and fallback is disabled: {exc}") from exc
                     logger.error(f"[MarketAnalystAgent] LLM analysis failed: {exc}. Using heuristic fallback.")
+            elif self._strict_no_fallback():
+                raise RuntimeError("[MarketAnalystAgent] No LLM is configured and fallback is disabled.")
 
             return self._heuristic_analysis(headlines)
 

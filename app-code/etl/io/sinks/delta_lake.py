@@ -265,6 +265,7 @@ class DeltaLakeWriter(DataWriter):
 
     def _register_in_hive(self, schema):
         """Register Delta table in Hive Metastore."""
+        import os
         from loguru import logger
         from etl.integrations.hive import HiveMetastore
         
@@ -285,7 +286,11 @@ class DeltaLakeWriter(DataWriter):
                     partition_keys=self.sink.partition_by or []
                 )
         except Exception as e:
-            logger.warning(f"Failed to register table in Hive: {e}")
+            message = f"Failed to register table in Hive: {e}"
+            if str(os.environ.get("DEMO_STRICT_NO_FALLBACK", "1")).strip().lower() not in {"0", "false", "no", "off"}:
+                logger.error(message)
+                raise RuntimeError(message) from e
+            logger.warning(message)
 
     def _clean_schema(self, table):
         """Strip timezone information from timestamp fields for Delta Lake compatibility."""
