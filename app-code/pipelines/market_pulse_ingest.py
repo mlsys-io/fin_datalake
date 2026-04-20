@@ -31,7 +31,10 @@ PRICE_WINDOW_CONTEXT_KEY = str(os.environ.get("DEMO_PRICE_WINDOW_CONTEXT_KEY", f
 PRICE_META_CONTEXT_KEY = str(os.environ.get("DEMO_PRICE_META_CONTEXT_KEY", f"market_pulse:price_meta:{DEFAULT_SYMBOL}")).strip() or f"market_pulse:price_meta:{DEFAULT_SYMBOL}"
 PRICE_METRICS_CONTEXT_KEY = str(os.environ.get("DEMO_PRICE_METRICS_CONTEXT_KEY", f"market_pulse:price_metrics:{DEFAULT_SYMBOL}")).strip() or f"market_pulse:price_metrics:{DEFAULT_SYMBOL}"
 DEFAULT_WEBSOCKET_URL = str(os.environ.get("DEMO_PRICE_WEBSOCKET_URL") or config.WEBSOCKET_URL or "wss://stream.binance.com:443/ws/btcusdt@trade").strip()
-PRICE_SERVICE_READY_TIMEOUT_SECONDS = int(os.environ.get("DEMO_PRICE_SERVICE_READY_TIMEOUT_SECONDS", "20"))
+PRICE_SERVICE_READY_TIMEOUT_SECONDS = int(os.environ.get("DEMO_PRICE_SERVICE_READY_TIMEOUT_SECONDS", "60"))
+PRICE_SERVICE_READ_TIMEOUT_SECONDS = float(os.environ.get("DEMO_PRICE_SERVICE_READ_TIMEOUT_SECONDS", "1.0"))
+FMP_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("DEMO_FMP_REQUEST_TIMEOUT_SECONDS", "20"))
+FMP_RETRIES = int(os.environ.get("DEMO_FMP_RETRIES", "4"))
 PRICE_STREAM_RISINGWAVE_TABLE = str(os.environ.get("DEMO_RISINGWAVE_PRICE_TABLE", "market_pulse_prices")).strip() or "market_pulse_prices"
 SIGNAL_RISINGWAVE_TABLE = str(os.environ.get("DEMO_RISINGWAVE_SIGNAL_TABLE", "market_pulse_signals")).strip() or "market_pulse_signals"
 
@@ -272,8 +275,9 @@ class MarketNewsIngestTask(BaseTask):
             RestApiSource(
                 url=f"{base_url}?{urlencode({'symbols': candidate, 'limit': 8, 'apikey': FMP_API_KEY})}",
                 method="GET",
-                retries=2,
+                retries=FMP_RETRIES,
                 rate_limit_delay=0.1,
+                timeout_seconds=FMP_REQUEST_TIMEOUT_SECONDS,
             )
             for candidate in self._candidate_symbols(symbol)
         ]
@@ -619,6 +623,7 @@ class MarketPriceIngestService(ServiceTask):
                         self.last_error = None
                         self.last_tick_at = time.time()
                         self._update_metrics(rows)
+                        self._publish_window()
                         self._persist_rows(rows, delta_mode=delta_mode)
                         self._publish_window()
                         self._log_batch_summary(rows)
@@ -714,7 +719,7 @@ def _price_service_cfg(*, symbol: str, window_size: int) -> Dict[str, Any]:
         "delta_uri": ohlc_stream_uri(),
         "risingwave_table": PRICE_STREAM_RISINGWAVE_TABLE,
         "batch_size": 20,
-        "read_timeout": 1.0,
+        "read_timeout": PRICE_SERVICE_READ_TIMEOUT_SECONDS,
     }
 
 

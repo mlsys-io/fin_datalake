@@ -33,6 +33,7 @@ class RestApiSource(DataSource):
     pagination: Optional[PaginationConfig] = None
     retries: int = 3
     rate_limit_delay: float = 0.0
+    timeout_seconds: float = 20.0
     
     def __post_init__(self):
         """Validate URL format."""
@@ -139,7 +140,8 @@ class RestApiReader(DataReader):
             resp = self._session.request(
                 method=self.source.method,
                 url=self.source.url,
-                params=params
+                params=params,
+                timeout=self.source.timeout_seconds,
             )
             resp.raise_for_status()
             return self._normalize(resp.json())
