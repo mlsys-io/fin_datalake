@@ -795,6 +795,18 @@ def _ensure_price_service(*, symbol: str, window_size: int) -> Dict[str, Any]:
     )
 
 
+def _ensure_price_service_on_compute(symbol: str, window_size: int) -> Dict[str, Any]:
+    import ray
+
+    ensure_ray()
+
+    @ray.remote(num_cpus=0)
+    def _ensure_remote(requested_symbol: str, requested_window_size: int) -> Dict[str, Any]:
+        return _ensure_price_service(symbol=requested_symbol, window_size=requested_window_size)
+
+    return ray.get(_ensure_remote.remote(symbol, window_size))
+
+
 @flow(
     name="Market Pulse Ingest",
     description="Market demo ingestion using Prefect-on-Ray tasks plus a Ray ServiceTask for streaming prices.",
@@ -806,7 +818,7 @@ def market_pulse_ingest(
 ) -> Dict[str, Any]:
     logger.info(f"=== Starting Market Pulse Ingest Flow for {symbol} (provider={provider}) ===")
 
-    service_status = _ensure_price_service(
+    service_status = _ensure_price_service_on_compute(
         symbol=symbol,
         window_size=DEFAULT_PRICE_WINDOW_SIZE,
     )

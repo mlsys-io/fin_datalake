@@ -22,10 +22,7 @@ class ContextStore:
     """
 
     def __init__(self, redis_url: str = None):
-        from etl.utils.logging import setup_logging
         from loguru import logger
-
-        setup_logging(component="context")
 
         url = redis_url or os.getenv("OVERSEER_REDIS_URL", "redis://localhost:6379/0")
         self._client = redis.Redis.from_url(url, decode_responses=True)
